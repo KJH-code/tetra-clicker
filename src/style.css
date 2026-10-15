@@ -186,3 +186,12 @@ canvas { display: block; image-rendering: pixelated; }
 .chip-tip[hidden] { display: none; }
 .chip-tip .tip-price { color: var(--ok); font-variant-numeric: tabular-nums; margin-top: 2px; }
 .chip-tip .rule { margin-left: 8px; font-size: 10px; color: #000; background: var(--ok); border-radius: 4px; padding: 1px 4px; }
+
+.chip.wrath { border-color: #ff3b3b80; color: #ff3b3b; }
+/* During a round the shop is closed: dim it and say so once. */
+#shop-pane.in-round .building, #shop-pane.in-round .chips { opacity: 0.35; pointer-events: none; }
+#shop-pane.in-round::after {
+  content: 'LOCKED · ROUND IN PLAY';
+  position: absolute; left: 16px; right: 16px; bottom: 64px;
+  text-align: center; font-size: 11px; letter-spacing: 0.3em; color: var(--warn);
+}

@@ -10,6 +10,7 @@ import { BoardRenderer, type BoardView } from './render/boardRenderer';
 import { Fx } from './render/fx';
 import { animatedPlacement, isLanded, type BotAnimation } from './render/botAnim';
 import { PIECE_COLORS } from './render/theme';
+import { drawRoundHud } from './render/roundHud';
 import { InputHandler } from './ui/input';
 import { Shop } from './ui/shop';
 import { SettingsPanel } from './ui/settings';
@@ -52,7 +53,14 @@ function ensureAutoViews(): void {
 const input = new InputHandler({
   game: world.manual,
   onHardDrop: () => { world.manualHardDrop(); },
+  gate: () => (!world.round.active ? 'start' : world.round.paused ? 'resume' : 'play'),
+  start: () => { world.startRound(); },
+  resume: () => { world.resumeRound(); },
+  onSettleTap: () => { world.tapSettle(); },
 }, settings);
+// A round cannot be played from another tab or window: pause it.
+document.addEventListener('visibilitychange', () => { if (document.hidden) world.pauseRound(); });
+window.addEventListener('blur', () => world.pauseRound());
 input.attach(window);
 input.setActive(true);
 
@@ -88,10 +96,6 @@ function handleEvent(e: WorldEvent): void {
         const label = clearLabel(r);
         if (label) manualFx.float(label, cx, cy - 26, { color: '#ffffff', size: 13, dur: 1100 });
       }
-      if (r.topped) {
-        manualFx.shakeBoard(4);
-        manualFx.float('RESET', manual.cellX(5), manual.cellY(30), { color: '#ff3b3b', size: 20, dur: 1200 });
-      }
       break;
     }
     case 'botMove': {
@@ -113,6 +117,27 @@ function handleEvent(e: WorldEvent): void {
       shop.refresh(true);
       break;
     case 'slept':
+      break;
+    case 'roundStart':
+      manualFx.float('GO', manual.cellX(5), manual.cellY(29), { color: '#00f0ff', size: 30, dur: 700 });
+      shop.refresh(true);
+      break;
+    case 'settleStart':
+      manualFx.float('SETTLING', manual.cellX(5), manual.cellY(24), { color: '#39ff14', size: 18, dur: 900 });
+      break;
+    case 'garbage':
+      manualFx.shakeBoard(1);
+      break;
+    case 'roundEnd': {
+      const settled = e.outcome === 'settled';
+      manualFx.shakeBoard(settled ? 2 : 6);
+      manualFx.float(settled ? `+${format(e.deposited)}` : `−${format(e.forfeited)}`, manual.cellX(5), manual.cellY(25),
+        { color: settled ? '#39ff14' : '#ff3b3b', size: 30, dur: 1600 });
+      manualFx.float(settled ? 'BANKED' : 'TOPPED OUT', manual.cellX(5), manual.cellY(23), { color: '#ffffff', size: 16, dur: 1600 });
+      shop.refresh(true);
+      break;
+    }
+    case 'paused':
       break;
   }
 }
@@ -174,7 +199,7 @@ function render(): void {
     grid: g.grid, active: g.active, ghostY: g.active ? g.ghostY() : null,
     holds: g.holds, holdUsed: g.holdUsed, next: g.next(),
   };
-  manual.render(view, manualFx);
+  manual.render(view, manualFx, (ctx) => drawRoundHud(ctx, manual, world.round, world.wrath()));
   ensureAutoViews();
   world.autoBoards.forEach((board, i) => {
     const v = autoViews[i]!;

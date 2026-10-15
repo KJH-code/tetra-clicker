@@ -11,7 +11,7 @@ export class Shop {
   private lastBalance = NaN;
   private chips: UpgradeChips;
 
-  constructor(root: HTMLElement, private world: World, onSettings: () => void) {
+  constructor(private root: HTMLElement, private world: World, onSettings: () => void) {
     root.innerHTML = '';
     const balance = stat('LINES', 'balance');
     const income = stat('PER SECOND', 'income', true);
@@ -58,6 +58,8 @@ export class Shop {
       this.lastBalance = balance;
     }
     this.incomeEl.textContent = `${format(this.world.incomePerSecond())}/s`;
+    // Shopping happens between rounds.
+    this.root.classList.toggle('in-round', this.world.round.active);
     this.chips.refresh();
     // Unlocked buildings show in full; only the next locked one is visible,
     // dimmed and unnamed, so the ladder is hinted at one step at a time.
@@ -76,7 +78,7 @@ export class Shop {
       ui.owned.textContent = String(this.world.economy.owned(b.id));
       ui.price.textContent = format(price);
       ui.price.classList.toggle('cant', !can);
-      ui.btn.disabled = !can;
+      ui.btn.disabled = !can || this.world.round.active;
     }
   }
 }

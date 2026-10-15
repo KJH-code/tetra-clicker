@@ -65,3 +65,44 @@ describe('DAS / ARR', () => {
     expect(drops()).toBe(2);
   });
 });
+
+describe('round gating', () => {
+  function gated(gate: 'play' | 'start' | 'resume') {
+    const game = new Game(5);
+    const calls: string[] = [];
+    const win = new FakeWindow();
+    const input = new InputHandler({
+      game,
+      onHardDrop: () => calls.push('drop'),
+      gate: () => gate,
+      start: () => calls.push('start'),
+      resume: () => calls.push('resume'),
+      onSettleTap: () => calls.push('settle'),
+    }, structuredClone(DEFAULT_HANDLING));
+    input.attach(win as unknown as Window);
+    input.setActive(true);
+    return { game, win, input, calls };
+  }
+
+  it('between rounds the first key starts the round and does nothing else', () => {
+    const { game, win, calls } = gated('start');
+    const x = game.active!.x;
+    win.fire('keydown', 'ArrowLeft');
+    expect(calls).toEqual(['start']);
+    expect(game.active!.x).toBe(x);
+  });
+
+  it('while paused any key resumes', () => {
+    const { win, calls } = gated('resume');
+    win.fire('keydown', 'Space');
+    expect(calls).toEqual(['resume']);
+  });
+
+  it('the settle key reports taps during play', () => {
+    const { win, calls } = gated('play');
+    win.fire('keydown', 'Enter');
+    win.fire('keyup', 'Enter');
+    win.fire('keydown', 'Enter');
+    expect(calls).toEqual(['settle', 'settle']);
+  });
+});

@@ -17,6 +17,7 @@ export interface KeyBindings {
   rotateCCW: string[];
   rotate180: string[];
   hold: string[];
+  settle: string[];
 }
 
 export const SDF_INSTANT = 41;
@@ -44,6 +45,7 @@ export const DEFAULT_HANDLING: HandlingSettings = {
     rotateCCW: ['KeyZ', 'ControlLeft'],
     rotate180: ['KeyA'],
     hold: ['ShiftLeft', 'KeyC'],
+    settle: ['Enter'],
   },
 };
 
@@ -56,4 +58,5 @@ export const ACTION_LABELS: Record<keyof KeyBindings, string> = {
   rotateCCW: 'CCW',
   rotate180: '180',
   hold: 'HOLD',
+  settle: 'SETTLE',
 };

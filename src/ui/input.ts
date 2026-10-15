@@ -3,9 +3,16 @@ import { SDF_INSTANT, SOFT_DROP_CELLS_PER_SECOND_PER_SDF, type HandlingSettings,
 
 export type Action = keyof KeyBindings;
 
+// What a key press means right now: play, start a round, or resume one.
+export type InputGate = 'play' | 'start' | 'resume';
+
 export interface InputHost {
   game: Game;
   onHardDrop(): void;
+  gate?(): InputGate;
+  start?(): void;
+  resume?(): void;
+  onSettleTap?(): void;
 }
 
 // Keyboard → game actions with guideline handling. Horizontal movement
@@ -47,6 +54,12 @@ export class InputHandler {
     e.preventDefault();
     if (this.down.has(e.code)) return; // OS key repeat; DAS handles repeats
     this.down.add(e.code);
+    // Between rounds or while paused, the first key only starts or resumes:
+    // it should not also move a piece the player has not looked at yet.
+    const gate = this.host.gate?.() ?? 'play';
+    if (gate === 'start') { this.host.start?.(); return; }
+    if (gate === 'resume') { this.host.resume?.(); return; }
+    if (action === 'settle') { this.host.onSettleTap?.(); return; }
     const game = this.host.game;
     switch (action) {
       case 'left':
@@ -108,6 +121,7 @@ export class InputHandler {
   // Called every frame with the elapsed time.
   update(dtMs: number): void {
     if (!this.active) return;
+    if ((this.host.gate?.() ?? 'play') !== 'play') { this.horizontal = null; this.softMs = 0; return; }
     const h = this.horizontal;
     if (h) {
       h.heldMs += dtMs;
