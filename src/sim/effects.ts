@@ -6,11 +6,12 @@ import { hasAll, type Tag } from './tags';
 export type EffectTarget = 'income' | 'price' | (string & {});
 export type EffectOp = 'add_pct' | 'mul' | 'flag';
 
-export interface Condition {
-  type: 'owned';
-  id: string;
-  gte: number;
-}
+// Conditions are data too: owning enough of a building, a play statistic
+// reaching a threshold, or having bought an upgrade.
+export type Condition =
+  | { type: 'owned'; id: string; gte: number }
+  | { type: 'stat'; stat: string; gte: number }
+  | { type: 'upgrade'; id: string };
 
 export interface Effect {
   target: EffectTarget;
@@ -23,10 +24,17 @@ export interface Effect {
 
 export interface EffectContext {
   owned(id: string): number;
+  stat?(name: string): number;
+  hasUpgrade?(id: string): boolean;
 }
 
-export const conditionMet = (c: Condition, ctx: EffectContext): boolean =>
-  c.type === 'owned' ? ctx.owned(c.id) >= c.gte : false;
+export function conditionMet(c: Condition, ctx: EffectContext): boolean {
+  switch (c.type) {
+    case 'owned': return ctx.owned(c.id) >= c.gte;
+    case 'stat': return (ctx.stat?.(c.stat) ?? 0) >= c.gte;
+    case 'upgrade': return ctx.hasUpgrade?.(c.id) ?? false;
+  }
+}
 
 function effectiveValue(e: Effect, ctx: EffectContext): number {
   if (!e.stack) return e.value;
@@ -61,4 +69,12 @@ export function evaluate(effects: readonly Effect[], target: EffectTarget, tags:
 
 export function flag(effects: readonly Effect[], target: EffectTarget, tags: readonly Tag[], ctx: EffectContext): boolean {
   return effects.some((e) => e.op === 'flag' && e.value !== 0 && applicable(e, target, tags, ctx));
+}
+
+// How many active flags a target has. Rules that come in steps (two grace
+// pieces instead of one) are expressed as several flags rather than a new op.
+export function flagCount(effects: readonly Effect[], target: EffectTarget, ctx: EffectContext): number {
+  let n = 0;
+  for (const e of effects) if (e.op === 'flag' && e.value !== 0 && applicable(e, target, [], ctx)) n++;
+  return n;
 }

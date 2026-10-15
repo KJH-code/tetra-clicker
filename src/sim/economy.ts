@@ -1,12 +1,16 @@
 import { BUILDINGS, buildingById } from '../data/buildings';
 import { allEffects } from '../data/index';
-import { evaluate, type Effect, type EffectContext } from './effects';
+import { conditionMet, evaluate, type Effect, type EffectContext } from './effects';
+import { upgradeById } from '../data/upgrades';
+import { emptyStats, type Stats } from './stats';
 import { tag } from './tags';
 import { add, gte, mul, num, pow, sub, toNumber, ZERO, type Num } from './num';
 
 export class Economy implements EffectContext {
   balance: Num = ZERO;
   private ownedCount = new Map<string, number>();
+  readonly upgrades = new Set<string>();
+  stats: Stats = emptyStats();
   readonly effects: Effect[];
 
   constructor(effects: Effect[] = allEffects()) {
@@ -19,6 +23,33 @@ export class Economy implements EffectContext {
 
   setOwned(id: string, n: number): void {
     this.ownedCount.set(id, n);
+  }
+
+  stat(name: string): number {
+    return (this.stats as unknown as Record<string, number>)[name] ?? 0;
+  }
+
+  hasUpgrade(id: string): boolean {
+    return this.upgrades.has(id);
+  }
+
+  // --- upgrades ---------------------------------------------------------------
+
+  isUpgradeUnlocked(id: string): boolean {
+    const def = upgradeById(id);
+    return !!def && !this.upgrades.has(id) && def.unlock.every((c) => conditionMet(c, this));
+  }
+
+  canBuyUpgrade(id: string): boolean {
+    const def = upgradeById(id);
+    return !!def && this.isUpgradeUnlocked(id) && gte(this.balance, num(def.price));
+  }
+
+  buyUpgrade(id: string): boolean {
+    if (!this.canBuyUpgrade(id)) return false;
+    this.balance = sub(this.balance, num(upgradeById(id)!.price));
+    this.upgrades.add(id);
+    return true;
   }
 
   price(id: string): Num {
@@ -51,8 +82,8 @@ export class Economy implements EffectContext {
     return evaluate(this.effects, 'income', tags, this, 1);
   }
 
-  snapshot(): { balance: Num; owned: Record<string, number> } {
-    return { balance: this.balance, owned: Object.fromEntries(this.ownedCount) };
+  snapshot(): { balance: Num; owned: Record<string, number>; upgrades: string[]; stats: Stats } {
+    return { balance: this.balance, owned: Object.fromEntries(this.ownedCount), upgrades: [...this.upgrades].sort(), stats: { ...this.stats } };
   }
 
   static buildingIds(): string[] {
