@@ -1,5 +1,5 @@
 import {
-  WIDTH, TOP_VISIBLE_ROW, createGrid, collides, dropDistance, lockPiece,
+  WIDTH, HEIGHT, TOP_VISIBLE_ROW, createGrid, collides, dropDistance, lockPiece,
   clearFullRows, isEmpty, occupiedCells, type Grid, type Placement,
   serializeGrid, deserializeGrid,
 } from './board';
@@ -8,6 +8,7 @@ import { kicksFor } from './kicks';
 import { createBag, type Bag } from './bag';
 import { createRng, restoreRng } from './rng';
 import { detectSpin, type SpinKind } from './spin';
+import { DANGER, GARBAGE_ID } from '../data/danger';
 
 // What one locked piece did. attack.ts turns this into Lines; the renderer
 // turns it into flashes.
@@ -66,6 +67,10 @@ export class Game {
   // Non-clearing pieces placed since the combo's last clear.
   private graceUsed = 0;
   private shieldSpent = false;
+  // Gravity and lock delay, used only when a round turns gravity on.
+  private fallMs = 0;
+  private lockMs = 0;
+  private lockResets = 0;
   // -1 = no run in progress; otherwise the index the next clear will use.
   combo = -1;
   // -1 = no chain; 0 = one qualifying clear made, the next one extends it.
@@ -138,6 +143,9 @@ export class Game {
     const p = this.spawnPlacement(piece ?? this.bag.take());
     this.lastActionWasRotation = false;
     this.lastKickIndex = -1;
+    this.fallMs = 0;
+    this.lockMs = 0;
+    this.lockResets = 0;
     if (collides(this.grid, p)) {
       this.active = p;
       return false;
@@ -152,6 +160,7 @@ export class Game {
     if (collides(this.grid, moved)) return false;
     this.active = moved;
     this.lastActionWasRotation = false;
+    this.touched();
     return true;
   }
 
@@ -172,10 +181,68 @@ export class Game {
         this.active = candidate;
         this.lastActionWasRotation = true;
         this.lastKickIndex = i;
+        this.touched();
         return true;
       }
     }
     return false;
+  }
+
+  // A move or turn while resting buys more lock delay, up to the reset limit,
+  // so a piece cannot be stalled forever.
+  private touched(): void {
+    if (this.lockMs > 0 && this.lockResets < DANGER.lockResetLimit) {
+      this.lockMs = 0;
+      this.lockResets += 1;
+    }
+  }
+
+  // Gravity for `dtMs` at `cellsPerSecond`, with lock delay once the piece
+  // rests. Returns the lock result if the piece locked on its own.
+  tick(dtMs: number, cellsPerSecond: number): LockResult | null {
+    if (!this.active || cellsPerSecond <= 0) return null;
+    this.fallMs += dtMs;
+    const interval = 1000 / cellsPerSecond;
+    let piece: Placement = this.active;
+    while (this.fallMs >= interval) {
+      this.fallMs -= interval;
+      const down: Placement = { ...piece, y: piece.y + 1 };
+      if (collides(this.grid, down)) { this.fallMs = 0; break; }
+      // A fall is not a manipulation: it clears the lock timer without
+      // spending the reset budget, and like any move it disarms a spin.
+      this.active = piece = down;
+      this.lastActionWasRotation = false;
+      this.lockMs = 0;
+    }
+    if (dropDistance(this.grid, piece) === 0) {
+      this.lockMs += dtMs;
+      if (this.lockMs >= DANGER.lockDelayMs) return this.lock();
+    } else {
+      this.lockMs = 0;
+    }
+    return null;
+  }
+
+  // Push one cheese garbage row in from the bottom with its hole at `holeX`.
+  // Returns true when that tops the player out: a block is pushed off the
+  // top of the matrix, or the active piece has nowhere to go.
+  addGarbage(holeX: number): boolean {
+    let overflow = false;
+    for (let x = 0; x < WIDTH; x++) if (this.grid[x] !== 0) overflow = true;
+    this.grid.copyWithin(0, WIDTH);
+    const bottom = (HEIGHT - 1) * WIDTH;
+    for (let x = 0; x < WIDTH; x++) this.grid[bottom + x] = x === holeX ? 0 : GARBAGE_ID;
+    if (this.active && collides(this.grid, this.active)) {
+      const lifted = { ...this.active, y: this.active.y - 1 };
+      if (collides(this.grid, lifted)) overflow = true;
+      else this.active = lifted;
+    }
+    return overflow;
+  }
+
+  // Clear the stack and chains: a round ending, or a top-out.
+  reset(): void {
+    this.resetBoard();
   }
 
   rotateCW(): boolean { return this.rotate(1); }
