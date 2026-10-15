@@ -227,12 +227,14 @@ export class Game {
     return { piece: p.piece, lines, spin, perfectClear, comboIndex, b2bExtended, topped, clearedRows };
   }
 
-  // Reaching the ceiling costs nothing but the stack: combo and back-to-back
-  // are dropped with it, hold and the queue stay.
+  // Reaching the ceiling costs the stack, the combo, the back-to-back chain
+  // and the held piece; only the queue carries over.
   private resetBoard(): void {
     this.grid = createGrid();
     this.combo = -1;
     this.b2b = -1;
+    this.hold = null;
+    this.holdUsed = false;
     if (this.active) this.active = this.spawnPlacement(this.active.piece);
   }
 

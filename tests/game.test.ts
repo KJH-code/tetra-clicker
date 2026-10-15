@@ -54,7 +54,7 @@ describe('Game basics', () => {
     expect(g.swapHold()).toBe(false);
   });
 
-  it('resets the board, combo and b2b when the spawn is blocked, keeps hold', () => {
+  it('resets the board, combo, b2b and hold when the spawn is blocked', () => {
     const full: string[] = [];
     for (let i = 0; i < 19; i++) full.push('XXXXXXXXX.');
     const g = gameWith(full, 'O', ['T', 'I', 'S', 'Z', 'J', 'L']);
@@ -64,7 +64,9 @@ describe('Game basics', () => {
     expect(r.topped).toBe(true);
     expect(serializeGrid(g.grid)).toBe('');
     expect(g.combo).toBe(-1);
-    expect(g.hold).toBe('O');
+    expect(g.b2b).toBe(-1);
+    expect(g.hold).toBeNull();
+    expect(g.holdUsed).toBe(false);
   });
 
   it('snapshot round-trips', () => {
