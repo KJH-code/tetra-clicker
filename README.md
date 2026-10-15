@@ -82,8 +82,8 @@ base → sum of all `add_pct` → product of all `mul`.
 |---|---|---|---|
 | SINGLE | 15 | 1 | 0.4 |
 | DOUBLE | 60 | 2 | 0.445 |
-| TRIPLE | 250 | 3 | 0.475 |
-| TETRIS | 900 | 4 | 0.62 |
+| TRIPLE | 150 | 3 | 0.475 |
+| TETRIS | 500 | 4 | 0.62 |
 
 Each building unlocks after one copy of the previous tier. Its bot never
 clears more rows at once than its size, never tops out, and is paid the
@@ -100,7 +100,7 @@ except registering the bot's placement policy:
 
 ```ts
 //   id        name       price clear  Lines/piece  unlocked by
-tier('tspin', 'T-SPIN', 3000, 2, 0.8, 'tetris'),
+tier('tspin', 'T-SPIN', 2000, 2, 0.8, 'tetris'),
 ```
 
 `tier` fills in the rest: price growth 1.15, 1 PPS, the
@@ -112,6 +112,39 @@ shop button, lock, price curve, income, catch-up and save all come from the
 data entry. Measure the bot's Lines per piece with a 10,000-piece run and put
 that number in the entry and in `src/data/ladder.ts`.
 
+## Upgrades
+
+Bought once each; they show up as chips above the buildings when they
+unlock. All of them are data in `src/data/upgrades.ts`.
+
+| group | unlock | effect |
+|---|---|---|
+| milestone ×2 (generated per building) | own 1 / 5 / 25 / 50 / 100 | that building's income ×2 |
+| manual ×2 | 100 / 1K / 10K / 100K / 1M Lines earned by hand | manual income ×2 |
+| SPIN / B2B / PC | that technique done 10 / 50 / 200 times (PC 1 / 5 / 20) | ×1.5, ×2, ×2 on clears with that tag |
+| COMBO | 5 / 25 / 100 runs reaching a 5 combo | combo step 0.1 → 0.15 → 0.2 → 0.25 |
+| GRACE | 5 combo 10 / 50 times | a combo survives 1, then 2, empty pieces |
+| SHIELD | 25 back-to-back clears | one ordinary clear per chain does not break B2B |
+| NEXT+1 / HOLD2 | 500 / 2,000 manual pieces | six next pieces / a two-slot hold queue |
+
+Technique upgrades and buffs only matter on the manual board: bots earn no
+technique bonuses and always play guideline rules. GRACE, SHIELD, NEXT+1 and
+HOLD2 change the rules of Tetris itself and say RULE in their tooltip.
+
+Each tier of a chain needs the previous one bought, so one chip per chain
+shows at a time. Conditions are data — `{ type: 'owned' | 'stat' |
+'upgrade', … }` — and the loader makes every upgrade effect depend on owning
+the upgrade, so an entry is only:
+
+```ts
+{ id: 'pc_1', name: 'PC ×1.5 (1)', label: 'PC×1.5', group: 'tech', price: 1_000,
+  unlock: [{ type: 'stat', stat: 'pcs', gte: 1 }],
+  effects: [{ target: 'income', filter: ['tech:pc'], op: 'mul', value: 1.5 }] }
+```
+
+A new stat counter (in `src/sim/stats.ts`) is all a new kind of unlock
+needs; a new rule flag needs the manual game to read it.
+
 ## Economy simulator
 
 https://kjh-code.github.io/tetra-clicker/sim.html (dev: `/sim.html`)
@@ -119,7 +152,8 @@ https://kjh-code.github.io/tetra-clicker/sim.html (dev: `/sim.html`)
 A second page that runs the whole building ladder through the catch-up
 formula (`PPS × lines per piece × multiplier`) with the game's own pricing
 and bonus code, under a player model (PPS, lines per piece, a focus window,
-then a daily allowance) and a greedy shortest-payback buyer. It plots income
+then a daily allowance) and a greedy shortest-payback buyer that also buys
+the milestone and manual ×2 upgrades (toggle UPGRADES to compare). It plots income
 over time with each building's first purchase, lists unlock times against a
 target of `first × ratio^k`, and exports the numbers as JSON in the shape of
 `src/data/ladder.ts`. The ladder file holds the nine buildings' numbers for
@@ -128,5 +162,6 @@ tuning; the first four have bots and shop entries so far.
 ## Save
 
 localStorage, key `tetra-clicker/save`, every 10 s plus on tab hide and
-unload. The file has a `version`; `src/save/schema.ts` holds the migration
-list for future versions.
+unload. The file has a `version` (now 2); `src/save/schema.ts` upgrades
+older saves step by step, so a version 1 save loads with no upgrades and
+zeroed stats.
