@@ -10,9 +10,16 @@ export interface Stats {
   combo5: number; // runs that reached a 5 combo
   b2bs: number; // clears that extended a back-to-back chain
   pcs: number; // perfect clears
+  // Risk-weighted Lines: every manual Line times the danger it was earned at.
+  // Prestige will be paid from this; for now it is only recorded.
+  riskLines: number;
+  rounds: number;
+  roundsSettled: number;
 }
 
-export const emptyStats = (): Stats => ({ manualLines: 0, manualPieces: 0, spins: 0, combo5: 0, b2bs: 0, pcs: 0 });
+export const emptyStats = (): Stats => ({
+  manualLines: 0, manualPieces: 0, spins: 0, combo5: 0, b2bs: 0, pcs: 0, riskLines: 0, rounds: 0, roundsSettled: 0,
+});
 
 // The combo index the HUD shows as "5 COMBO".
 const COMBO_MILESTONE = 5;

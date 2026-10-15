@@ -1,7 +1,7 @@
 import type { WorldSnapshot } from '../sim/world';
 import type { HandlingSettings } from '../data/handling';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface SaveData {
   version: number;
@@ -29,6 +29,13 @@ const MIGRATIONS: Migration[] = [
       g['graceUsed'] ??= 0;
       g['shieldSpent'] ??= false;
     }
+    return raw;
+  },
+  // 2 → 3: rounds arrive. An old save is between rounds; new stats default
+  // to zero when the world loads.
+  (raw) => {
+    const world = raw['world'] as Record<string, unknown>;
+    world['round'] ??= null;
     return raw;
   },
 ];

@@ -8,7 +8,7 @@ export interface UpgradeDef {
   id: string;
   label: string;
   name: string;
-  group: 'milestone' | 'manual' | 'tech' | 'buff';
+  group: 'milestone' | 'manual' | 'tech' | 'buff' | 'wrath';
   price: number;
   unlock: Condition[];
   effects: Effect[];
@@ -104,6 +104,18 @@ const buffs: UpgradeDef[] = [
     unlock: [{ type: 'stat', stat: 'manualPieces', gte: 2_000 }], effects: [{ target: 'rule:hold2', op: 'flag', value: 1 }] },
 ];
 
-export const UPGRADES: UpgradeDef[] = [...BUILDINGS.flatMap(milestonesFor), ...MANUAL_UPGRADES, ...tech, ...buffs];
+// Wrath: buying it turns on the manual board's death elements a stage at a
+// time (I garbage, II gravity, III faster danger) and raises the starting
+// danger, which multiplies manual income. There is no way back before prestige.
+const wrath = chain({ group: 'wrath', rule: true }, ['I', 'II', 'III'].map((n, i) => ({
+  id: `wrath_${i + 1}`,
+  name: `WRATH ${n}: ${['garbage', '+ gravity', '+ danger rises twice as fast'][i]}`,
+  label: `WRATH ${n}`,
+  price: [1_000, 10_000, 100_000][i]!,
+  unlock: [{ type: 'stat', stat: 'rounds', gte: 1 }] as Condition[],
+  effects: [{ target: 'rule:wrath', op: 'flag', value: 1 }] as Effect[],
+})));
+
+export const UPGRADES: UpgradeDef[] = [...BUILDINGS.flatMap(milestonesFor), ...MANUAL_UPGRADES, ...tech, ...buffs, ...wrath];
 
 export const upgradeById = (id: string): UpgradeDef | undefined => UPGRADES.find((u) => u.id === id);
