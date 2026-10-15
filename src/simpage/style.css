@@ -14,7 +14,7 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
-#sim { display: grid; grid-template-columns: 430px 1fr; gap: 16px; height: 100%; padding: 16px; }
+#sim { display: grid; grid-template-columns: 460px 1fr; gap: 16px; height: 100%; padding: 16px; }
 #controls, #output {
   background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; overflow: auto;
 }
@@ -29,7 +29,7 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
 th { color: var(--dim); font-weight: 400; font-size: 10px; letter-spacing: 0.1em; text-align: right; padding: 4px 4px; border-bottom: 1px solid var(--line); }
 th:first-child, td:first-child { text-align: left; }
 td { padding: 3px 4px; text-align: right; border-bottom: 1px solid #10101f; }
-td input { width: 60px; background: #11112a; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 2px 5px; text-align: right; font-variant-numeric: tabular-nums; }
+td input { width: 52px; background: #11112a; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 2px 5px; text-align: right; font-variant-numeric: tabular-nums; }
 td input:focus { outline: none; border-color: var(--accent); }
 .ratio.good { color: var(--ok); }
 .ratio.off { color: var(--warn); }
@@ -45,3 +45,5 @@ canvas { display: block; width: 100%; }
 .summary { display: flex; gap: 24px; color: var(--dim); font-size: 11px; letter-spacing: 0.1em; }
 .summary b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 @media (max-width: 1000px) { #sim { grid-template-columns: 1fr; } }
+/* Prices run to ten digits; the other columns stay narrow. */
+td:nth-child(2) input { width: 92px; }
