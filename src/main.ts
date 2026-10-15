@@ -109,6 +109,9 @@ function handleEvent(e: WorldEvent): void {
       ensureAutoViews();
       shop.refresh(true);
       break;
+    case 'upgraded':
+      shop.refresh(true);
+      break;
     case 'slept':
       break;
   }
@@ -169,14 +172,14 @@ function render(): void {
   const g = world.manual;
   const view: BoardView = {
     grid: g.grid, active: g.active, ghostY: g.active ? g.ghostY() : null,
-    hold: g.hold, holdUsed: g.holdUsed, next: g.next(5),
+    holds: g.holds, holdUsed: g.holdUsed, next: g.next(),
   };
   manual.render(view, manualFx);
   ensureAutoViews();
   world.autoBoards.forEach((board, i) => {
     const v = autoViews[i]!;
     const def = buildingById(board.buildingId);
-    const hold = { hold: board.game.hold, holdUsed: false, next: [] as never[] };
+    const hold = { holds: board.game.holds, holdUsed: false, next: [] as never[] };
     if (v.anim) {
       const p = animatedPlacement(v.anim);
       v.renderer.render({ grid: v.anim.before, active: p, ghostY: null, ...hold }, v.fx, (ctx) => label(ctx, v.renderer, def?.name ?? board.buildingId));

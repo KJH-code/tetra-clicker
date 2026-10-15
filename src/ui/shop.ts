@@ -1,6 +1,7 @@
 import type { World } from '../sim/world';
 import { format } from '../sim/num';
 import { BUILDINGS } from '../data/buildings';
+import { UpgradeChips } from './upgradeChips';
 
 // Right pane: balance, income, one button per building, settings.
 export class Shop {
@@ -8,6 +9,7 @@ export class Shop {
   private incomeEl: HTMLElement;
   private buttons = new Map<string, { btn: HTMLButtonElement; owned: HTMLElement; price: HTMLElement }>();
   private lastBalance = NaN;
+  private chips: UpgradeChips;
 
   constructor(root: HTMLElement, private world: World, onSettings: () => void) {
     root.innerHTML = '';
@@ -16,6 +18,7 @@ export class Shop {
     this.balanceEl = balance.value;
     this.incomeEl = income.value;
     root.append(balance.el, income.el);
+    this.chips = new UpgradeChips(root, world, () => this.refresh(true));
 
     for (const b of BUILDINGS) {
       const btn = document.createElement('button');
@@ -55,6 +58,7 @@ export class Shop {
       this.lastBalance = balance;
     }
     this.incomeEl.textContent = `${format(this.world.incomePerSecond())}/s`;
+    this.chips.refresh();
     // Unlocked buildings show in full; only the next locked one is visible,
     // dimmed and unnamed, so the ladder is hinted at one step at a time.
     let lockedShown = false;

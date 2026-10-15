@@ -161,3 +161,28 @@ canvas { display: block; image-rendering: pixelated; }
   #app { grid-template-columns: auto 1fr; grid-template-rows: 1fr auto; }
   #shop-pane { grid-column: 1 / span 2; flex-direction: row; flex-wrap: wrap; }
 }
+
+#shop-pane { position: relative; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 0; }
+.chip {
+  font: 700 11px/1 system-ui, sans-serif; letter-spacing: 0.05em;
+  padding: 7px 8px; border-radius: 7px; cursor: pointer;
+  background: #11112a; color: var(--text); border: 1px solid var(--line);
+  box-shadow: 0 0 10px #00f0ff20;
+  transition: transform 80ms, box-shadow 120ms, border-color 120ms;
+}
+.chip:hover { box-shadow: 0 0 14px #00f0ff60; }
+.chip:active { transform: scale(0.95); }
+.chip.milestone { border-color: #00f0ff80; color: #00f0ff; }
+.chip.manual { border-color: #ffe60080; color: #ffe600; }
+.chip.tech { border-color: #ff2ed280; color: #ff2ed2; }
+.chip.buff { border-color: #39ff1480; color: #39ff14; }
+.chip.cant { opacity: 0.35; cursor: default; box-shadow: none; }
+.chip-tip {
+  position: absolute; z-index: 5; pointer-events: none;
+  background: #11112af0; border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 10px; font-size: 12px; white-space: nowrap;
+}
+.chip-tip[hidden] { display: none; }
+.chip-tip .tip-price { color: var(--ok); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.chip-tip .rule { margin-left: 8px; font-size: 10px; color: #000; background: var(--ok); border-radius: 4px; padding: 1px 4px; }

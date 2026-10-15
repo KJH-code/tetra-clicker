@@ -18,7 +18,7 @@ export interface BoardView {
   grid: Grid;
   active: Placement | null;
   ghostY: number | null;
-  hold: Piece | null;
+  holds: Piece[];
   holdUsed: boolean;
   next: Piece[];
 }
@@ -102,7 +102,7 @@ export class BoardRenderer {
     // Side panels.
     if (layout.leftCells > 0) {
       this.drawLabel('HOLD', 0, 0, layout.leftCells);
-      if (view.hold) this.drawPreview(view.hold, 0, 1, layout.leftCells, view.holdUsed ? 0.35 : 1);
+      view.holds.forEach((p, i) => this.drawPreview(p, 0, 1 + i * 3, layout.leftCells, view.holdUsed ? 0.35 : 1));
     }
     if (layout.rightCells > 0) {
       this.drawLabel('NEXT', this.originX + WIDTH * c, 0, layout.rightCells);
