@@ -31,8 +31,11 @@ export function occupiedCells(p: Placement): Cell[] {
 }
 
 export function collides(g: Grid, p: Placement): boolean {
-  for (const [x, y] of occupiedCells(p)) {
-    if (cellAt(g, x, y) !== 0) return true;
+  // Hot path for the bot's search: no allocations.
+  const cells = cellsOf(p.piece, p.rot);
+  for (let i = 0; i < cells.length; i++) {
+    const c = cells[i]!;
+    if (cellAt(g, p.x + c[0], p.y + c[1]) !== 0) return true;
   }
   return false;
 }
@@ -51,10 +54,11 @@ export function lockPiece(g: Grid, p: Placement, id: number): void {
 }
 
 // Removes full rows and returns how many were removed. Rows above shift down.
-export function clearFullRows(g: Grid): number {
+// `top` is an optional bound: the first row that might hold anything.
+export function clearFullRows(g: Grid, top = 0): number {
   let write = HEIGHT - 1;
   let cleared = 0;
-  for (let read = HEIGHT - 1; read >= 0; read--) {
+  for (let read = HEIGHT - 1; read >= top; read--) {
     let full = true;
     for (let x = 0; x < WIDTH; x++) {
       if (g[read * WIDTH + x] === 0) { full = false; break; }
@@ -63,25 +67,34 @@ export function clearFullRows(g: Grid): number {
     if (write !== read) g.copyWithin(write * WIDTH, read * WIDTH, read * WIDTH + WIDTH);
     write--;
   }
-  for (let y = write; y >= 0; y--) g.fill(0, y * WIDTH, y * WIDTH + WIDTH);
+  if (cleared > 0) for (let y = write; y >= Math.max(0, top - cleared); y--) g.fill(0, y * WIDTH, y * WIDTH + WIDTH);
   return cleared;
 }
 
 export function fullRowsIfLocked(g: Grid, p: Placement): number {
-  // Counts rows the placement would complete without mutating the grid; the
-  // bot uses this to refuse anything but single clears.
-  const rows = new Set<number>();
-  for (const [, y] of occupiedCells(p)) rows.add(y);
+  // Counts rows the placement would complete. The piece is written in and
+  // taken back out rather than allocating, because the bot calls this for
+  // every candidate of every ply. The placement must not collide.
+  const cells = cellsOf(p.piece, p.rot);
+  for (let i = 0; i < cells.length; i++) {
+    const c = cells[i]!;
+    g[(p.y + c[1]) * WIDTH + p.x + c[0]] = 255;
+  }
   let n = 0;
-  for (const y of rows) {
+  let lastRow = -1;
+  for (let i = 0; i < cells.length; i++) {
+    const y = p.y + cells[i]![1];
+    if (y === lastRow) continue;
+    lastRow = y;
     let full = true;
     for (let x = 0; x < WIDTH; x++) {
-      if (cellAt(g, x, y) === 0) {
-        const own = occupiedCells(p).some(([px, py]) => px === x && py === y);
-        if (!own) { full = false; break; }
-      }
+      if (g[y * WIDTH + x] === 0) { full = false; break; }
     }
     if (full) n++;
+  }
+  for (let i = 0; i < cells.length; i++) {
+    const c = cells[i]!;
+    g[(p.y + c[1]) * WIDTH + p.x + c[0]] = 0;
   }
   return n;
 }
