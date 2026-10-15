@@ -101,6 +101,19 @@ percentage. A new `skill` needs a placement policy (`BotPolicy`) registered in
 `src/sim/bot/index.ts`; everything else (shop button, price curve, income,
 catch-up, save) comes from the data entry.
 
+## Economy simulator
+
+https://kjh-code.github.io/tetra-clicker/sim.html (dev: `/sim.html`)
+
+A second page that runs the whole building ladder through the catch-up
+formula (`PPS × lines per piece × multiplier`) with the game's own pricing
+and bonus code, under a player model (PPS, lines per piece, a focus window,
+then a daily allowance) and a greedy shortest-payback buyer. It plots income
+over time with each building's first purchase, lists unlock times against a
+target of `first × ratio^k`, and exports the numbers as JSON in the shape of
+`src/data/ladder.ts`. The ladder file holds the nine buildings' numbers for
+tuning; only `single` has a bot and a shop entry so far.
+
 ## Save
 
 localStorage, key `tetra-clicker/save`, every 10 s plus on tab hide and
