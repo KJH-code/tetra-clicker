@@ -1,9 +1,15 @@
 import type { Placement } from '../board';
 import type { Game } from '../game';
 
-// A policy picks where the active piece goes. It returns the placement at
-// the spawn row (the bot slides there, then hard drops) or null when nothing
-// legal exists, which the single bot's tests prove never happens.
+// What a policy decided: where the piece goes (at the spawn row; the bot
+// slides there and hard drops) and whether it is the held piece rather than
+// the active one. Null means nothing legal exists, which the bot tests prove
+// never happens.
+export interface BotChoice {
+  placement: Placement;
+  useHold: boolean;
+}
+
 export interface BotPolicy {
-  choose(game: Game): Placement | null;
+  choose(game: Game): BotChoice | null;
 }

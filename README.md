@@ -76,30 +76,41 @@ how many copies are owned plus an offset. Conditions are data too:
 `when: [{ type: 'owned', id: 'single', gte: 5 }]`. Evaluation order is fixed:
 base → sum of all `add_pct` → product of all `mul`.
 
+### Buildings
+
+| building | price | largest clear | Lines / piece (measured) |
+|---|---|---|---|
+| SINGLE | 15 | 1 | 0.4 |
+| DOUBLE | 60 | 2 | 0.445 |
+| TRIPLE | 250 | 3 | 0.475 |
+| TETRIS | 900 | 4 | 0.62 |
+
+Each building unlocks after one copy of the previous tier. Its bot never
+clears more rows at once than its size, never tops out, and is paid the
+attack table for every clear it makes (no combo, B2B, spin or PC bonuses).
+Bots for TRIPLE and TETRIS keep a one-column well on the right and bank the I
+in hold; when the stack climbs they drop the well and dig flat. The measured
+Lines per piece is what the hidden-tab formula and the shop's per-second
+figure use, and a test holds each bot to it within 1%.
+
 ### Adding a building
 
-Append one entry to `src/data/buildings.ts`; nothing in `src/sim` changes:
+Append one line to `src/data/buildings.ts`; nothing in `src/sim` changes
+except registering the bot's placement policy:
 
 ```ts
-{
-  id: 'double',
-  name: 'DOUBLE',
-  basePrice: 100,
-  priceGrowth: 1.15,
-  pps: 1,
-  skill: 'double',          // a policy registered in src/sim/bot/index.ts
-  unlock: [{ type: 'owned', id: 'single', gte: 1 }],
-  effects: [
-    { target: 'income', filter: ['building:double'], op: 'add_pct', value: 10,
-      stack: { type: 'owned', id: 'double', offset: -1 } },
-  ],
-}
+//   id        name       price clear  Lines/piece  unlocked by
+tier('tspin', 'T-SPIN', 3000, 2, 0.8, 'tetris'),
 ```
 
-The first copy of a building creates its board; each further copy adds the
-percentage. A new `skill` needs a placement policy (`BotPolicy`) registered in
-`src/sim/bot/index.ts`; everything else (shop button, price curve, income,
-catch-up, save) comes from the data entry.
+`tier` fills in the rest: price growth 1.15, 1 PPS, the
+`{ target: 'income', filter: ['building:tspin'], op: 'add_pct', value: 10,
+stack: { type: 'owned', id: 'tspin', offset: -1 } }` bonus, and the
+`unlock: [{ type: 'owned', id: 'tetris', gte: 1 }]` condition. The bot is a
+`BotPolicy` registered under the building id in `src/sim/bot/index.ts`;
+shop button, lock, price curve, income, catch-up and save all come from the
+data entry. Measure the bot's Lines per piece with a 10,000-piece run and put
+that number in the entry and in `src/data/ladder.ts`.
 
 ## Economy simulator
 
@@ -112,7 +123,7 @@ then a daily allowance) and a greedy shortest-payback buyer. It plots income
 over time with each building's first purchase, lists unlock times against a
 target of `first × ratio^k`, and exports the numbers as JSON in the shape of
 `src/data/ladder.ts`. The ladder file holds the nine buildings' numbers for
-tuning; only `single` has a bot and a shop entry so far.
+tuning; the first four have bots and shop entries so far.
 
 ## Save
 

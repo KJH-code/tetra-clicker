@@ -21,19 +21,30 @@ const world = saved ? new World(saved.world.seed, saved.world) : new World((Date
 
 // --- manual board ---------------------------------------------------------
 const manualCanvas = document.getElementById('manual-board') as HTMLCanvasElement;
-const manual = new BoardRenderer(manualCanvas, { cell: 28, sideCells: 5 });
+const manual = new BoardRenderer(manualCanvas, { cell: 28, leftCells: 5, rightCells: 5 });
 const manualFx = new Fx();
 
 // --- auto boards ----------------------------------------------------------
-interface AutoView { renderer: BoardRenderer; fx: Fx; anim: BotAnimation | null }
+interface AutoView { renderer: BoardRenderer; fx: Fx; anim: BotAnimation | null; lastEarned: number }
 const autoViews: AutoView[] = [];
 const autoRoot = document.getElementById('auto-boards')!;
 
+// Bot boards shrink as more of them share the middle pane; when the size
+// changes every canvas is rebuilt so they all match.
+function autoCellSize(): number {
+  return world.autoBoards.length <= 1 ? 20 : 14;
+}
+
 function ensureAutoViews(): void {
+  const cell = autoCellSize();
+  if (autoViews.length > 0 && autoViews[0]!.renderer.layout.cell !== cell) {
+    autoRoot.replaceChildren();
+    autoViews.length = 0;
+  }
   while (autoViews.length < world.autoBoards.length) {
     const canvas = document.createElement('canvas');
     autoRoot.append(canvas);
-    autoViews.push({ renderer: new BoardRenderer(canvas, { cell: 20, sideCells: 0 }), fx: new Fx(), anim: null });
+    autoViews.push({ renderer: new BoardRenderer(canvas, { cell, leftCells: 4, rightCells: 0 }), fx: new Fx(), anim: null, lastEarned: 0 });
   }
 }
 
@@ -87,6 +98,7 @@ function handleEvent(e: WorldEvent): void {
       ensureAutoViews();
       const v = autoViews[e.board]!;
       v.anim = { move: e.move, before: e.move.before, t: 0 };
+      v.lastEarned = Number(e.earned);
       break;
     }
     case 'catchUp': {
@@ -143,7 +155,7 @@ function tick(): void {
         if (r.lines > 0) {
           v.fx.rowClear(r.clearedRows);
           v.fx.shakeBoard(1);
-          v.fx.float('+1', v.renderer.cellX(5), v.renderer.cellY(r.clearedRows[0] ?? 30), { color: PIECE_COLORS[r.piece], size: 14, dur: 700 });
+          v.fx.float(`+${format(e2Earned(v))}`, v.renderer.cellX(5), v.renderer.cellY(r.clearedRows[0] ?? 30), { color: PIECE_COLORS[r.piece], size: 14, dur: 700 });
         }
         v.anim = null;
       }
@@ -164,14 +176,17 @@ function render(): void {
   world.autoBoards.forEach((board, i) => {
     const v = autoViews[i]!;
     const def = buildingById(board.buildingId);
+    const hold = { hold: board.game.hold, holdUsed: false, next: [] as never[] };
     if (v.anim) {
       const p = animatedPlacement(v.anim);
-      v.renderer.render({ grid: v.anim.before, active: p, ghostY: null, hold: null, holdUsed: false, next: [] }, v.fx, (ctx) => label(ctx, v.renderer, def?.name ?? board.buildingId));
+      v.renderer.render({ grid: v.anim.before, active: p, ghostY: null, ...hold }, v.fx, (ctx) => label(ctx, v.renderer, def?.name ?? board.buildingId));
     } else {
-      v.renderer.render({ grid: board.game.grid, active: null, ghostY: null, hold: null, holdUsed: false, next: [] }, v.fx, (ctx) => label(ctx, v.renderer, def?.name ?? board.buildingId));
+      v.renderer.render({ grid: board.game.grid, active: null, ghostY: null, ...hold }, v.fx, (ctx) => label(ctx, v.renderer, def?.name ?? board.buildingId));
     }
   });
 }
+
+const e2Earned = (v: AutoView): number => v.lastEarned;
 
 function label(ctx: CanvasRenderingContext2D, r: BoardRenderer, text: string): void {
   ctx.save();

@@ -10,7 +10,8 @@ const FIRST_DRAWN_ROW = TOP_VISIBLE_ROW - BUFFER_ROWS_SHOWN;
 
 export interface BoardLayout {
   cell: number;
-  sideCells: number; // hold / next columns on each side (0 for auto boards)
+  leftCells: number; // hold column width (0 = no hold shown)
+  rightCells: number; // next column width (0 = no queue shown)
 }
 
 export interface BoardView {
@@ -30,8 +31,8 @@ export class BoardRenderer {
 
   constructor(readonly canvas: HTMLCanvasElement, readonly layout: BoardLayout) {
     const rows = HEIGHT - FIRST_DRAWN_ROW;
-    this.originX = layout.sideCells * layout.cell;
-    this.width = (WIDTH + layout.sideCells * 2) * layout.cell;
+    this.originX = layout.leftCells * layout.cell;
+    this.width = (WIDTH + layout.leftCells + layout.rightCells) * layout.cell;
     this.height = rows * layout.cell;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = this.width * dpr;
@@ -99,11 +100,13 @@ export class BoardRenderer {
     if (overlay) overlay(ctx);
 
     // Side panels.
-    if (layout.sideCells > 0) {
-      this.drawLabel('HOLD', 0, 0);
-      if (view.hold) this.drawPreview(view.hold, 0, 1, view.holdUsed ? 0.35 : 1);
-      this.drawLabel('NEXT', this.originX + WIDTH * c, 0);
-      view.next.forEach((p, i) => this.drawPreview(p, this.originX + WIDTH * c, 1 + i * 3, 1));
+    if (layout.leftCells > 0) {
+      this.drawLabel('HOLD', 0, 0, layout.leftCells);
+      if (view.hold) this.drawPreview(view.hold, 0, 1, layout.leftCells, view.holdUsed ? 0.35 : 1);
+    }
+    if (layout.rightCells > 0) {
+      this.drawLabel('NEXT', this.originX + WIDTH * c, 0, layout.rightCells);
+      view.next.forEach((p, i) => this.drawPreview(p, this.originX + WIDTH * c, 1 + i * 3, layout.rightCells, 1));
     }
     if (fx) fx.drawFloaters(ctx);
     ctx.restore();
@@ -141,20 +144,20 @@ export class BoardRenderer {
     ctx.restore();
   }
 
-  private drawLabel(text: string, px: number, row: number): void {
+  private drawLabel(text: string, px: number, row: number, cells: number): void {
     const { ctx, layout } = this;
     ctx.save();
     ctx.fillStyle = THEME.dim;
     ctx.font = `${Math.round(layout.cell * 0.42)}px system-ui, sans-serif`;
     ctx.textBaseline = 'top';
     ctx.textAlign = 'center';
-    ctx.fillText(text, px + (layout.sideCells * layout.cell) / 2, row * layout.cell + 4);
+    ctx.fillText(text, px + (cells * layout.cell) / 2, row * layout.cell + 4);
     ctx.restore();
   }
 
   // A preview piece centred in a side column; drawn at 80% cell size so the
   // five-deep queue fits beside the board.
-  private drawPreview(piece: Piece, px: number, row: number, alpha: number): void {
+  private drawPreview(piece: Piece, px: number, row: number, span: number, alpha: number): void {
     const { ctx, layout } = this;
     const c = layout.cell * 0.8;
     const cells = cellsOf(piece, 0);
@@ -162,7 +165,7 @@ export class BoardRenderer {
     const maxX = Math.max(...cells.map(([x]) => x));
     const minY = Math.min(...cells.map(([, y]) => y));
     const w = (maxX - minX + 1) * c;
-    const ox = px + (layout.sideCells * layout.cell - w) / 2;
+    const ox = px + (span * layout.cell - w) / 2;
     const oy = row * layout.cell + 8;
     ctx.save();
     ctx.globalAlpha = alpha;

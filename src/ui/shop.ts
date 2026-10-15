@@ -29,6 +29,7 @@ export class Shop {
       btn.addEventListener('click', () => {
         if (this.world.buy(b.id)) this.refresh(true);
       });
+      btn.dataset['label'] = b.name;
       root.append(btn);
       this.buttons.set(b.id, { btn, owned, price });
     }
@@ -54,10 +55,20 @@ export class Shop {
       this.lastBalance = balance;
     }
     this.incomeEl.textContent = `${format(this.world.incomePerSecond())}/s`;
+    // Unlocked buildings show in full; only the next locked one is visible,
+    // dimmed and unnamed, so the ladder is hinted at one step at a time.
+    let lockedShown = false;
     for (const b of BUILDINGS) {
       const ui = this.buttons.get(b.id)!;
+      const unlocked = this.world.isUnlocked(b.id);
+      const visible = unlocked || !lockedShown;
+      if (!unlocked && visible) lockedShown = true;
+      ui.btn.hidden = !visible;
+      ui.btn.classList.toggle('locked', !unlocked);
+      const name = ui.btn.querySelector('.name')!;
+      name.textContent = unlocked ? b.name : '???';
       const price = this.world.economy.price(b.id);
-      const can = this.world.economy.canBuy(b.id);
+      const can = this.world.canBuy(b.id);
       ui.owned.textContent = String(this.world.economy.owned(b.id));
       ui.price.textContent = format(price);
       ui.price.classList.toggle('cant', !can);

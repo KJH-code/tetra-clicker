@@ -81,11 +81,14 @@ export function fullRowsIfLocked(g: Grid, p: Placement): number {
     g[(p.y + c[1]) * WIDTH + p.x + c[0]] = 255;
   }
   let n = 0;
-  let lastRow = -1;
+  // A piece spans at most four rows; check each distinct one once. Cells are
+  // not row-sorted, so a bitmask over the box rows does the dedupe.
+  let seen = 0;
   for (let i = 0; i < cells.length; i++) {
-    const y = p.y + cells[i]![1];
-    if (y === lastRow) continue;
-    lastRow = y;
+    const row = cells[i]![1];
+    if (seen & (1 << row)) continue;
+    seen |= 1 << row;
+    const y = p.y + row;
     let full = true;
     for (let x = 0; x < WIDTH; x++) {
       if (g[y * WIDTH + x] === 0) { full = false; break; }

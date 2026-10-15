@@ -17,7 +17,8 @@ export function classifyGap(gapMs: number): GapKind {
 // needs to be fine enough for smooth piece timing in the renderer.
 export const STEP_MS = 1000 / 60;
 
-// Long-run lines cleared per piece when the stack stays bounded: a piece is
+// Long-run rows cleared per piece when the stack stays bounded: a piece is
 // four cells and a row is ten, so 0.4 rows per piece on average. The bot
-// test checks this against the real simulation.
+// tests check this against the real simulation.
 export const LINES_PER_PIECE = 0.4;
+

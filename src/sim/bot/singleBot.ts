@@ -4,7 +4,7 @@ import {
 } from '../board';
 import { pieceId, type Piece, type Rotation } from '../pieces';
 import type { Game } from '../game';
-import type { BotPolicy } from './policy';
+import type { BotChoice, BotPolicy } from './policy';
 
 // Weights in the spirit of the classic Dellacherie-style evaluators: keep the
 // stack low, never bury holes, keep the surface flat. The bot does not need
@@ -102,7 +102,7 @@ function evaluateGrid(grid: Grid, cleared: number, top: number): number {
     + WEIGHTS.crowded * f.crowded + WEIGHTS.rowTrans * f.rowTrans + WEIGHTS.colTrans * f.colTrans;
 }
 
-interface Candidate {
+export interface Candidate {
   spawn: Placement;
   rest: Placement;
   grid: Grid;
@@ -112,7 +112,7 @@ interface Candidate {
 
 // Every legal single-or-nothing placement of the piece at `from`, which is
 // its spawn position.
-function candidates(grid: Grid, from: Placement): Candidate[] {
+export function candidates(grid: Grid, from: Placement): Candidate[] {
   const out: Candidate[] = [];
   const parentTop = topRow(grid);
   const rotations: Rotation[] = from.piece === 'O' ? [0] : [0, 1, 2, 3];
@@ -137,13 +137,13 @@ function candidates(grid: Grid, from: Placement): Candidate[] {
 }
 
 export const singleBot: BotPolicy = {
-  choose(game: Game): Placement | null {
+  choose(game: Game): BotChoice | null {
     const active = game.active;
     if (!active) return null;
     const first = candidates(game.grid, active).sort((a, b) => b.score - a.score);
     if (first.length === 0) return null;
     const next = game.next(1)[0];
-    if (!next) return first[0]!.spawn;
+    if (!next) return { placement: first[0]!.spawn, useHold: false };
     const nextSpawn: Placement = { piece: next, rot: 0, x: spawnX(next), y: next === 'I' ? active.y - 1 : active.y };
     let best: Candidate | null = null;
     let bestScore = -Infinity;
@@ -155,11 +155,11 @@ export const singleBot: BotPolicy = {
       follow += WEIGHTS.single * c.cleared;
       if (follow > bestScore) { bestScore = follow; best = c; }
     }
-    return (best ?? first[0]!).spawn;
+    return { placement: (best ?? first[0]!).spawn, useHold: false };
   },
 };
 
-function spawnX(piece: Piece): number {
+export function spawnX(piece: Piece): number {
   const size = piece === 'I' ? 4 : piece === 'O' ? 2 : 3;
   return Math.floor((WIDTH - size) / 2);
 }
@@ -167,7 +167,7 @@ function spawnX(piece: Piece): number {
 // The bot moves sideways along the spawn row before dropping, so every cell
 // it slides through must be free. Rotation is assumed to happen at spawn
 // where there is room; the test suite's height bound keeps that true.
-function reachable(grid: Grid, from: Placement, to: Placement): boolean {
+export function reachable(grid: Grid, from: Placement, to: Placement): boolean {
   const step = to.x > from.x ? 1 : -1;
   for (let x = from.x; x !== to.x; x += step) {
     if (collides(grid, { ...to, x })) return false;

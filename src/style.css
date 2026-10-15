@@ -101,6 +101,8 @@ canvas { display: block; image-rendering: pixelated; }
 .building:hover:not(:disabled) { border-color: var(--accent); box-shadow: 0 0 14px #00f0ff40; }
 .building:active:not(:disabled) { transform: scale(0.98); }
 .building:disabled { opacity: 0.45; cursor: default; }
+.building.locked { opacity: 0.3; border-style: dashed; }
+.building[hidden] { display: none; }
 .building .name { font-weight: 700; letter-spacing: 0.15em; }
 .building .owned { font-size: 22px; font-weight: 700; text-align: right; color: var(--accent2); text-shadow: 0 0 8px var(--accent2); grid-row: 1 / span 2; align-self: center; }
 .building .price { color: var(--ok); font-variant-numeric: tabular-nums; }

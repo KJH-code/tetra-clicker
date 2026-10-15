@@ -4,7 +4,8 @@ import { earnedFor, attackFor } from './attack';
 import { tag, type Tag } from './tags';
 import { POLICIES, playOne, type BotMove } from './bot/index';
 import { buildingById, BUILDINGS } from '../data/buildings';
-import { classifyGap, LINES_PER_PIECE, STEP_MS } from './clock';
+import { classifyGap, STEP_MS } from './clock';
+import { conditionMet } from './effects';
 import { add, mul, num, toNumber, type Num } from './num';
 import type { Placement } from './board';
 
@@ -102,9 +103,23 @@ export class World {
 
   // --- shop ---------------------------------------------------------------
 
+  // A building can be bought once its unlock conditions hold (owning the
+  // previous tier) and the price is covered.
+  canBuy(id: string): boolean {
+    const def = buildingById(id);
+    if (!def) return false;
+    return this.isUnlocked(id) && this.economy.canBuy(id);
+  }
+
+  isUnlocked(id: string): boolean {
+    const def = buildingById(id);
+    if (!def) return false;
+    return (def.unlock ?? []).every((c) => conditionMet(c, this.economy));
+  }
+
   buy(id: string): boolean {
     const def = buildingById(id);
-    if (!def || !this.economy.buy(id)) return false;
+    if (!def || !this.isUnlocked(id) || !this.economy.buy(id)) return false;
     // The first copy of a building is its board; later copies only add income.
     if (!this.autoBoards.some((b) => b.buildingId === id)) {
       this.autoBoards.push({
@@ -124,15 +139,16 @@ export class World {
 
   // Income tags a bot's clear carries. Bots earn no technique bonuses, so the
   // result is flattened before pricing.
-  private botTags(buildingId: string): Tag[] {
-    return [tag.board('auto'), tag.building(buildingId), tag.clear(1)];
+  private botTags(buildingId: string, lines: number): Tag[] {
+    return [tag.board('auto'), tag.building(buildingId), tag.clear(lines)];
   }
 
   private botEarn(board: AutoBoard, move: BotMove): Num {
+    // Every clear pays its table value; bots just get no technique bonuses.
     const flat: LockResult = { ...move.result, spin: 'none', comboIndex: 0, b2bExtended: false, perfectClear: false };
     const amount = num(attackFor(flat).total);
     if (toNumber(amount) === 0) return num(0);
-    return this.economy.earn(amount, this.botTags(board.buildingId));
+    return this.economy.earn(amount, this.botTags(board.buildingId, move.result.lines));
   }
 
   // Expected Lines per second from every auto board, as the catch-up formula
@@ -142,7 +158,9 @@ export class World {
     for (const b of this.autoBoards) {
       const def = buildingById(b.buildingId);
       if (!def) continue;
-      const rate = def.pps * LINES_PER_PIECE * this.economy.incomeMultiplier(this.botTags(b.buildingId));
+      // The multiplier is read for the building's own clear size, which is
+      // the tag its purchases' bonus filters on.
+      const rate = def.pps * def.linesPerPiece * this.economy.incomeMultiplier(this.botTags(b.buildingId, def.clearSize));
       total = add(total, num(rate));
     }
     return total;

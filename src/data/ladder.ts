@@ -19,9 +19,9 @@ export interface LadderEntry {
 // day. Rounded to friendly numbers afterwards.
 export const LADDER: LadderEntry[] = [
   { id: 'single', name: 'SINGLE', basePrice: 15, growth: 1.15, pps: 1, linesPerPiece: 0.4, bonusPct: 10 },
-  { id: 'double', name: 'DOUBLE', basePrice: 60, growth: 1.15, pps: 1, linesPerPiece: 0.5, bonusPct: 10, requires: 'single' },
-  { id: 'triple', name: 'TRIPLE', basePrice: 250, growth: 1.15, pps: 1, linesPerPiece: 0.6, bonusPct: 10, requires: 'double' },
-  { id: 'tetris', name: 'TETRIS', basePrice: 900, growth: 1.15, pps: 1, linesPerPiece: 0.7, bonusPct: 10, requires: 'triple' },
+  { id: 'double', name: 'DOUBLE', basePrice: 60, growth: 1.15, pps: 1, linesPerPiece: 0.445, bonusPct: 10, requires: 'single' },
+  { id: 'triple', name: 'TRIPLE', basePrice: 250, growth: 1.15, pps: 1, linesPerPiece: 0.475, bonusPct: 10, requires: 'double' },
+  { id: 'tetris', name: 'TETRIS', basePrice: 900, growth: 1.15, pps: 1, linesPerPiece: 0.62, bonusPct: 10, requires: 'triple' },
   { id: 'tspin', name: 'T-SPIN', basePrice: 3_000, growth: 1.15, pps: 1, linesPerPiece: 0.8, bonusPct: 10, requires: 'tetris' },
   { id: 'allspin', name: 'ALL-SPIN', basePrice: 10_000, growth: 1.15, pps: 1, linesPerPiece: 0.9, bonusPct: 10, requires: 'tspin' },
   { id: 'combo', name: 'COMBO', basePrice: 35_000, growth: 1.15, pps: 1, linesPerPiece: 1.0, bonusPct: 10, requires: 'allspin' },
