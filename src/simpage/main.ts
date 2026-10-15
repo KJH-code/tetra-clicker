@@ -10,10 +10,11 @@ interface PageState {
   player: PlayerParams;
   target: TargetParams;
   horizonDays: number;
+  upgrades: boolean;
 }
 
 function defaults(): PageState {
-  return { ladder: structuredClone(LADDER), player: { ...DEFAULT_PLAYER }, target: { ...DEFAULT_TARGET }, horizonDays: DEFAULT_HORIZON_SECONDS / 86_400 };
+  return { ladder: structuredClone(LADDER), player: { ...DEFAULT_PLAYER }, target: { ...DEFAULT_TARGET }, horizonDays: DEFAULT_HORIZON_SECONDS / 86_400, upgrades: true };
 }
 
 function load(): PageState {
@@ -24,7 +25,7 @@ function load(): PageState {
     const d = defaults();
     // Rows are matched by id so a ladder change in code survives an old save.
     const ladder = d.ladder.map((b) => ({ ...b, ...(s.ladder?.find((x) => x.id === b.id) ?? {}) }));
-    return { ladder, player: { ...d.player, ...s.player }, target: { ...d.target, ...s.target }, horizonDays: s.horizonDays ?? d.horizonDays };
+    return { ladder, player: { ...d.player, ...s.player }, target: { ...d.target, ...s.target }, horizonDays: s.horizonDays ?? d.horizonDays, upgrades: s.upgrades ?? true };
   } catch {
     return defaults();
   }
@@ -43,14 +44,16 @@ function save(): void {
 }
 
 function run(): void {
-  const params: SimParams = { buildings: state.ladder, player: state.player, target: state.target, horizonSeconds: state.horizonDays * 86_400 };
+  const params: SimParams = { buildings: state.ladder, player: state.player, target: state.target, horizonSeconds: state.horizonDays * 86_400, upgrades: state.upgrades };
   const result = simulate(params);
   chart.setState({ result, ladder: state.ladder, horizonSeconds: params.horizonSeconds });
   renderUnlocks(result.firstUnlock, result.target);
+  const upgradesBought = result.purchases.filter((p) => p.kind === 'upgrade').length;
   summary.innerHTML =
     `<span>FINAL INCOME <b>${formatLines(result.finalIncome)}/s</b></span>` +
     `<span>FINAL BALANCE <b>${formatLines(result.finalBalance)}</b></span>` +
-    `<span>PURCHASES <b>${result.purchases.length}</b></span>`;
+    `<span>BUILDINGS <b>${result.purchases.length - upgradesBought}</b></span>` +
+    `<span>UPGRADES <b>${upgradesBought}</b></span>`;
   save();
 }
 
@@ -136,6 +139,15 @@ function buildControls(): void {
   controls.append(slider('FIRST (S)', () => state.target.firstSeconds, (v) => { state.target.firstSeconds = v; }, 10, 600, 5));
   controls.append(slider('RATIO', () => state.target.ratio, (v) => { state.target.ratio = v; }, 1.2, 5, 0.1));
   controls.append(slider('HORIZON (D)', () => state.horizonDays, (v) => { state.horizonDays = v; }, 1, 90, 1));
+  // Milestone and manual ×2 upgrades bought by the same payback rule.
+  const up = document.createElement('label');
+  up.className = 'toggle';
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.checked = state.upgrades;
+  box.addEventListener('change', () => { state.upgrades = box.checked; run(); });
+  up.append(box, document.createTextNode(' UPGRADES'));
+  controls.append(up);
   controls.append(h2('LADDER'));
   controls.append(ladderTable());
   const row = document.createElement('div');
@@ -166,7 +178,7 @@ function buildControls(): void {
 // The exact shape of src/data/ladder.ts entries, plus the player model, so
 // the chosen numbers can be pasted back without translation.
 function exportJson(): string {
-  return JSON.stringify({ ladder: state.ladder, player: state.player, target: state.target }, null, 2);
+  return JSON.stringify({ ladder: state.ladder, player: state.player, target: state.target, upgrades: state.upgrades }, null, 2);
 }
 
 buildControls();

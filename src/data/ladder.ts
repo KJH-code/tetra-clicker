@@ -13,18 +13,19 @@ export interface LadderEntry {
   requires?: string;
 }
 
-// Prices fitted with the simulator page to the chosen schedule: first
-// building at about a minute, each next one 2.5× later, for a 0.5 PPS
-// single/double player who plays 15 minutes flat out and then an hour a
-// day. Rounded to friendly numbers afterwards.
+// Prices fitted with the simulator to the chosen schedule: first building at
+// about a minute, each next one 2.5× later, for a 0.5 PPS single/double
+// player who plays 15 minutes flat out and then an hour a day, buying
+// milestone and manual ×2 upgrades as they pay off. Rounded to friendly
+// numbers; every unlock stays within 25% of its target.
 export const LADDER: LadderEntry[] = [
   { id: 'single', name: 'SINGLE', basePrice: 15, growth: 1.15, pps: 1, linesPerPiece: 0.4, bonusPct: 10 },
   { id: 'double', name: 'DOUBLE', basePrice: 60, growth: 1.15, pps: 1, linesPerPiece: 0.445, bonusPct: 10, requires: 'single' },
-  { id: 'triple', name: 'TRIPLE', basePrice: 250, growth: 1.15, pps: 1, linesPerPiece: 0.475, bonusPct: 10, requires: 'double' },
-  { id: 'tetris', name: 'TETRIS', basePrice: 900, growth: 1.15, pps: 1, linesPerPiece: 0.62, bonusPct: 10, requires: 'triple' },
-  { id: 'tspin', name: 'T-SPIN', basePrice: 3_000, growth: 1.15, pps: 1, linesPerPiece: 0.8, bonusPct: 10, requires: 'tetris' },
-  { id: 'allspin', name: 'ALL-SPIN', basePrice: 10_000, growth: 1.15, pps: 1, linesPerPiece: 0.9, bonusPct: 10, requires: 'tspin' },
-  { id: 'combo', name: 'COMBO', basePrice: 35_000, growth: 1.15, pps: 1, linesPerPiece: 1.0, bonusPct: 10, requires: 'allspin' },
-  { id: 'b2b', name: 'B2B', basePrice: 100_000, growth: 1.15, pps: 1, linesPerPiece: 1.1, bonusPct: 10, requires: 'combo' },
-  { id: 'pc', name: 'PERFECT', basePrice: 300_000, growth: 1.15, pps: 1, linesPerPiece: 1.2, bonusPct: 10, requires: 'b2b' },
+  { id: 'triple', name: 'TRIPLE', basePrice: 150, growth: 1.15, pps: 1, linesPerPiece: 0.475, bonusPct: 10, requires: 'double' },
+  { id: 'tetris', name: 'TETRIS', basePrice: 500, growth: 1.15, pps: 1, linesPerPiece: 0.62, bonusPct: 10, requires: 'triple' },
+  { id: 'tspin', name: 'T-SPIN', basePrice: 2_000, growth: 1.15, pps: 1, linesPerPiece: 0.8, bonusPct: 10, requires: 'tetris' },
+  { id: 'allspin', name: 'ALL-SPIN', basePrice: 8_000, growth: 1.15, pps: 1, linesPerPiece: 0.9, bonusPct: 10, requires: 'tspin' },
+  { id: 'combo', name: 'COMBO', basePrice: 33_000, growth: 1.15, pps: 1, linesPerPiece: 1.0, bonusPct: 10, requires: 'allspin' },
+  { id: 'b2b', name: 'B2B', basePrice: 90_000, growth: 1.15, pps: 1, linesPerPiece: 1.1, bonusPct: 10, requires: 'combo' },
+  { id: 'pc', name: 'PERFECT', basePrice: 210_000, growth: 1.15, pps: 1, linesPerPiece: 1.2, bonusPct: 10, requires: 'b2b' },
 ];

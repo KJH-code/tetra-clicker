@@ -1,7 +1,7 @@
 import { BUILDINGS, buildingById } from '../data/buildings';
 import { allEffects } from '../data/index';
 import { conditionMet, evaluate, type Effect, type EffectContext } from './effects';
-import { upgradeById } from '../data/upgrades';
+import { UPGRADES, type UpgradeDef } from '../data/upgrades';
 import { emptyStats, type Stats } from './stats';
 import { tag } from './tags';
 import { add, gte, mul, num, pow, sub, toNumber, ZERO, type Num } from './num';
@@ -12,9 +12,21 @@ export class Economy implements EffectContext {
   readonly upgrades = new Set<string>();
   stats: Stats = emptyStats();
   readonly effects: Effect[];
+  private readonly upgradeDefs: Map<string, UpgradeDef>;
 
-  constructor(effects: Effect[] = allEffects()) {
+  // The economy simulator passes its own ladder's effects and upgrades; the
+  // game uses the data files.
+  constructor(effects: Effect[] = allEffects(), upgrades: readonly UpgradeDef[] = UPGRADES) {
     this.effects = effects;
+    this.upgradeDefs = new Map(upgrades.map((u) => [u.id, u]));
+  }
+
+  upgradeDef(id: string): UpgradeDef | undefined {
+    return this.upgradeDefs.get(id);
+  }
+
+  allUpgrades(): UpgradeDef[] {
+    return [...this.upgradeDefs.values()];
   }
 
   owned(id: string): number {
@@ -36,18 +48,18 @@ export class Economy implements EffectContext {
   // --- upgrades ---------------------------------------------------------------
 
   isUpgradeUnlocked(id: string): boolean {
-    const def = upgradeById(id);
+    const def = this.upgradeDef(id);
     return !!def && !this.upgrades.has(id) && def.unlock.every((c) => conditionMet(c, this));
   }
 
   canBuyUpgrade(id: string): boolean {
-    const def = upgradeById(id);
+    const def = this.upgradeDef(id);
     return !!def && this.isUpgradeUnlocked(id) && gte(this.balance, num(def.price));
   }
 
   buyUpgrade(id: string): boolean {
     if (!this.canBuyUpgrade(id)) return false;
-    this.balance = sub(this.balance, num(upgradeById(id)!.price));
+    this.balance = sub(this.balance, num(this.upgradeDef(id)!.price));
     this.upgrades.add(id);
     return true;
   }

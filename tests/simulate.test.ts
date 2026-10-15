@@ -18,7 +18,8 @@ describe('economy simulator', () => {
   });
 
   it('prices and bot income match the game for the same owned count', () => {
-    const r = simulate(base({ horizonSeconds: 7 * 86_400 }));
+    // Upgrades off: this compares the building arithmetic alone.
+    const r = simulate(base({ horizonSeconds: 7 * 86_400, upgrades: false }));
     const third = r.purchases.find((p) => p.id === 'single' && p.n === 3)!;
     expect(third).toBeDefined();
     const w = new World(1);
@@ -68,5 +69,17 @@ describe('economy simulator', () => {
     const b = simulate(p);
     expect(a).toEqual(b);
     expect(a.series.length).toBeLessThan(2000);
+  });
+
+  it('buys milestone and manual upgrades when they pay off sooner', () => {
+    const r = simulate(base({ buildings: LADDER, horizonSeconds: 7 * 86_400 }));
+    const ids = r.purchases.filter((p) => p.kind === 'upgrade').map((p) => p.id);
+    expect(ids).toContain('ms_single_1');
+    expect(ids.some((id) => id.startsWith('manual_'))).toBe(true);
+    // Upgrades are only ever bought once.
+    expect(new Set(ids).size).toBe(ids.length);
+    const off = simulate(base({ buildings: LADDER, horizonSeconds: 7 * 86_400, upgrades: false }));
+    expect(off.purchases.every((p) => p.kind !== 'upgrade')).toBe(true);
+    expect(r.finalIncome).toBeGreaterThan(off.finalIncome);
   });
 });

@@ -47,3 +47,5 @@ canvas { display: block; width: 100%; }
 @media (max-width: 1000px) { #sim { grid-template-columns: 1fr; } }
 /* Prices run to ten digits; the other columns stay narrow. */
 td:nth-child(2) input { width: 92px; }
+.toggle { display: flex; align-items: center; gap: 6px; color: var(--dim); font-size: 11px; letter-spacing: 0.1em; margin: 6px 0; cursor: pointer; }
+.toggle input { accent-color: var(--accent); }

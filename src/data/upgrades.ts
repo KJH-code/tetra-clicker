@@ -47,7 +47,7 @@ export function milestonesFor(b: { id: string; name: string; basePrice: number }
 
 // Manual ×2: unlocked by Lines earned by hand, priced at ten times that.
 const MANUAL_STEPS = [100, 1_000, 10_000, 100_000, 1_000_000];
-const manual = chain({ group: 'manual' }, MANUAL_STEPS.map((n) => ({
+export const MANUAL_UPGRADES = chain({ group: 'manual' }, MANUAL_STEPS.map((n) => ({
   id: `manual_${n}`,
   name: `MANUAL ×2 (${n} by hand)`,
   label: 'M×2',
@@ -104,6 +104,6 @@ const buffs: UpgradeDef[] = [
     unlock: [{ type: 'stat', stat: 'manualPieces', gte: 2_000 }], effects: [{ target: 'rule:hold2', op: 'flag', value: 1 }] },
 ];
 
-export const UPGRADES: UpgradeDef[] = [...BUILDINGS.flatMap(milestonesFor), ...manual, ...tech, ...buffs];
+export const UPGRADES: UpgradeDef[] = [...BUILDINGS.flatMap(milestonesFor), ...MANUAL_UPGRADES, ...tech, ...buffs];
 
 export const upgradeById = (id: string): UpgradeDef | undefined => UPGRADES.find((u) => u.id === id);

@@ -36,8 +36,8 @@ export const BUILDINGS: BuildingDef[] = [
   tier('single', 'SINGLE', 15, 1, 0.4),
   // Measured over 5 seeds × 10,000 pieces of each bot (see bots.test.ts).
   tier('double', 'DOUBLE', 60, 2, 0.445, 'single'),
-  tier('triple', 'TRIPLE', 250, 3, 0.475, 'double'),
-  tier('tetris', 'TETRIS', 900, 4, 0.62, 'triple'),
+  tier('triple', 'TRIPLE', 150, 3, 0.475, 'double'),
+  tier('tetris', 'TETRIS', 500, 4, 0.62, 'triple'),
 ];
 
 export const buildingById = (id: string): BuildingDef | undefined => BUILDINGS.find((b) => b.id === id);
