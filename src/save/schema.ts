@@ -1,7 +1,7 @@
 import type { WorldSnapshot } from '../sim/world';
 import type { HandlingSettings } from '../data/handling';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export interface SaveData {
   version: number;
@@ -13,7 +13,25 @@ export interface SaveData {
 // Each entry upgrades a save from version n to n+1. A new schema version
 // means appending a function here, never editing older ones.
 type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
-const MIGRATIONS: Migration[] = [];
+const MIGRATIONS: Migration[] = [
+  // 1 → 2: run upgrades and manual stats arrive; hold becomes a queue; the
+  // manual game tracks combo grace and the B2B shield.
+  (raw) => {
+    const world = raw['world'] as Record<string, unknown>;
+    const economy = world['economy'] as Record<string, unknown>;
+    economy['upgrades'] ??= [];
+    economy['stats'] ??= { manualLines: 0, manualPieces: 0, spins: 0, combo5: 0, b2bs: 0, pcs: 0 };
+    const games = [world['manual'], ...((world['autoBoards'] as { game: unknown }[] | undefined) ?? []).map((b) => b.game)];
+    for (const g of games as Record<string, unknown>[]) {
+      if (!g) continue;
+      if (!Array.isArray(g['holds'])) g['holds'] = g['hold'] ? [g['hold']] : [];
+      delete g['hold'];
+      g['graceUsed'] ??= 0;
+      g['shieldSpent'] ??= false;
+    }
+    return raw;
+  },
+];
 
 export function migrate(raw: unknown): SaveData | null {
   if (!raw || typeof raw !== 'object') return null;

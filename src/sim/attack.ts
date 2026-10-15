@@ -17,7 +17,8 @@ export interface AttackBreakdown {
 
 // Lines earned by one placement. Minis are worth a plain clear, and spins by
 // pieces other than T are worth a plain clear too; both only add a tag.
-export function attackFor(r: LockResult): AttackBreakdown {
+// `comboStep` is the per-step combo coefficient; upgrades can raise it.
+export function attackFor(r: LockResult, comboStep: number = ATTACK.comboStep): AttackBreakdown {
   if (r.lines <= 0) return { base: 0, comboMultiplier: 1, b2bMultiplier: 1, total: 0 };
   const lines = Math.min(r.lines, 4);
   let base: number;
@@ -25,7 +26,7 @@ export function attackFor(r: LockResult): AttackBreakdown {
   else if (r.piece === 'T' && r.spin === 'full') base = ATTACK.tspin[lines]!;
   else base = ATTACK.normal[lines]!;
   const comboIdx = Math.min(Math.max(r.comboIndex, 0), ATTACK.combo.length - 1);
-  const comboMultiplier = 1 + ATTACK.comboStep * ATTACK.combo[comboIdx]!;
+  const comboMultiplier = 1 + comboStep * ATTACK.combo[comboIdx]!;
   const b2bMultiplier = r.b2bExtended ? ATTACK.b2bMultiplier : 1;
   return { base, comboMultiplier, b2bMultiplier, total: base * comboMultiplier * b2bMultiplier };
 }
@@ -41,6 +42,6 @@ export function tagsFor(r: LockResult, origin: Tag[]): Tag[] {
   return tags;
 }
 
-export function earnedFor(r: LockResult, origin: Tag[]): Earned {
-  return { amount: num(attackFor(r).total), tags: tagsFor(r, origin) };
+export function earnedFor(r: LockResult, origin: Tag[], comboStep: number = ATTACK.comboStep): Earned {
+  return { amount: num(attackFor(r, comboStep).total), tags: tagsFor(r, origin) };
 }

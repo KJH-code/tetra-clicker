@@ -28,20 +28,44 @@ export interface LockResult {
 
 export interface GameSnapshot {
   grid: string;
-  hold: Piece | null;
+  // Oldest first. A single slot is the guideline hold.
+  holds: Piece[];
   holdUsed: boolean;
   queue: Piece[];
   rng: number;
   combo: number;
   b2b: number;
   active: Placement | null;
+  graceUsed: number;
+  shieldSpent: boolean;
 }
+
+// Rule changes upgrades can buy for the manual board. The defaults are plain
+// guideline Tetris, which is what bots and a fresh game play.
+export interface GameRules {
+  // Non-clearing pieces a running combo survives.
+  comboGrace: number;
+  // One non-qualifying clear per chain does not break back-to-back; it
+  // recharges on the next back-to-back clear.
+  b2bShield: boolean;
+  nextCount: number;
+  holdSlots: number;
+}
+
+export const DEFAULT_RULES: GameRules = { comboGrace: 0, b2bShield: false, nextCount: 5, holdSlots: 1 };
+
+// Pieces kept in the queue: enough for the longest preview a rule can show.
+const QUEUE_LOOKAHEAD = 6;
 
 export class Game {
   grid: Grid = createGrid();
   active: Placement | null = null;
-  hold: Piece | null = null;
+  holds: Piece[] = [];
   holdUsed = false;
+  rules: GameRules = { ...DEFAULT_RULES };
+  // Non-clearing pieces placed since the combo's last clear.
+  private graceUsed = 0;
+  private shieldSpent = false;
   // -1 = no run in progress; otherwise the index the next clear will use.
   combo = -1;
   // -1 = no chain; 0 = one qualifying clear made, the next one extends it.
@@ -53,15 +77,17 @@ export class Game {
   constructor(seed: number, snapshot?: GameSnapshot) {
     if (snapshot) {
       this.grid = deserializeGrid(snapshot.grid);
-      this.hold = snapshot.hold;
+      this.holds = [...snapshot.holds];
       this.holdUsed = snapshot.holdUsed;
       this.combo = snapshot.combo;
       this.b2b = snapshot.b2b;
-      this.bag = createBag(restoreRng(snapshot.rng), 5, snapshot.queue);
+      this.graceUsed = snapshot.graceUsed;
+      this.shieldSpent = snapshot.shieldSpent;
+      this.bag = createBag(restoreRng(snapshot.rng), QUEUE_LOOKAHEAD, snapshot.queue);
       this.active = snapshot.active;
       if (!this.active) this.spawn();
     } else {
-      this.bag = createBag(createRng(seed));
+      this.bag = createBag(createRng(seed), QUEUE_LOOKAHEAD);
       this.spawn();
     }
   }
@@ -72,7 +98,12 @@ export class Game {
     return this.lastActionWasRotation;
   }
 
-  next(n = 5): Piece[] {
+  // The piece the next hold press would bring back.
+  get hold(): Piece | null {
+    return this.holds.length >= this.rules.holdSlots ? this.holds[0] ?? null : null;
+  }
+
+  next(n = this.rules.nextCount): Piece[] {
     return this.bag.peek(n);
   }
 
@@ -80,13 +111,15 @@ export class Game {
     const { queue, rng } = this.bag.snapshot();
     return {
       grid: serializeGrid(this.grid),
-      hold: this.hold,
+      holds: [...this.holds],
       holdUsed: this.holdUsed,
       queue,
       rng,
       combo: this.combo,
       b2b: this.b2b,
       active: this.active ? { ...this.active } : null,
+      graceUsed: this.graceUsed,
+      shieldSpent: this.shieldSpent,
     };
   }
 
@@ -149,13 +182,14 @@ export class Game {
   rotateCCW(): boolean { return this.rotate(-1); }
   rotate180(): boolean { return this.rotate(2); }
 
+  // Hold is a queue: the current piece goes to the back, and once every slot
+  // is full the oldest comes out. With one slot this is the guideline swap.
   swapHold(): boolean {
     if (!this.active || this.holdUsed) return false;
-    const current = this.active.piece;
-    const incoming = this.hold;
-    this.hold = current;
+    this.holds.push(this.active.piece);
+    const incoming = this.holds.length > this.rules.holdSlots ? this.holds.shift() : undefined;
     this.holdUsed = true;
-    this.spawn(incoming ?? undefined);
+    this.spawn(incoming);
     return true;
   }
 
@@ -200,8 +234,12 @@ export class Game {
     if (lines > 0) {
       this.combo += 1;
       comboIndex = this.combo;
+      this.graceUsed = 0;
+    } else if (this.combo >= 0 && this.graceUsed < this.rules.comboGrace) {
+      this.graceUsed += 1;
     } else {
       this.combo = -1;
+      this.graceUsed = 0;
     }
 
     // Back-to-back: quads and T-spins (minis included) keep the chain; any other
@@ -212,6 +250,9 @@ export class Game {
       if (qualifies) {
         b2bExtended = this.b2b >= 0;
         this.b2b += 1;
+        if (b2bExtended) this.shieldSpent = false;
+      } else if (this.b2b >= 0 && this.rules.b2bShield && !this.shieldSpent) {
+        this.shieldSpent = true;
       } else {
         this.b2b = -1;
       }
@@ -233,8 +274,10 @@ export class Game {
     this.grid = createGrid();
     this.combo = -1;
     this.b2b = -1;
-    this.hold = null;
+    this.holds = [];
     this.holdUsed = false;
+    this.graceUsed = 0;
+    this.shieldSpent = false;
     if (this.active) this.active = this.spawnPlacement(this.active.piece);
   }
 

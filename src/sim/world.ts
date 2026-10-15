@@ -5,7 +5,10 @@ import { tag, type Tag } from './tags';
 import { POLICIES, playOne, type BotMove } from './bot/index';
 import { buildingById, BUILDINGS } from '../data/buildings';
 import { classifyGap, STEP_MS } from './clock';
-import { conditionMet } from './effects';
+import { conditionMet, evaluate, flagCount } from './effects';
+import { recordManual, emptyStats, type Stats } from './stats';
+import { ATTACK } from '../data/attackTable';
+import { upgradeById } from '../data/upgrades';
 import { add, mul, num, toNumber, type Num } from './num';
 import type { Placement } from './board';
 
@@ -28,7 +31,7 @@ export interface WorldSnapshot {
   // Leftover sub-step time, kept so a reload continues on the same step grid.
   accumulatorMs: number;
   manual: GameSnapshot;
-  economy: { balance: string; owned: Record<string, number> };
+  economy: { balance: string; owned: Record<string, number>; upgrades: string[]; stats: Stats };
   autoBoards: AutoBoardSnapshot[];
 }
 
@@ -39,6 +42,7 @@ export type WorldEvent =
   | { type: 'botMove'; board: number; move: BotMove; earned: Num }
   | { type: 'catchUp'; seconds: number; earned: Num }
   | { type: 'bought'; buildingId: string; owned: number }
+  | { type: 'upgraded'; upgradeId: string }
   | { type: 'slept'; seconds: number };
 
 export class World {
@@ -58,6 +62,8 @@ export class World {
       this.economy = new Economy();
       this.economy.balance = num(Number(snapshot.economy.balance));
       for (const [id, n] of Object.entries(snapshot.economy.owned)) this.economy.setOwned(id, n);
+      for (const id of snapshot.economy.upgrades) this.economy.upgrades.add(id);
+      this.economy.stats = { ...emptyStats(), ...snapshot.economy.stats };
       this.autoBoards = snapshot.autoBoards.map((b) => ({
         buildingId: b.buildingId,
         game: new Game(seed, b.game),
@@ -72,6 +78,31 @@ export class World {
       this.manual = new Game(seed);
       this.economy = new Economy();
     }
+    this.applyRules();
+  }
+
+  // Manual-board rules bought as upgrades. Recomputed after every purchase;
+  // bots always play the default rules.
+  private applyRules(): void {
+    const fx = this.economy.effects;
+    const eco = this.economy;
+    this.manual.rules = {
+      comboGrace: flagCount(fx, 'rule:combo_grace', eco),
+      b2bShield: flagCount(fx, 'rule:b2b_shield', eco) > 0,
+      nextCount: 5 + flagCount(fx, 'rule:next_plus', eco),
+      holdSlots: 1 + flagCount(fx, 'rule:hold2', eco),
+    };
+  }
+
+  comboStep(): number {
+    return evaluate(this.economy.effects, 'combo_step', [], this.economy, ATTACK.comboStep);
+  }
+
+  buyUpgrade(id: string): boolean {
+    if (!upgradeById(id) || !this.economy.buyUpgrade(id)) return false;
+    this.applyRules();
+    this.events.push({ type: 'upgraded', upgradeId: id });
+    return true;
   }
 
   snapshot(): WorldSnapshot {
@@ -80,7 +111,7 @@ export class World {
       seed: this.seed,
       accumulatorMs: this.accumulatorMs,
       manual: this.manual.snapshot(),
-      economy: { balance: String(eco.balance), owned: eco.owned },
+      economy: { balance: String(eco.balance), owned: eco.owned, upgrades: eco.upgrades, stats: eco.stats },
       autoBoards: this.autoBoards.map((b) => ({ buildingId: b.buildingId, game: b.game.snapshot(), timerMs: b.timerMs })),
     };
   }
@@ -89,8 +120,9 @@ export class World {
 
   manualLock(result: LockResult): Num {
     const at = this.manual.active!;
-    const earned = earnedFor(result, [tag.board('manual')]);
+    const earned = earnedFor(result, [tag.board('manual')], this.comboStep());
     const final = this.economy.earn(earned.amount, earned.tags);
+    recordManual(this.economy.stats, result, Number(final));
     this.events.push({ type: 'manualLock', result, earned: final, tags: earned.tags, at });
     return final;
   }

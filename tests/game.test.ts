@@ -11,7 +11,7 @@ function gridFrom(rows: string[]): string {
 
 function gameWith(rows: string[], piece: Piece, queue: Piece[] = ['I', 'O', 'S', 'Z', 'J', 'L']): Game {
   return new Game(0, {
-    grid: gridFrom(rows), hold: null, holdUsed: false, queue: [piece, ...queue], rng: 1,
+    grid: gridFrom(rows), holds: [], holdUsed: false, graceUsed: 0, shieldSpent: false, queue: [piece, ...queue], rng: 1,
     combo: -1, b2b: -1, active: null,
   });
 }
