@@ -1,0 +1,142 @@
+import type { Game } from '../sim/game';
+import { SDF_INSTANT, SOFT_DROP_CELLS_PER_SECOND_PER_SDF, type HandlingSettings, type KeyBindings } from '../data/handling';
+
+export type Action = keyof KeyBindings;
+
+export interface InputHost {
+  game: Game;
+  onHardDrop(): void;
+}
+
+// Keyboard → game actions with guideline handling. Horizontal movement
+// repeats after DAS at ARR intervals (ARR 0 = teleport to the wall); soft
+// drop moves at a rate set by SDF. Timing is driven from the main loop so it
+// stays consistent with the render frame rather than keyboard repeat events.
+export class InputHandler {
+  private down = new Set<string>();
+  private horizontal: { dir: -1 | 1; heldMs: number; repeatMs: number } | null = null;
+  private softMs = 0;
+  private active = false;
+
+  constructor(private host: InputHost, public settings: HandlingSettings) {}
+
+  attach(target: Window): void {
+    target.addEventListener('keydown', this.onKeyDown);
+    target.addEventListener('keyup', this.onKeyUp);
+    target.addEventListener('blur', () => this.releaseAll());
+  }
+
+  // Settings UI sets this false while capturing a rebind so play keys stay quiet.
+  setActive(on: boolean): void {
+    this.active = on;
+    if (!on) this.releaseAll();
+  }
+
+  private actionFor(code: string): Action | null {
+    const keys = this.settings.keys;
+    for (const action of Object.keys(keys) as Action[]) {
+      if (keys[action].includes(code)) return action;
+    }
+    return null;
+  }
+
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (!this.active) return;
+    const action = this.actionFor(e.code);
+    if (!action) return;
+    e.preventDefault();
+    if (this.down.has(e.code)) return; // OS key repeat; DAS handles repeats
+    this.down.add(e.code);
+    const game = this.host.game;
+    switch (action) {
+      case 'left':
+      case 'right': {
+        const dir = action === 'left' ? -1 : 1;
+        // A fresh press in the other direction takes over at once, which is
+        // what lets players tap-tap across the board.
+        this.horizontal = { dir, heldMs: 0, repeatMs: 0 };
+        this.move(dir);
+        break;
+      }
+      case 'softDrop':
+        this.softMs = 0;
+        this.softStep(true);
+        break;
+      case 'hardDrop':
+        this.host.onHardDrop();
+        break;
+      case 'rotateCW': game.rotateCW(); break;
+      case 'rotateCCW': game.rotateCCW(); break;
+      case 'rotate180': game.rotate180(); break;
+      case 'hold': game.swapHold(); break;
+    }
+  };
+
+  private onKeyUp = (e: KeyboardEvent): void => {
+    if (!this.down.delete(e.code)) return;
+    const action = this.actionFor(e.code);
+    if (action === 'left' || action === 'right') {
+      const dir = action === 'left' ? -1 : 1;
+      if (this.horizontal && this.horizontal.dir === dir) {
+        // If the other direction is still held, DAS restarts for it.
+        const other = dir === -1 ? 'right' : 'left';
+        const stillHeld = this.settings.keys[other].some((k) => this.down.has(k));
+        this.horizontal = stillHeld ? { dir: -dir as -1 | 1, heldMs: 0, repeatMs: 0 } : null;
+        if (stillHeld) this.move(-dir as -1 | 1);
+      }
+    }
+  };
+
+  private releaseAll(): void {
+    this.down.clear();
+    this.horizontal = null;
+  }
+
+  private move(dir: -1 | 1): boolean {
+    return dir === -1 ? this.host.game.moveLeft() : this.host.game.moveRight();
+  }
+
+  private softStep(first: boolean): void {
+    const game = this.host.game;
+    if (this.settings.sdf >= SDF_INSTANT) {
+      while (game.softDrop()) { /* to the floor */ }
+      return;
+    }
+    if (first) game.softDrop();
+  }
+
+  // Called every frame with the elapsed time.
+  update(dtMs: number): void {
+    if (!this.active) return;
+    const h = this.horizontal;
+    if (h) {
+      h.heldMs += dtMs;
+      if (h.heldMs >= this.settings.das) {
+        if (this.settings.arr <= 0) {
+          while (this.move(h.dir)) { /* ARR 0: straight to the wall */ }
+        } else {
+          h.repeatMs += dtMs;
+          while (h.repeatMs >= this.settings.arr) {
+            h.repeatMs -= this.settings.arr;
+            if (!this.move(h.dir)) { h.repeatMs = 0; break; }
+          }
+        }
+      }
+    }
+    const softHeld = this.settings.keys.softDrop.some((k) => this.down.has(k));
+    if (softHeld) {
+      if (this.settings.sdf >= SDF_INSTANT) {
+        while (this.host.game.softDrop()) { /* instant */ }
+      } else {
+        const interval = 1000 / (this.settings.sdf * SOFT_DROP_CELLS_PER_SECOND_PER_SDF);
+        this.softMs += dtMs;
+        while (this.softMs >= interval) {
+          this.softMs -= interval;
+          if (!this.host.game.softDrop()) { this.softMs = 0; break; }
+        }
+      }
+    } else {
+      this.softMs = 0;
+    }
+  }
+}

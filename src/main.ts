@@ -1,0 +1,193 @@
+import { World, type WorldEvent } from './sim/world';
+import type { LockResult } from './sim/game';
+import { format } from './sim/num';
+import { LocalStorageStore } from './save/localStorageStore';
+import { SAVE_VERSION, type SaveData } from './save/schema';
+import { startAutosave } from './save/autosave';
+import { DEFAULT_HANDLING, type HandlingSettings } from './data/handling';
+import { buildingById } from './data/buildings';
+import { BoardRenderer, type BoardView } from './render/boardRenderer';
+import { Fx } from './render/fx';
+import { animatedPlacement, isLanded, type BotAnimation } from './render/botAnim';
+import { PIECE_COLORS } from './render/theme';
+import { InputHandler } from './ui/input';
+import { Shop } from './ui/shop';
+import { SettingsPanel } from './ui/settings';
+
+const store = new LocalStorageStore();
+const saved = store.load();
+const settings: HandlingSettings = saved ? mergeSettings(saved.settings) : structuredClone(DEFAULT_HANDLING);
+const world = saved ? new World(saved.world.seed, saved.world) : new World((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
+
+// --- manual board ---------------------------------------------------------
+const manualCanvas = document.getElementById('manual-board') as HTMLCanvasElement;
+const manual = new BoardRenderer(manualCanvas, { cell: 28, sideCells: 5 });
+const manualFx = new Fx();
+
+// --- auto boards ----------------------------------------------------------
+interface AutoView { renderer: BoardRenderer; fx: Fx; anim: BotAnimation | null }
+const autoViews: AutoView[] = [];
+const autoRoot = document.getElementById('auto-boards')!;
+
+function ensureAutoViews(): void {
+  while (autoViews.length < world.autoBoards.length) {
+    const canvas = document.createElement('canvas');
+    autoRoot.append(canvas);
+    autoViews.push({ renderer: new BoardRenderer(canvas, { cell: 20, sideCells: 0 }), fx: new Fx(), anim: null });
+  }
+}
+
+// --- input / shop / settings -----------------------------------------------
+const input = new InputHandler({
+  game: world.manual,
+  onHardDrop: () => { world.manualHardDrop(); },
+}, settings);
+input.attach(window);
+input.setActive(true);
+
+const shopRoot = document.getElementById('shop-pane')!;
+const settingsOverlay = document.getElementById('settings-overlay')!;
+const settingsPanel = new SettingsPanel(settingsOverlay, settings, () => saveNow(), (open) => input.setActive(!open));
+const shop = new Shop(shopRoot, world, () => settingsPanel.open());
+
+// --- save -----------------------------------------------------------------
+function snapshot(): SaveData {
+  return { version: SAVE_VERSION, savedAt: Date.now(), world: world.snapshot(), settings };
+}
+function saveNow(): void { store.save(snapshot()); }
+startAutosave(store, snapshot);
+
+function mergeSettings(s: Partial<HandlingSettings> | undefined): HandlingSettings {
+  const d = structuredClone(DEFAULT_HANDLING);
+  if (!s) return d;
+  return { das: s.das ?? d.das, arr: s.arr ?? d.arr, sdf: s.sdf ?? d.sdf, keys: { ...d.keys, ...(s.keys ?? {}) } };
+}
+
+// --- events → effects -----------------------------------------------------
+function handleEvent(e: WorldEvent): void {
+  switch (e.type) {
+    case 'manualLock': {
+      const r = e.result;
+      if (r.lines > 0) {
+        manualFx.rowClear(r.clearedRows);
+        manualFx.shakeBoard(r.lines + (r.spin !== 'none' ? 1 : 0) + (r.perfectClear ? 3 : 0));
+        const cx = manual.cellX(5);
+        const cy = manual.cellY(r.clearedRows[0] ?? e.at.y);
+        manualFx.float(`+${format(e.earned)}`, cx, cy, { color: PIECE_COLORS[r.piece], size: 22 + r.lines * 3 });
+        const label = clearLabel(r);
+        if (label) manualFx.float(label, cx, cy - 26, { color: '#ffffff', size: 13, dur: 1100 });
+      }
+      if (r.topped) {
+        manualFx.shakeBoard(4);
+        manualFx.float('RESET', manual.cellX(5), manual.cellY(30), { color: '#ff3b3b', size: 20, dur: 1200 });
+      }
+      break;
+    }
+    case 'botMove': {
+      ensureAutoViews();
+      const v = autoViews[e.board]!;
+      v.anim = { move: e.move, before: e.move.before, t: 0 };
+      break;
+    }
+    case 'catchUp': {
+      if (Number(e.earned) > 0) toast(`+${format(e.earned)} · ${Math.round(e.seconds)}s`);
+      break;
+    }
+    case 'bought':
+      ensureAutoViews();
+      shop.refresh(true);
+      break;
+    case 'slept':
+      break;
+  }
+}
+
+function clearLabel(r: LockResult): string | null {
+  const names = ['', 'SINGLE', 'DOUBLE', 'TRIPLE', 'TETRIS'];
+  const parts: string[] = [];
+  if (r.b2bExtended) parts.push('B2B');
+  if (r.spin === 'full') parts.push(`${r.piece}-SPIN`);
+  if (r.spin === 'mini') parts.push(`MINI ${r.piece}-SPIN`);
+  parts.push(names[r.lines] ?? `${r.lines} LINES`);
+  if (r.comboIndex > 0) parts.push(`${r.comboIndex} COMBO`);
+  if (r.perfectClear) parts.push('PERFECT CLEAR');
+  return parts.length ? parts.join(' ') : null;
+}
+
+function toast(text: string): void {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = text;
+  document.getElementById('auto-pane')!.append(t);
+  setTimeout(() => t.remove(), 2600);
+}
+
+// --- loop -----------------------------------------------------------------
+let lastFrame = performance.now();
+
+function tick(): void {
+  const now = performance.now();
+  const dt = Math.min(250, now - lastFrame);
+  lastFrame = now;
+  // Wall clock, not frame time: hidden tabs throttle frames but time still passes.
+  world.advance(Date.now());
+  input.update(dt);
+  for (const e of world.drainEvents()) handleEvent(e);
+  manualFx.update(dt);
+  for (const v of autoViews) {
+    v.fx.update(dt);
+    if (v.anim) {
+      v.anim.t += dt;
+      if (isLanded(v.anim)) {
+        const r = v.anim.move.result;
+        if (r.lines > 0) {
+          v.fx.rowClear(r.clearedRows);
+          v.fx.shakeBoard(1);
+          v.fx.float('+1', v.renderer.cellX(5), v.renderer.cellY(r.clearedRows[0] ?? 30), { color: PIECE_COLORS[r.piece], size: 14, dur: 700 });
+        }
+        v.anim = null;
+      }
+    }
+  }
+  render();
+  shop.refresh();
+}
+
+function render(): void {
+  const g = world.manual;
+  const view: BoardView = {
+    grid: g.grid, active: g.active, ghostY: g.active ? g.ghostY() : null,
+    hold: g.hold, holdUsed: g.holdUsed, next: g.next(5),
+  };
+  manual.render(view, manualFx);
+  ensureAutoViews();
+  world.autoBoards.forEach((board, i) => {
+    const v = autoViews[i]!;
+    const def = buildingById(board.buildingId);
+    if (v.anim) {
+      const p = animatedPlacement(v.anim);
+      v.renderer.render({ grid: v.anim.before, active: p, ghostY: null, hold: null, holdUsed: false, next: [] }, v.fx, (ctx) => label(ctx, v.renderer, def?.name ?? board.buildingId));
+    } else {
+      v.renderer.render({ grid: board.game.grid, active: null, ghostY: null, hold: null, holdUsed: false, next: [] }, v.fx, (ctx) => label(ctx, v.renderer, def?.name ?? board.buildingId));
+    }
+  });
+}
+
+function label(ctx: CanvasRenderingContext2D, r: BoardRenderer, text: string): void {
+  ctx.save();
+  ctx.fillStyle = '#7a7aa0';
+  ctx.font = '11px system-ui, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(text, r.cellX(0) + 4, 4);
+  ctx.restore();
+}
+
+function frame(): void {
+  tick();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+// Hidden tabs stop animation frames entirely; a coarse interval keeps the
+// clock advancing so the catch-up formula runs while the tab is away.
+window.setInterval(() => { if (document.hidden) tick(); }, 1000);
