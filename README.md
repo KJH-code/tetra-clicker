@@ -11,7 +11,8 @@ Play: https://kjh-code.github.io/tetra-clicker/
 ```
 npm install
 npm run dev        # http://localhost:5173
-npm test           # vitest
+npm test           # everything (the bot runs take ~15 min)
+npm run test:fast  # all but the 10,000-piece bot runs (seconds)
 npm run build      # typecheck + static build in dist/
 ```
 

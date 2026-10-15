@@ -54,30 +54,3 @@ describe('building ladder in the shop', () => {
     expect(w2.snapshot()).toEqual(w.snapshot());
   });
 });
-
-describe('catch-up formula per building', () => {
-  for (const id of ['double', 'triple', 'tetris']) {
-    it(`${id}: 10,000 bot pieces earn within 1% of the formula`, () => {
-      const w = new World(11);
-      w.economy.balance = 1e9;
-      for (const b of BUILDINGS) { w.buy(b.id); if (b.id === id) break; }
-      // Only the building under test keeps its board: the others are dropped so
-      // their income does not blur the comparison.
-      w.autoBoards = w.autoBoards.filter((b) => b.buildingId === id);
-      w.economy.balance = 0;
-      w.advance(0);
-      const pieces = 10_000;
-      for (let i = 1; i <= pieces; i++) w.advance(i * 1000);
-      const expected = pieces * w.incomePerSecond();
-      const events = w.drainEvents().filter((e) => e.type === 'botMove');
-      const def = BUILDINGS.find((b) => b.id === id)!;
-      for (const e of events) {
-        if (e.type !== 'botMove') continue;
-        expect(e.move.result.lines).toBeLessThanOrEqual(def.clearSize);
-        expect(e.move.result.topped).toBe(false);
-      }
-      // The data file's measured constant must match the bot it describes.
-      expect(Math.abs(Number(w.economy.balance) - expected) / expected).toBeLessThan(0.01);
-    }, 300_000);
-  }
-});

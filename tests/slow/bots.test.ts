@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { Game } from '../src/sim/game';
-import { playOne, POLICIES } from '../src/sim/bot/index';
-import { columnHeight, WIDTH } from '../src/sim/board';
+import { Game } from '../../src/sim/game';
+import { playOne, POLICIES } from '../../src/sim/bot/index';
+import { columnHeight, WIDTH } from '../../src/sim/board';
 
 const PIECES = 10_000;
 const SEEDS = [1, 2, 3, 4, 5];

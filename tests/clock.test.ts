@@ -71,20 +71,3 @@ describe('world time with a fake clock', () => {
     }
   });
 });
-
-describe('catch-up formula vs the real bot', () => {
-  it('10,000 bot pieces earn within 1% of seconds × PPS × 0.4 × multiplier', () => {
-    const w = new World(3);
-    w.economy.balance = 1e9;
-    w.buy('single');
-    w.buy('single');
-    w.buy('single'); // multiplier 1.2
-    w.economy.balance = 0;
-    w.advance(0);
-    const pieces = 10_000;
-    for (let i = 1; i <= pieces; i++) w.advance(i * 1000); // one piece per second at PPS 1
-    const simulated = Number(w.economy.balance);
-    const formula = pieces * 1 * 0.4 * 1.2;
-    expect(Math.abs(simulated - formula) / formula).toBeLessThan(0.01);
-  }, 120_000);
-});

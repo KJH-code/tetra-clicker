@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:fast": "vitest run --exclude 'tests/slow/**'",
+    "test:slow": "vitest run tests/slow"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
