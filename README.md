@@ -22,9 +22,34 @@ serves from `/`.
 ## Controls
 
 Guideline defaults: ← → move, ↓ soft drop, Space hard drop, ↑ / X rotate CW,
-Z / Ctrl rotate CCW, A 180, Shift / C hold. DAS / ARR / SDF and every key can
-be changed under SETTINGS. There is no gravity on the manual board: a piece
-waits until you drop it. Reaching the ceiling only wipes the board.
+Z / Ctrl rotate CCW, A 180, Shift / C hold, Enter twice to settle. DAS / ARR /
+SDF and every key can be changed under SETTINGS.
+
+## Rounds
+
+The manual board plays in rounds. Between rounds it shows READY and the
+first game key starts one (that key does nothing else). During a round:
+
+- Manual Lines go to the **vault**, not the balance, times `1 + danger`.
+- **Danger** starts at the wrath floor and rises 1 per 5 minutes.
+- **Settle**: Enter twice within 0.4 s, then a 3 s countdown while you keep
+  playing. The whole vault is banked.
+- **Top out**: 40% of the vault is lost, 60% banked. Either way the board,
+  combo, B2B and hold reset.
+- The shop and upgrade chips are locked.
+- Hiding the tab or leaving the window pauses the round (bots keep going);
+  any key resumes. A round restored from a save starts paused.
+
+Wrath is bought as three upgrades (unlocked after the first round):
+
+| | price | floor | adds |
+|---|---|---|---|
+| WRATH I | 1K | 0.25 | cheese garbage, one row every `max(1.5, 8 / danger)` s |
+| WRATH II | 10K | 0.5 | gravity of `danger` cells/s, 500 ms lock delay (15 resets) |
+| WRATH III | 100K | 1.0 | danger rises twice as fast |
+
+Every manual Line times the danger it was earned at is summed into the
+`riskLines` stat for later prestige. All numbers live in `src/data/danger.ts`.
 
 ## Attack table
 
@@ -163,6 +188,6 @@ tuning; the first four have bots and shop entries so far.
 ## Save
 
 localStorage, key `tetra-clicker/save`, every 10 s plus on tab hide and
-unload. The file has a `version` (now 2); `src/save/schema.ts` upgrades
+unload. The file has a `version` (now 3); `src/save/schema.ts` upgrades
 older saves step by step, so a version 1 save loads with no upgrades and
-zeroed stats.
+zeroed stats, and a version 2 save loads with no round in play.
