@@ -12,7 +12,7 @@ Play: https://kjh-code.github.io/tetra-clicker/
 ```
 npm install
 npm run dev        # http://localhost:5173
-npm test           # everything (the bot runs take ~20 min)
+npm test           # everything (the bot runs take ~30 min)
 npm run test:fast  # all but the long bot runs (about half a minute)
 npm run build      # typecheck + static build in dist/
 npm run build:engine  # rebuild src/engine/cold-clear.wasm from engine/ (Rust)
@@ -115,7 +115,38 @@ before:
 | manual ×3 | garbage gaps ×1.25 | risk weight ×2 |
 | all income ×2 | keep 50% of the vault on a top-out | start level +2 |
 
+A fourth chain, SYNERGY, is research: 1, 2, 3 … 8 crowns up the ladder, each
+opening one synergy for every later run (below).
+
 Everything is data in `src/data/prestige.ts`.
+
+### Synergies
+
+One per pair of neighbouring buildings. Researched once with crowns; then, in
+any run where both buildings are owned, a SYN chip offers it for ten times
+the dearer building's base price. Prestige drops the purchase and keeps the
+research.
+
+| pair | price | kind | effect |
+|---|---|---|---|
+| SINGLE + DOUBLE | 2,500 | cross | each earns +1% per copy of the other |
+| DOUBLE + TRIPLE | 9,000 | cross | each earns +1% per copy of the other |
+| TRIPLE + TETRIS | 13,500 | link | a tetris by hand doubles the TETRIS bot for 30 s |
+| TETRIS + T-SPIN | 34,000 | reward | the T-SPIN bot shares back-to-back pay: ×1.25 |
+| T-SPIN + ALL-SPIN | 130,000 | play | the T-SPIN bot goes for TSS and TST too, ×1.25 |
+| ALL-SPIN + COMBO | 320,000 | reward | the ALL-SPIN bot shares combo pay: ×1.25 |
+| COMBO + B2B | 1,500,000 | play | the B2B bot keeps combos going, ×1.25 |
+| B2B + PERFECT | 3,800,000 | link | a perfect clear by hand doubles every bot for 30 s |
+
+Reward and play synergies are a fixed ×1.25 on that bot's income, in play
+and in the hidden-tab formula alike; the bot is still paid only for its own
+technique. A play synergy also switches the board to another bot (a
+`variant` in the data): measured over 9,000 pieces, the T-SPIN variant
+earns about the same per piece (1% more), the B2B variant about a tenth
+less, which the ×1.25 more than covers. A link buff is game time like a
+golden buff, and the same clear again refills it to 30 s. Boards show SYN
+while a synergy they belong to is bought, and the multiplier while a buff
+lifts them. All of it is data in `src/data/synergies.ts`.
 
 ## Attack table
 

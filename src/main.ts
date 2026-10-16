@@ -7,6 +7,8 @@ import { SAVE_VERSION, type SaveData } from './save/schema';
 import { startAutosave } from './save/autosave';
 import { DEFAULT_HANDLING, type HandlingSettings } from './data/handling';
 import { buildingById } from './data/buildings';
+import { SYNERGIES } from './data/synergies';
+import { tag } from './sim/tags';
 import { BoardRenderer, type BoardView } from './render/boardRenderer';
 import { Fx } from './render/fx';
 import { animatedPlacement, isLanded, type BotAnimation } from './render/botAnim';
@@ -38,7 +40,8 @@ const settings: HandlingSettings = saved ? mergeSettings(saved.settings) : struc
 const world = saved ? new World(saved.world.seed, saved.world) : new World((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
 // Bot decisions are worked out ahead in a worker so a search never stalls a frame.
 const prefetch = new BotPrefetch(world);
-if (import.meta.env.DEV) (window as unknown as { prefetch: BotPrefetch }).prefetch = prefetch;
+// Handles for checking the page by hand in dev builds.
+if (import.meta.env.DEV) Object.assign(window, { prefetch, world });
 
 // --- manual board ---------------------------------------------------------
 const manualCanvas = document.getElementById('manual-board') as HTMLCanvasElement;
@@ -290,14 +293,22 @@ function render(): void {
     const hold = { holds: board.game.holds, holdUsed: false, next: [] as never[] };
     if (v.anim) {
       const p = animatedPlacement(v.anim);
-      v.renderer.render({ grid: v.anim.before, active: p, ghostY: null, ...hold }, v.fx, (ctx) => label(ctx, v.renderer, def?.name ?? board.buildingId));
+      v.renderer.render({ grid: v.anim.before, active: p, ghostY: null, ...hold }, v.fx, (ctx) => label(ctx, v.renderer, boardLabel(board.buildingId, def?.name)));
     } else {
-      v.renderer.render({ grid: board.game.grid, active: null, ghostY: null, ...hold }, v.fx, (ctx) => label(ctx, v.renderer, def?.name ?? board.buildingId));
+      v.renderer.render({ grid: board.game.grid, active: null, ghostY: null, ...hold }, v.fx, (ctx) => label(ctx, v.renderer, boardLabel(board.buildingId, def?.name)));
     }
   });
 }
 
 const e2Earned = (v: AutoView): number => v.lastEarned;
+
+// The building's name, SYN when a synergy it is part of is bought, and the
+// buff multiplier while one is lifting this bot.
+function boardLabel(id: string, name: string | undefined): string {
+  const syn = SYNERGIES.some((s) => s.pair.includes(id) && world.economy.hasUpgrade(s.id)) ? ' · SYN' : '';
+  const buff = world.buffs.multiplier([tag.board('auto'), tag.building(id)], world.economy);
+  return `${name ?? id}${syn}${buff > 1 ? ` ×${buff}` : ''}`;
+}
 
 function label(ctx: CanvasRenderingContext2D, r: BoardRenderer, text: string): void {
   ctx.save();

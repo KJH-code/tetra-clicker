@@ -58,3 +58,22 @@ export const comboBot = (): BotPolicy => ccWasmBot({
 });
 
 export const allspinBot = (): BotPolicy => ccWasmBot({ ...ALLSPIN, nodes: 10_000 });
+
+// Play synergies (src/data/synergies.ts) switch a board to one of these.
+
+// T-SPIN + ALL-SPIN: singles and triples are open too, and a triple slot is
+// worth building.
+export const TSPIN_TST: CcMode = {
+  weights: w({ ...TSPIN.weights, tslot: [8, 148, 600, 500], tspin1: 300, tspin3: 2500 }),
+};
+export const tspinTstBot = (): BotPolicy => ccWasmBot({ ...TSPIN_TST, nodes: 20_000 });
+
+// COMBO + B2B: still only tetrises and TSDs to start a run, but once a
+// combo is going any clear may extend it. Weighted so combos show (up to 7
+// in a 1,800-piece sweep); that costs the chain about a tenth of its Lines
+// per piece, which the synergy's ×1.25 more than repays.
+const B2B_COMBO_RUN: CcMode = { weights: w({ combo_garbage: 1500, clear1: 0, clear2: 0, clear3: 0 }) };
+export const b2bComboBot = (): BotPolicy => ccWasmBot({
+  ...B2B, nodes: 10_000,
+  mode: (game) => (stackHeight(game.grid) >= B2B_PANIC ? { weights: CC_DEFAULT } : game.combo >= 0 ? B2B_COMBO_RUN : null),
+});

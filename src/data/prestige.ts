@@ -1,4 +1,6 @@
 import type { Condition, Effect } from '../sim/effects';
+import { SYNERGIES } from './synergies';
+import { buildingById } from './buildings';
 
 // Prestige: CROWNs from risk-weighted Lines, spent between runs.
 //
@@ -41,7 +43,7 @@ export const TECH_CHECKS: TechCheck[] = [
 ];
 
 // Prestige upgrades: three chains, bought only on the ascension screen.
-export type Branch = 'production' | 'survival' | 'proportion';
+export type Branch = 'production' | 'survival' | 'proportion' | 'synergy';
 
 export interface PrestigeDef {
   id: string;
@@ -76,6 +78,12 @@ export const PRESTIGE_UPGRADES: PrestigeDef[] = [
     { name: 'RISK WEIGHT ×2', effects: [{ target: 'risk_weight', op: 'mul', value: 2 }] },
     { name: 'START LEVEL +2', effects: [{ target: 'start_level', op: 'add', value: 2 }] },
   ]),
+  // Research: each opens one synergy for every later run (bought there with
+  // Lines). Up the ladder, a crown dearer each step, so they come a few per
+  // ascension rather than all at once.
+  ...SYNERGIES.map((s, i): PrestigeDef => ({
+    id: s.research, branch: 'synergy', name: `${s.pair.map((p) => buildingById(p)?.name ?? p).join(' + ')}`, price: i + 1, effects: [],
+  })),
 ];
 
 export const prestigeById = (id: string): PrestigeDef | undefined => PRESTIGE_UPGRADES.find((u) => u.id === id);

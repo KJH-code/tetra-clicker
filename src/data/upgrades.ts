@@ -1,5 +1,6 @@
 import type { Condition, Effect } from '../sim/effects';
 import { BUILDINGS } from './buildings';
+import { SYNERGIES, synergyUnlock } from './synergies';
 
 // Run upgrades: bought once, kept until prestige. Each is data; the engine
 // only knows conditions, effects and rule flags. `label` is the short text on
@@ -8,7 +9,7 @@ export interface UpgradeDef {
   id: string;
   label: string;
   name: string;
-  group: 'milestone' | 'manual' | 'tech' | 'buff' | 'wrath' | 'golden';
+  group: 'milestone' | 'manual' | 'tech' | 'buff' | 'wrath' | 'golden' | 'synergy';
   price: number;
   unlock: Condition[];
   effects: Effect[];
@@ -144,6 +145,11 @@ const golden: UpgradeDef[] = [
     unlock: [{ type: 'stat', stat: 'goldens', gte: 27 }], effects: [{ target: 'buff_duration', op: 'mul', value: 2 }] },
 ];
 
-export const UPGRADES: UpgradeDef[] = [...BUILDINGS.flatMap(milestonesFor), ...MANUAL_UPGRADES, ...MANUAL_SHARE_UPGRADES, ...tech, ...buffs, ...wrath, ...golden];
+// Synergies, researched with crowns and bought here (src/data/synergies.ts).
+const synergy: UpgradeDef[] = SYNERGIES.map((s) => ({
+  id: s.id, name: s.name, label: 'SYN', group: 'synergy', price: s.price, unlock: synergyUnlock(s), effects: s.effects,
+}));
+
+export const UPGRADES: UpgradeDef[] = [...BUILDINGS.flatMap(milestonesFor), ...MANUAL_UPGRADES, ...MANUAL_SHARE_UPGRADES, ...tech, ...buffs, ...wrath, ...golden, ...synergy];
 
 export const upgradeById = (id: string): UpgradeDef | undefined => UPGRADES.find((u) => u.id === id);

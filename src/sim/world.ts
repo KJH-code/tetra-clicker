@@ -5,6 +5,7 @@ import { tag, type Tag } from './tags';
 import { POLICIES, playOne, type BotMove } from './bot/index';
 import type { BotPolicy } from './bot/policy';
 import { buildingById, BUILDINGS } from '../data/buildings';
+import { SYNERGIES } from '../data/synergies';
 import { classifyGap, STEP_MS } from './clock';
 import { conditionMet, evaluate, flagCount } from './effects';
 import { recordManual, emptyStats, addStats, type Stats } from './stats';
@@ -76,10 +77,13 @@ export class World {
   autoBoards: AutoBoard[] = [];
   // Where a board's decisions come from. The page swaps in one fed by a
   // worker running ahead; the decisions are the same either way.
-  policyFor: (board: AutoBoard) => BotPolicy | undefined = (board) => {
-    const def = buildingById(board.buildingId);
-    return def ? POLICIES[def.skill] : undefined;
-  };
+  policyFor: (board: AutoBoard) => BotPolicy | undefined = (board) => POLICIES[this.skillFor(board)];
+
+  // The building's own skill, or the one a play synergy switched it to.
+  skillFor(board: AutoBoard): string {
+    const variant = SYNERGIES.find((s) => s.variant?.building === board.buildingId && this.economy.hasUpgrade(s.id));
+    return variant?.variant!.skill ?? buildingById(board.buildingId)?.skill ?? '';
+  }
   events: WorldEvent[] = [];
   private accumulatorMs = 0;
   private lastTickMs: number | null = null;
@@ -196,6 +200,7 @@ export class World {
       if (result.lines > 0) this.triggerGolden();
       else this.events.push({ type: 'goldenLost' });
     }
+    this.triggerSynergies(result);
     if (result.topped && this.round.active) {
       this.endRound();
     } else if (this.round.active && result.lines > 0) {
@@ -218,6 +223,15 @@ export class World {
     this.round.vault = 0;
     this.round.vaultRisk = 0;
     this.events.push({ type: 'checkpoint', banked });
+  }
+
+  // Link synergies: a tetris or perfect clear by hand starts a bot buff.
+  private triggerSynergies(result: LockResult): void {
+    for (const s of SYNERGIES) {
+      if (!s.trigger || !this.economy.hasUpgrade(s.id)) continue;
+      const hit = s.trigger.on === 'tetris' ? result.lines === 4 : result.perfectClear;
+      if (hit) this.grantBuff(s.trigger.buff);
+    }
   }
 
   private triggerGolden(): void {

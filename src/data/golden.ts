@@ -12,6 +12,11 @@ export interface BuffDef {
 export const BUFFS: Record<string, BuffDef> = {
   frenzy: { id: 'frenzy', label: 'FRENZY ×7', durationMs: 77_000,
     effects: [{ target: 'income', op: 'mul', value: 7 }] },
+  // Synergy links: a manual clear lending the bots a hand.
+  syn_tetris: { id: 'syn_tetris', label: 'TETRIS BOT ×2', durationMs: 30_000,
+    effects: [{ target: 'income', filter: ['building:tetris'], op: 'mul', value: 2 }] },
+  syn_pc: { id: 'syn_pc', label: 'BOTS ×2', durationMs: 30_000,
+    effects: [{ target: 'income', filter: ['board:auto'], op: 'mul', value: 2 }] },
   clear_frenzy: { id: 'clear_frenzy', label: 'CLEAR FRENZY ×777', durationMs: 13_000,
     effects: [{ target: 'income', filter: ['board:manual'], op: 'mul', value: 777 }] },
 };

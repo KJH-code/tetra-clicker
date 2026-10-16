@@ -1,7 +1,7 @@
 import type { BotPolicy } from './policy';
 import { singleBot } from './singleBot';
 import { sizeBot } from './sizeBot';
-import { tspinBot, allspinBot, comboBot, b2bBot } from './techBots';
+import { tspinBot, allspinBot, comboBot, b2bBot, tspinTstBot, b2bComboBot } from './techBots';
 import { pcBot } from './pcBot';
 import type { Game, LockResult } from '../game';
 import { cloneGrid, type Grid, type Placement } from '../board';
@@ -17,6 +17,9 @@ export const POLICIES: Record<string, BotPolicy> = {
   combo: comboBot(),
   b2b: b2bBot(),
   pc: pcBot(),
+  // Switched to by play synergies.
+  tspin_tst: tspinTstBot(),
+  b2b_combo: b2bComboBot(),
 };
 
 export interface BotMove {
