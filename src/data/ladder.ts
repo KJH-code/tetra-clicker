@@ -1,7 +1,5 @@
-// The full building ladder as the economy simulator sees it. Only `single`
-// has a bot today; the rest live here so the ladder's numbers can be tuned
-// before their bots exist. When a bot arrives, its entry moves to
-// buildings.ts. Lines per piece follow the design's per-piece income steps.
+// The full building ladder as the economy simulator sees it, mirroring
+// buildings.ts: PPS and measured Lines per piece per building.
 export interface LadderEntry {
   id: string;
   name: string;
@@ -23,9 +21,9 @@ export const LADDER: LadderEntry[] = [
   { id: 'double', name: 'DOUBLE', basePrice: 120, growth: 1.15, pps: 1, linesPerPiece: 0.89, bonusPct: 10, requires: 'single' },
   { id: 'triple', name: 'TRIPLE', basePrice: 300, growth: 1.15, pps: 1, linesPerPiece: 0.95, bonusPct: 10, requires: 'double' },
   { id: 'tetris', name: 'TETRIS', basePrice: 1_000, growth: 1.15, pps: 1, linesPerPiece: 1.24, bonusPct: 10, requires: 'triple' },
-  { id: 'tspin', name: 'T-SPIN', basePrice: 4_000, growth: 1.15, pps: 1, linesPerPiece: 1.6, bonusPct: 10, requires: 'tetris' },
-  { id: 'allspin', name: 'ALL-SPIN', basePrice: 16_000, growth: 1.15, pps: 1, linesPerPiece: 1.8, bonusPct: 10, requires: 'tspin' },
-  { id: 'combo', name: 'COMBO', basePrice: 66_000, growth: 1.15, pps: 1, linesPerPiece: 2.0, bonusPct: 10, requires: 'allspin' },
-  { id: 'b2b', name: 'B2B', basePrice: 180_000, growth: 1.15, pps: 1, linesPerPiece: 2.2, bonusPct: 10, requires: 'combo' },
-  { id: 'pc', name: 'PERFECT', basePrice: 420_000, growth: 1.15, pps: 1, linesPerPiece: 2.4, bonusPct: 10, requires: 'b2b' },
+  { id: 'tspin', name: 'T-SPIN', basePrice: 4_000, growth: 1.15, pps: 1.26, linesPerPiece: 1.27, bonusPct: 10, requires: 'tetris' },
+  { id: 'allspin', name: 'ALL-SPIN', basePrice: 16_000, growth: 1.15, pps: 1.35, linesPerPiece: 1.33, bonusPct: 10, requires: 'tspin' },
+  { id: 'combo', name: 'COMBO', basePrice: 66_000, growth: 1.15, pps: 1.71, linesPerPiece: 1.17, bonusPct: 10, requires: 'allspin' },
+  { id: 'b2b', name: 'B2B', basePrice: 180_000, growth: 1.15, pps: 1.62, linesPerPiece: 1.36, bonusPct: 10, requires: 'combo' },
+  { id: 'pc', name: 'PERFECT', basePrice: 420_000, growth: 1.15, pps: 1, linesPerPiece: 2.45, bonusPct: 10, requires: 'b2b' },
 ];

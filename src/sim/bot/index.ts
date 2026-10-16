@@ -1,6 +1,8 @@
 import type { BotPolicy } from './policy';
 import { singleBot } from './singleBot';
 import { sizeBot } from './sizeBot';
+import { tspinBot, allspinBot, comboBot, b2bBot } from './techBots';
+import { pcBot } from './pcBot';
 import type { Game, LockResult } from '../game';
 import { cloneGrid, type Grid, type Placement } from '../board';
 import { replay } from './cc/movegen';
@@ -10,6 +12,11 @@ export const POLICIES: Record<string, BotPolicy> = {
   double: sizeBot(2),
   triple: sizeBot(3),
   tetris: sizeBot(4),
+  tspin: tspinBot(),
+  allspin: allspinBot(),
+  combo: comboBot(),
+  b2b: b2bBot(),
+  pc: pcBot(),
 };
 
 export interface BotMove {

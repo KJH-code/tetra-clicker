@@ -216,6 +216,12 @@ function tick(): void {
           v.fx.rowClear(r.clearedRows);
           v.fx.shakeBoard(1);
           v.fx.float(`+${format(e2Earned(v))}`, v.renderer.cellX(5), v.renderer.cellY(r.clearedRows[0] ?? 30), { color: PIECE_COLORS[r.piece], size: 14, dur: 700 });
+          // Technique bots announce their technique, as the manual board does.
+          const tech = buildingById(world.autoBoards[autoViews.indexOf(v)]?.buildingId ?? '')?.tech;
+          const label = tech ? clearLabel(r) : null;
+          if (label && (r.spin !== 'none' || r.comboIndex > 1 || r.b2bExtended || r.perfectClear)) {
+            v.fx.float(label, v.renderer.cellX(5), v.renderer.cellY((r.clearedRows[0] ?? 30) - 2), { color: '#ffffff', size: 10, dur: 900 });
+          }
         }
         v.anim = null;
       }

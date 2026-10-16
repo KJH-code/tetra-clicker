@@ -15,7 +15,13 @@ export interface BotAnimation {
 }
 
 export function animatedPlacement(anim: BotAnimation): Placement {
-  const { from, via, to } = anim.move;
+  const { from, via, to, path } = anim.move;
+  // A move played input by input replays its path, so a spin is seen
+  // turning into its slot.
+  if (path && path.length > 1) {
+    const k = Math.min(1, anim.t / BOT_ANIM_MS);
+    return path[Math.min(path.length - 1, Math.floor(k * path.length))]!;
+  }
   if (anim.t < SLIDE_MS) {
     const k = easeOut(anim.t / SLIDE_MS);
     return { piece: from.piece, rot: k > 0.4 ? via.rot : from.rot, x: Math.round(from.x + (via.x - from.x) * k), y: from.y };

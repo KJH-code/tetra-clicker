@@ -25,9 +25,11 @@ export interface BuildingDef {
   unlock?: Effect['when'];
 }
 
-function tier(id: string, name: string, basePrice: number, clearSize: 1 | 2 | 3 | 4, linesPerPiece: number, requires?: string): BuildingDef {
+function tier(id: string, name: string, basePrice: number, clearSize: 1 | 2 | 3 | 4, linesPerPiece: number, requires?: string,
+  extra: { tech?: BotTech; pps?: number } = {}): BuildingDef {
   const def: BuildingDef = {
-    id, name, basePrice, priceGrowth: 1.15, pps: 1, skill: id, clearSize, linesPerPiece,
+    id, name, basePrice, priceGrowth: 1.15, pps: extra.pps ?? 1, skill: id, clearSize, linesPerPiece,
+    ...(extra.tech ? { tech: extra.tech } : {}),
     effects: [
       { target: 'income', filter: [`building:${id}`], op: 'add_pct', value: 10, stack: { type: 'owned', id, offset: -1 } },
     ],
@@ -42,6 +44,15 @@ export const BUILDINGS: BuildingDef[] = [
   tier('double', 'DOUBLE', 120, 2, 0.89, 'single'),
   tier('triple', 'TRIPLE', 300, 3, 0.95, 'double'),
   tier('tetris', 'TETRIS', 1_000, 4, 1.24, 'triple'),
+  // Technique bots, paid only for their own technique. Their Lines per
+  // piece come out close to each other (a single is worth too little for
+  // combos to beat tetrises), so a higher tier plays faster instead: PPS is
+  // set so PPS × Lines per piece hits the ladder's design step.
+  tier('tspin', 'T-SPIN', 4_000, 4, 1.27, 'tetris', { tech: 'tspin', pps: 1.26 }),
+  tier('allspin', 'ALL-SPIN', 16_000, 4, 1.33, 'tspin', { tech: 'allspin', pps: 1.35 }),
+  tier('combo', 'COMBO', 66_000, 4, 1.17, 'allspin', { tech: 'combo', pps: 1.71 }),
+  tier('b2b', 'B2B', 180_000, 4, 1.36, 'combo', { tech: 'b2b', pps: 1.62 }),
+  tier('pc', 'PERFECT', 420_000, 4, 2.45, 'b2b', { tech: 'pc', pps: 1 }),
 ];
 
 export const buildingById = (id: string): BuildingDef | undefined => BUILDINGS.find((b) => b.id === id);

@@ -34,7 +34,7 @@ describe('building ladder in the shop', () => {
     expect(w.buy('triple')).toBe(true);
     expect(w.buy('tetris')).toBe(true);
     expect(w.autoBoards.map((b) => b.buildingId)).toEqual(['single', 'double', 'triple', 'tetris']);
-    expect(w.incomePerSecond()).toBeCloseTo(BUILDINGS.reduce((sum, b) => sum + b.linesPerPiece, 0), 10);
+    expect(w.incomePerSecond()).toBeCloseTo(BUILDINGS.slice(0, 4).reduce((sum, b) => sum + b.pps * b.linesPerPiece, 0), 10);
   });
 
   it('four boards survive a save round trip and keep stepping identically', () => {
