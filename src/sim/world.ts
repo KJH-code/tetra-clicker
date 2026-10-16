@@ -250,9 +250,14 @@ export class World {
     return flagCount(this.economy.effects, 'rule:wrath', this.economy);
   }
 
+  // The level the next life starts at (wrath and prestige raise it).
+  nextStartLevel(): number {
+    return Math.max(1, Math.floor(this.fx('start_level', LEVELS.startLevel)));
+  }
+
   startRound(): boolean {
     if (this.round.active || this.ascending) return false;
-    this.round.start(this.fx('start_level', LEVELS.startLevel), this.fx('rows_per_level', LEVELS.rowsPerLevel), this.goldenScale());
+    this.round.start(this.nextStartLevel(), this.fx('rows_per_level', LEVELS.rowsPerLevel), this.goldenScale());
     this.economy.stats.rounds += 1;
     this.economy.stats.maxLevel = Math.max(this.economy.stats.maxLevel, this.round.level);
     this.events.push({ type: 'roundStart', level: this.round.level });

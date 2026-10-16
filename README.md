@@ -22,35 +22,42 @@ serves from `/`.
 ## Controls
 
 Guideline defaults: ← → move, ↓ soft drop, Space hard drop, ↑ / X rotate CW,
-Z / Ctrl rotate CCW, A 180, Shift / C hold, Enter twice to settle. DAS / ARR /
-SDF and every key can be changed under SETTINGS.
+Z / Ctrl rotate CCW, A 180, Shift / C hold. DAS / ARR / SDF and every key can
+be changed under SETTINGS.
 
-## Rounds
+## Lives
 
-The manual board plays in rounds. Between rounds it shows READY and the
-first game key starts one (that key does nothing else). During a round:
+The manual board is played one life at a time. Between lives it shows READY
+and the first game key starts one (that key does nothing else). There is no
+way out of a life but topping out, so every life ends; how far it gets is the
+skill.
 
-- Manual Lines go to the **vault**, not the balance, times `1 + danger`.
-- **Danger** starts at the wrath floor and rises 1 per 5 minutes.
-- **Settle**: Enter twice within 0.4 s, then a 3 s countdown while you keep
-  playing. The whole vault is banked.
-- **Top out**: 40% of the vault is lost, 60% banked. Either way the board,
-  combo, B2B and hold reset.
-- The shop and upgrade chips are locked.
-- Hiding the tab or leaving the window pauses the round (bots keep going);
-  any key resumes. A round restored from a save starts paused.
+- **Level**: marathon style, +1 every 10 rows cleared. Manual Lines are
+  multiplied by the level.
+- **Gravity** is always on and follows the level: 0.5 cells/s at level 1,
+  1.5 at 5, 4 at 10, 10 at 15, and at level 20 pieces land at once (20G).
+  A resting piece locks after 500 ms; moves and turns reset that up to 15 times.
+- **Garbage**: from level 3, a cheese row (one random hole) every
+  `max(1.5, 24 / level)` seconds.
+- **Vault and checkpoints**: manual Lines go to the vault. Every 40 rows
+  cleared in a life, a checkpoint banks the vault into the balance. A top-out
+  loses whatever the vault still holds, and the level goes back to the start.
+- The shop stays open: buying is a click away while the board keeps falling.
+- Hiding the tab or leaving the window pauses the life (bots keep going); any
+  key resumes. A life restored from a save starts paused.
 
-Wrath is bought as three upgrades (unlocked after the first round):
+Wrath is bought as three upgrades (unlocked after the first life) that make
+lives harder and richer. There is no way back before prestige:
 
-| | price | floor | adds |
-|---|---|---|---|
-| WRATH I | 2K | 0.25 | cheese garbage, one row every `max(1.5, 8 / danger)` s |
-| WRATH II | 20K | 0.5 | gravity of `danger` cells/s, 500 ms lock delay (15 resets) |
-| WRATH III | 200K | 1.0 | danger rises twice as fast |
+| | price | effect |
+|---|---|---|
+| WRATH I | 2K | every life starts at level 4 |
+| WRATH II | 20K | a level every 8 rows instead of 10 |
+| WRATH III | 200K | start at level 8, a level every 6 rows |
 
-Every Line that goes into the vault (manual clears and lucky payouts) times
-the danger at that moment is summed into the `riskLines` stat, which pays for
-prestige. A top-out does not take it back. All numbers live in `src/data/danger.ts`.
+Banked Lines times the level they were earned at are summed into the
+`riskLines` stat, which pays for prestige; Lines lost to a top-out never
+count. All numbers live in `src/data/levels.ts`.
 
 ## Keeping the manual board worth playing
 
@@ -59,7 +66,7 @@ Bots outgrow the attack table, so two things keep hand play in step:
 - **Manual share.** Five upgrades (unlocked at 2K / 20K / 200K / 2M / 20M Lines
   by hand, priced at ten times that) each add 1% of PER SECOND to every row
   cleared by hand. A manual clear pays
-  `(table value × manual upgrades + share × PER SECOND × rows) × (1 + danger) × buffs`,
+  `(table value × manual upgrades + share × PER SECOND × rows) × level × buffs`,
   with PER SECOND taken without buffs.
 - **Golden pieces.** Every 1–5 minutes of round time the last NEXT piece turns
   gold. It stays gold through hold and pays only if it clears a line; placed
@@ -81,14 +88,14 @@ wait; GET LUCKY (155,554, after 27) doubles buff time. Numbers live in
 ## Prestige
 
 Ascending trades a run for CROWNs. Crowns ever earned =
-`∛(lifetime risk-weighted Lines / 5,000)`; an ascension pays the growth of
+`∛(lifetime risk-weighted Lines / 135,000)`; an ascension pays the growth of
 that since the last one, times `1 + tech score`, rounded down, and needs at
 least one. The cube root makes each next crown dearer, so one long run beats
 many short ones. K is set so the first crown comes after about 2.5 hours.
 
 - **Tech score**: ten checks per run, 0.15 each, capped at 1.0 — T-spin
   single / double / triple, perfect clear, 5 and 10 combo, five B2B in a row,
-  10 tetrises, a settle at danger 2+, 3 golden pieces.
+  10 tetrises, reaching level 10, 3 golden pieces.
 - **Every crown earned** adds 1% to all income, spent or not.
 - **Resets**: Lines, buildings, run upgrades (wrath too), run stats, round,
   buffs, golden piece. **Stays**: crowns, prestige upgrades, lifetime stats,
@@ -101,10 +108,10 @@ before:
 
 | production | survival | proportion |
 |---|---|---|
-| all income ×2 | danger rises ×0.8 | risk weight ×1.5 |
-| start with 2K Lines | top-out loss 40% → 30% | tech cap +0.5 |
+| all income ×2 | gravity ×0.8 | risk weight ×1.5 |
+| start with 2K Lines | keep 25% of the vault on a top-out | tech cap +0.5 |
 | manual ×3 | garbage gaps ×1.25 | risk weight ×2 |
-| all income ×2 | top-out loss 30% → 20% | start danger +0.25 |
+| all income ×2 | keep 50% of the vault on a top-out | start level +2 |
 
 Everything is data in `src/data/prestige.ts`.
 
@@ -125,8 +132,8 @@ B2B. Bots earn none of the bonuses.
 Balances, the vault and every payout are whole Lines. Multipliers still make
 fractions, so each payout pays the whole part and carries the remainder into
 the next (one carry for the balance, one for the vault): nothing is lost and
-long-run income equals the exact sum. Building prices round up; a top-out
-banks its share rounded down.
+long-run income equals the exact sum. Building prices round up; a share of
+the vault kept on a top-out rounds down.
 
 ## Layout
 
@@ -242,8 +249,9 @@ https://kjh-code.github.io/tetra-clicker/sim.html (dev: `/sim.html`)
 
 A second page that runs the whole building ladder through the catch-up
 formula (`PPS × lines per piece × multiplier`) with the game's own pricing
-and bonus code, under a player model (PPS, lines per piece, a focus window,
-then a daily allowance) and a greedy shortest-payback buyer that also buys
+and bonus code, under a player model (PPS, lines per piece, an average life
+level that multiplies manual income, a focus window, then a daily allowance)
+and a greedy shortest-payback buyer that also buys
 the milestone, manual ×2 and manual share upgrades (toggle UPGRADES to compare). It plots income
 over time with each building's first purchase, lists unlock times against a
 target of `first × ratio^k`, and exports the numbers as JSON in the shape of
@@ -253,8 +261,10 @@ tuning; the first four have bots and shop entries so far.
 ## Save
 
 localStorage, key `tetra-clicker/save`, every 10 s plus on tab hide and
-unload. The file has a `version` (now 5); `src/save/schema.ts` upgrades
+unload. The file has a `version` (now 6); `src/save/schema.ts` upgrades
 older saves step by step, so a version 1 save loads with no upgrades and
 zeroed stats, a version 2 save loads with no round in play, a version 3
-save loads with no buffs or golden piece, and a version 4 save has never
-ascended and has its Lines doubled into the whole-number unit.
+save loads with no buffs or golden piece, a version 4 save has never
+ascended and has its Lines doubled into the whole-number unit, and a
+version 5 save has any round in progress banked in full (lives replaced
+settled rounds) and its settle key dropped.

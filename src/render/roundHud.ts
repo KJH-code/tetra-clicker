@@ -9,7 +9,7 @@ import { GOLD } from './theme';
 // checkpoint. A centred banner covers the states where the board is not
 // live (waiting, paused).
 export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, round: Round, wrath: number,
-  buffs: { label: string; msLeft: number }[] = []): void {
+  buffs: { label: string; msLeft: number }[] = [], nextStartLevel = 1): void {
   const c = r.layout.cell;
   const colW = r.layout.leftCells * c;
   const x0 = 6;
@@ -32,7 +32,7 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
   y += c * 0.15;
   label(wrath > 0 ? `LEVEL · WRATH ${'I'.repeat(wrath)}` : 'LEVEL');
   // Level and the bar to the next one; the colour warms as levels climb.
-  const level = round.active ? round.level : round.startLevel;
+  const level = round.active ? round.level : nextStartLevel;
   const color = level < 5 ? '#00f0ff' : level < 10 ? '#ff2ed2' : '#ff3b3b';
   ctx.fillStyle = color;
   ctx.shadowColor = color;
