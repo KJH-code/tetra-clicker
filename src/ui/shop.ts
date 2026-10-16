@@ -10,14 +10,17 @@ export class Shop {
   private buttons = new Map<string, { btn: HTMLButtonElement; owned: HTMLElement; price: HTMLElement }>();
   private lastBalance = NaN;
   private chips: UpgradeChips;
+  private crownEl: HTMLElement;
+  private ascendBtn: HTMLButtonElement;
 
-  constructor(private root: HTMLElement, private world: World, onSettings: () => void) {
+  constructor(private root: HTMLElement, private world: World, onSettings: () => void, onAscend: () => void) {
     root.innerHTML = '';
     const balance = stat('LINES', 'balance');
     const income = stat('PER SECOND', 'income', true);
     this.balanceEl = balance.value;
     this.incomeEl = income.value;
-    root.append(balance.el, income.el);
+    this.crownEl = el('div', 'crowns', '');
+    root.append(balance.el, income.el, this.crownEl);
     this.chips = new UpgradeChips(root, world, () => this.refresh(true));
 
     for (const b of BUILDINGS) {
@@ -38,6 +41,10 @@ export class Shop {
     }
 
     root.append(el('div', 'spacer', ''));
+    this.ascendBtn = document.createElement('button');
+    this.ascendBtn.className = 'btn ascend-btn';
+    this.ascendBtn.addEventListener('click', onAscend);
+    root.append(this.ascendBtn);
     const settings = document.createElement('button');
     settings.className = 'btn';
     settings.textContent = 'SETTINGS';
@@ -62,6 +69,14 @@ export class Shop {
     // Shopping happens between rounds.
     this.root.classList.toggle('in-round', this.world.round.active);
     this.chips.refresh();
+    const meta = this.world.economy.meta;
+    this.crownEl.hidden = meta.crownsEarned === 0;
+    this.crownEl.textContent = `♛ ${meta.crowns} CROWN · +${meta.crownsEarned}% income`;
+    // The button stays hidden until a run is worth something, then names the price.
+    const preview = this.world.crownPreview();
+    this.ascendBtn.hidden = preview < 1 && meta.ascensions === 0;
+    this.ascendBtn.disabled = !this.world.canAscend();
+    this.ascendBtn.textContent = preview >= 1 ? `ASCEND +${preview} CROWN` : 'ASCEND';
     // Unlocked buildings show in full; only the next locked one is visible,
     // dimmed and unnamed, so the ladder is hinted at one step at a time.
     let lockedShown = false;

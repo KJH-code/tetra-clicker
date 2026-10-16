@@ -15,6 +15,7 @@ import { drawRoundHud } from './render/roundHud';
 import { InputHandler } from './ui/input';
 import { Shop } from './ui/shop';
 import { SettingsPanel } from './ui/settings';
+import { AscendPanel } from './ui/ascend';
 
 const store = new LocalStorageStore();
 const saved = store.load();
@@ -52,7 +53,8 @@ function ensureAutoViews(): void {
 
 // --- input / shop / settings -----------------------------------------------
 const input = new InputHandler({
-  game: world.manual,
+  // A getter: ascending replaces the manual game.
+  get game() { return world.manual; },
   onHardDrop: () => { world.manualHardDrop(); },
   gate: () => (!world.round.active ? 'start' : world.round.paused ? 'resume' : 'play'),
   start: () => { world.startRound(); },
@@ -68,7 +70,16 @@ input.setActive(true);
 const shopRoot = document.getElementById('shop-pane')!;
 const settingsOverlay = document.getElementById('settings-overlay')!;
 const settingsPanel = new SettingsPanel(settingsOverlay, settings, () => saveNow(), (open) => input.setActive(!open));
-const shop = new Shop(shopRoot, world, () => settingsPanel.open());
+const ascendOverlay = document.getElementById('ascend-overlay')!;
+// Built before the shop so a save made on the prestige shop reopens it.
+let shop: Shop;
+const ascendPanel = new AscendPanel(ascendOverlay, world, (open) => input.setActive(!open), () => {
+  autoRoot.replaceChildren();
+  autoViews.length = 0;
+  shop.refresh(true);
+  saveNow();
+});
+shop = new Shop(shopRoot, world, () => settingsPanel.open(), () => ascendPanel.confirm());
 
 // --- save -----------------------------------------------------------------
 function snapshot(): SaveData {
