@@ -13,8 +13,9 @@ Play: https://kjh-code.github.io/tetra-clicker/
 npm install
 npm run dev        # http://localhost:5173
 npm test           # everything (the bot runs take ~20 min)
-npm run test:fast  # all but the 10,000-piece bot runs (seconds)
+npm run test:fast  # all but the long bot runs (about half a minute)
 npm run build      # typecheck + static build in dist/
+npm run build:engine  # rebuild src/engine/cold-clear.wasm from engine/ (Rust)
 ```
 
 Node 22. The build sets `base` to `/tetra-clicker/` for GitHub Pages; dev
@@ -147,7 +148,9 @@ src/
   save/       SaveStore interface, localStorage store, schema + migrations, autosave
   render/     Canvas 2D boards, effects, bot replay animation
   ui/         DOM shop, settings panel, keyboard handling (DAS/ARR/SDF)
+  engine/     the built Cold Clear module and the worker that runs bots ahead
   main.ts     wires the loop: wall clock → world.advance → events → render
+engine/       Cold Clear's Rust source (MPL-2.0) and the glue to this game
 tests/        vitest
 ```
 
@@ -187,10 +190,10 @@ average level 4.
 | DOUBLE | 250 | clears up to doubles | 1 | 0.89 | table value |
 | TRIPLE | 900 | up to triples, keeps a well | 1 | 0.95 | table value |
 | TETRIS | 1,350 | tetrises from a well | 1 | 1.24 | table value |
-| T-SPIN | 3,400 | sets up and spins T-spin doubles, nothing else | 1.22 | 1.31 | TSD |
-| ALL-SPIN | 13,000 | spins every piece it can into a clear | 1.32 | 1.36 | every full spin (×1.5 for non-T) |
-| COMBO | 32,000 | builds a ragged stack, then cuts it down one row at a time | 1.61 | 1.24 | combo |
-| B2B | 150,000 | tetrises and TSDs without breaking back-to-back | 1.82 | 1.21 | B2B +20% (a TSD is a plain double) |
+| T-SPIN | 3,400 | a T-spin double from nearly every T (12.9 per 100 pieces; 14.3 is the cap), nothing else | 1.12 | 1.43 | TSD |
+| ALL-SPIN | 13,000 | spins every piece into its clears (11 non-T spins per 100 pieces) | 1.24 | 1.45 | every full spin (×1.5 for non-T) |
+| COMBO | 32,000 | builds a ragged stack 12 rows high, then cuts it down one row at a time (combos up to 10) | 1.69 | 1.18 | combo |
+| B2B | 150,000 | only tetrises and TSDs, so the chain holds (13 B2B clears per 100 pieces) | 1.48 | 1.49 | B2B +20% (a TSD is a plain double) |
 | PERFECT | 380,000 | 4-row perfect clear, then again from the empty board | 1 | 2.45 | perfect clear |
 
 Each building unlocks after one copy of the previous tier. Its bot never
@@ -201,13 +204,20 @@ the I in hold; when the stack climbs they drop the well and dig flat.
 The technique bots earn about the same per piece (a single is worth too
 little for a combo to beat a tetris), so a higher tier plays faster instead:
 PPS is set so PPS × Lines per piece climbs 1.6, 1.8, 2.0, 2.2 Lines a second,
-and PERFECT, which earns the most per piece, stays at 1 PPS. They are built on
-ports of Cold Clear (move generation with spins, the board evaluator, a beam
-search with hold) and pcf (the perfect clear finder); see
-[THIRD_PARTY.md](THIRD_PARTY.md). Their boards replay each piece's real path,
-so a spin shows the piece sliding down and turning in, with the technique's
-name floating over the board. When a stack climbs too high, any of them
-switches to a survival preset that digs out.
+and PERFECT, which earns the most per piece, stays at 1 PPS.
+
+T-SPIN, ALL-SPIN, COMBO and B2B are [Cold Clear](https://github.com/MinusKelvin/cold-clear)
+itself: the Rust engine in `engine/`, built to a 150 KB WebAssembly module,
+with weights per building (`src/sim/bot/techBots.ts`) and a list of clears
+each bot may never make. A search is 10,000–20,000 nodes (30–65 ms); a
+worker runs a copy of every bot board a few pieces ahead and hands each
+decision over, keyed by the exact position, so the page never waits on a
+search and gets the same move it would have worked out itself. The search's
+random choices are seeded from the position, so the same board always plays
+the same way. PERFECT plans with a port of pcf, the perfect clear finder, and
+falls back to Cold Clear between loops; see [THIRD_PARTY.md](THIRD_PARTY.md).
+Every bot board replays each piece's real path, so a spin shows the piece
+sliding down and turning in, with the technique's name floating over the board.
 
 The measured Lines per piece is what the hidden-tab formula and the shop's
 per-second figure use, and the slow tests hold each bot to it within 1%.

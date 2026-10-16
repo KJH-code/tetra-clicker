@@ -1,21 +1,20 @@
 import type { Game } from '../game';
 import type { BotChoice, BotPolicy } from './policy';
 import { solvePc, moveFor, type PcStep } from './cc/pcf';
-import { ccBot } from './ccBot';
-import { STANDARD, type Weights } from './cc/eval';
+import { ccWasmBot, CC_DEFAULT, type CcWeights } from './ccWasm';
 
 // PC loop: from an empty board, find a four-line perfect clear for the next
 // ten pieces (plus hold) and play it, then do it again. When no PC can be
-// found the bot plays a low, flat stack with Cold Clear's weights and keeps
+// found the bot plays a low, flat stack with Cold Clear and keeps
 // looking for a PC from whatever board it has (up to six rows).
 const PC_PREVIEW = 11;
 
 // Low and flat, so a PC stays in reach after a miss.
-export const PC_RECOVER: Weights = { ...STANDARD, perfect_clear: 3000, height: -80, top_half: -400, clear1: 0, clear2: 0, clear3: 0, clear4: 0 };
+export const PC_RECOVER: CcWeights = { ...CC_DEFAULT, perfect_clear: 3000, height: -80, top_half: -400, clear1: 0, clear2: 0, clear3: 0, clear4: 0 };
 
 export function pcBot(): BotPolicy {
   const plans = new WeakMap<Game, PcStep[]>();
-  const recover = ccBot({ weights: PC_RECOVER, width: 4, depth: 2 });
+  const recover = ccWasmBot({ weights: PC_RECOVER, nodes: 3_000 });
   return {
     choose(game: Game): BotChoice | null {
       const active = game.active;

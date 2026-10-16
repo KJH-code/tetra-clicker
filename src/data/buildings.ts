@@ -49,11 +49,11 @@ export const BUILDINGS: BuildingDef[] = [
   // combos to beat tetrises), so a higher tier plays faster instead: PPS is
   // set so PPS × Lines per piece hits the ladder's design step (1.6, 1.8,
   // 2.0, 2.2 Lines a second; PERFECT earns 2.45 at 1 PPS). Measured over
-  // 3 seeds × 3,000 pieces (see tests/slow/techbots.test.ts).
-  tier('tspin', 'T-SPIN', 3_400, 4, 1.31, 'tetris', { tech: 'tspin', pps: 1.22 }),
-  tier('allspin', 'ALL-SPIN', 13_000, 4, 1.36, 'tspin', { tech: 'allspin', pps: 1.32 }),
-  tier('combo', 'COMBO', 32_000, 4, 1.24, 'allspin', { tech: 'combo', pps: 1.61 }),
-  tier('b2b', 'B2B', 150_000, 4, 1.21, 'combo', { tech: 'b2b', pps: 1.82 }),
+  // 3 seeds × 3,000 pieces (see tests/slow/tech-*.test.ts).
+  tier('tspin', 'T-SPIN', 3_400, 4, 1.43, 'tetris', { tech: 'tspin', pps: 1.12 }),
+  tier('allspin', 'ALL-SPIN', 13_000, 4, 1.45, 'tspin', { tech: 'allspin', pps: 1.24 }),
+  tier('combo', 'COMBO', 32_000, 4, 1.18, 'allspin', { tech: 'combo', pps: 1.69 }),
+  tier('b2b', 'B2B', 150_000, 4, 1.49, 'combo', { tech: 'b2b', pps: 1.48 }),
   tier('pc', 'PERFECT', 380_000, 4, 2.45, 'b2b', { tech: 'pc', pps: 1 }),
 ];
 

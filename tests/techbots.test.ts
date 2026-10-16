@@ -34,13 +34,13 @@ describe('technique bots (short runs; long ones live in tests/slow)', () => {
   it('COMBO builds and cuts into combos', () => {
     const rs = run(comboBot, 300, 2);
     expect(rs.filter((r) => r.topped)).toHaveLength(0);
-    expect(Math.max(...rs.map((r) => r.comboIndex))).toBeGreaterThanOrEqual(3);
+    expect(Math.max(...rs.map((r) => r.comboIndex))).toBeGreaterThanOrEqual(4);
   }, 60_000);
 
   it('ALL-SPIN lands spins with pieces other than T', () => {
     const rs = run(allspinBot, 200, 2);
     expect(rs.filter((r) => r.topped)).toHaveLength(0);
-    expect(rs.filter((r) => r.spin === 'full' && r.lines > 0).length).toBeGreaterThan(0);
+    expect(rs.filter((r) => r.spin === 'full' && r.lines > 0 && r.piece !== 'T').length).toBeGreaterThan(5);
   }, 60_000);
 });
 

@@ -1,21 +1,26 @@
 # Third-party code
 
 The bots for the T-SPIN, ALL-SPIN, COMBO, B2B and PC buildings are built on
-ports of two projects by MinusKelvin. Each ported file says so in its header.
+two projects by MinusKelvin. Each copied or ported file says so in its header.
 
 ## Cold Clear
 
 https://github.com/MinusKelvin/cold-clear — Mozilla Public License 2.0.
 
-Ported to TypeScript, adapted to this project's board, SRS kicks and spin
-rules:
+The engine itself, in Rust, built to WebAssembly (`src/engine/cold-clear.wasm`):
+
+- `engine/libtetris/`, `engine/bot/`, `engine/opening-book/` — Cold Clear's
+  crates at commit `279edd7`, trimmed and modified; `engine/README.md` lists
+  the changes.
+- `engine/glue/` — this project's bridge to it, under the same license.
+
+Ported to TypeScript, for the PC bot and for replaying moves on screen:
 
 - `src/sim/bot/cc/movegen.ts` — from `libtetris/src/moves.rs`
-- `src/sim/bot/cc/eval.ts` — from `bot/src/evaluation/standard.rs`
-- `src/sim/bot/cc/search.ts` — scoring after `bot/src/dag.rs`
 
-These files remain under the MPL 2.0 (https://mozilla.org/MPL/2.0/). The
-rest of the repository is not affected by it.
+These files and the built module remain under the MPL 2.0
+(https://mozilla.org/MPL/2.0/; full text in `engine/LICENSE`). The rest of
+the repository is not affected by it.
 
 ## pcf
 

@@ -18,6 +18,8 @@ building type is a bot that clears lines on its own board.
 - `src/save/` SaveStore interface, localStorage implementation, schema + migrations, autosave.
 - `src/render/` Canvas drawing and effects.
 - `src/ui/` DOM shop, settings, keyboard input (DAS/ARR/SDF).
+- `src/engine/` the built Cold Clear module (committed) and the worker that runs bot boards ahead.
+- `engine/` Cold Clear's Rust source (MPL-2.0, modified) and its glue; see engine/README.md.
 - `tests/` Vitest.
 
 ## Commands
@@ -25,9 +27,10 @@ building type is a bot that clears lines on its own board.
 ```
 npm run dev        # vite dev server
 npm test           # vitest run, everything (bot runs take ~20 min)
-npm run test:fast  # all but tests/slow (seconds); what the deploy runs
+npm run test:fast  # all but tests/slow (~30 s); what the deploy runs
 npm run typecheck  # tsc --noEmit
 npm run build      # typecheck + vite build (base /tetra-clicker/)
+npm run build:engine  # rebuild src/engine/cold-clear.wasm from engine/ (Rust, pinned toolchain)
 ```
 
 ## Rules

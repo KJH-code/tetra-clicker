@@ -17,11 +17,28 @@ import { InputHandler } from './ui/input';
 import { Shop } from './ui/shop';
 import { SettingsPanel } from './ui/settings';
 import { AscendPanel } from './ui/ascend';
+import { installEngine } from './sim/bot/ccWasm';
+import engineUrl from './engine/cold-clear.wasm?url';
+import { BotPrefetch } from './engine/botPrefetch';
+
+// The technique bots think with Cold Clear compiled to wasm. Browsers only
+// compile a module this size asynchronously, so it loads before anything plays.
+installEngine(await loadEngine());
+
+async function loadEngine(): Promise<WebAssembly.Instance> {
+  const response = await fetch(engineUrl);
+  // A host that serves .wasm with the wrong type breaks streaming; bytes always work.
+  const bytes = await response.arrayBuffer();
+  return (await WebAssembly.instantiate(bytes, {})).instance;
+}
 
 const store = new LocalStorageStore();
 const saved = store.load();
 const settings: HandlingSettings = saved ? mergeSettings(saved.settings) : structuredClone(DEFAULT_HANDLING);
 const world = saved ? new World(saved.world.seed, saved.world) : new World((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
+// Bot decisions are worked out ahead in a worker so a search never stalls a frame.
+const prefetch = new BotPrefetch(world);
+if (import.meta.env.DEV) (window as unknown as { prefetch: BotPrefetch }).prefetch = prefetch;
 
 // --- manual board ---------------------------------------------------------
 const manualCanvas = document.getElementById('manual-board') as HTMLCanvasElement;
@@ -294,6 +311,7 @@ function label(ctx: CanvasRenderingContext2D, r: BoardRenderer, text: string): v
 
 function frame(): void {
   tick();
+  prefetch.sync();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

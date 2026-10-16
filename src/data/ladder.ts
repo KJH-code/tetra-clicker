@@ -24,9 +24,9 @@ export const LADDER: LadderEntry[] = [
   { id: 'double', name: 'DOUBLE', basePrice: 250, growth: 1.15, pps: 1, linesPerPiece: 0.89, bonusPct: 10, requires: 'single' },
   { id: 'triple', name: 'TRIPLE', basePrice: 900, growth: 1.15, pps: 1, linesPerPiece: 0.95, bonusPct: 10, requires: 'double' },
   { id: 'tetris', name: 'TETRIS', basePrice: 1_350, growth: 1.15, pps: 1, linesPerPiece: 1.24, bonusPct: 10, requires: 'triple' },
-  { id: 'tspin', name: 'T-SPIN', basePrice: 3_400, growth: 1.15, pps: 1.22, linesPerPiece: 1.31, bonusPct: 10, requires: 'tetris' },
-  { id: 'allspin', name: 'ALL-SPIN', basePrice: 13_000, growth: 1.15, pps: 1.32, linesPerPiece: 1.36, bonusPct: 10, requires: 'tspin' },
-  { id: 'combo', name: 'COMBO', basePrice: 32_000, growth: 1.15, pps: 1.61, linesPerPiece: 1.24, bonusPct: 10, requires: 'allspin' },
-  { id: 'b2b', name: 'B2B', basePrice: 150_000, growth: 1.15, pps: 1.82, linesPerPiece: 1.21, bonusPct: 10, requires: 'combo' },
+  { id: 'tspin', name: 'T-SPIN', basePrice: 3_400, growth: 1.15, pps: 1.12, linesPerPiece: 1.43, bonusPct: 10, requires: 'tetris' },
+  { id: 'allspin', name: 'ALL-SPIN', basePrice: 13_000, growth: 1.15, pps: 1.24, linesPerPiece: 1.45, bonusPct: 10, requires: 'tspin' },
+  { id: 'combo', name: 'COMBO', basePrice: 32_000, growth: 1.15, pps: 1.69, linesPerPiece: 1.18, bonusPct: 10, requires: 'allspin' },
+  { id: 'b2b', name: 'B2B', basePrice: 150_000, growth: 1.15, pps: 1.48, linesPerPiece: 1.49, bonusPct: 10, requires: 'combo' },
   { id: 'pc', name: 'PERFECT', basePrice: 380_000, growth: 1.15, pps: 1, linesPerPiece: 2.45, bonusPct: 10, requires: 'b2b' },
 ];

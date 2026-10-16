@@ -3,6 +3,7 @@ import { Economy } from './economy';
 import { earnedFor, botAttack } from './attack';
 import { tag, type Tag } from './tags';
 import { POLICIES, playOne, type BotMove } from './bot/index';
+import type { BotPolicy } from './bot/policy';
 import { buildingById, BUILDINGS } from '../data/buildings';
 import { classifyGap, STEP_MS } from './clock';
 import { conditionMet, evaluate, flagCount } from './effects';
@@ -73,6 +74,12 @@ export class World {
   manual: Game;
   economy: Economy;
   autoBoards: AutoBoard[] = [];
+  // Where a board's decisions come from. The page swaps in one fed by a
+  // worker running ahead; the decisions are the same either way.
+  policyFor: (board: AutoBoard) => BotPolicy | undefined = (board) => {
+    const def = buildingById(board.buildingId);
+    return def ? POLICIES[def.skill] : undefined;
+  };
   events: WorldEvent[] = [];
   private accumulatorMs = 0;
   private lastTickMs: number | null = null;
@@ -504,7 +511,7 @@ export class World {
       board.timerMs -= dtMs;
       while (board.timerMs <= 0) {
         board.timerMs += 1000 / def.pps;
-        const policy = POLICIES[def.skill];
+        const policy = this.policyFor(board);
         if (!policy) break;
         const move = playOne(board.game, policy);
         if (!move) break;
