@@ -23,6 +23,10 @@ export class Shop {
     root.append(balance.el, income.el, this.crownEl);
     this.chips = new UpgradeChips(root, world, () => this.refresh(true));
 
+    // Nine buildings outgrow a short window; the list scrolls on its own so
+    // the balance, chips and buttons below stay in view.
+    const list = el('div', 'buildings', '');
+    root.append(list);
     for (const b of BUILDINGS) {
       const btn = document.createElement('button');
       btn.className = 'building';
@@ -36,11 +40,10 @@ export class Shop {
         if (this.world.buy(b.id)) this.refresh(true);
       });
       btn.dataset['label'] = b.name;
-      root.append(btn);
+      list.append(btn);
       this.buttons.set(b.id, { btn, owned, price });
     }
 
-    root.append(el('div', 'spacer', ''));
     this.ascendBtn = document.createElement('button');
     this.ascendBtn.className = 'btn ascend-btn';
     this.ascendBtn.addEventListener('click', onAscend);

@@ -1,5 +1,6 @@
 import { World, type WorldEvent } from './sim/world';
 import type { LockResult } from './sim/game';
+import type { BotTech } from './sim/attack';
 import { format } from './sim/num';
 import { LocalStorageStore } from './save/localStorageStore';
 import { SAVE_VERSION, type SaveData } from './save/schema';
@@ -32,10 +33,22 @@ interface AutoView { renderer: BoardRenderer; fx: Fx; anim: BotAnimation | null;
 const autoViews: AutoView[] = [];
 const autoRoot = document.getElementById('auto-boards')!;
 
-// Bot boards shrink as more of them share the middle pane; when the size
-// changes every canvas is rebuilt so they all match.
+// Bot boards shrink as more of them share the middle pane: the largest cell
+// at which every board fits without scrolling. When the size changes every
+// canvas is rebuilt so they all match.
+const AUTO_BOARD_COLS = 14; // hold column + the 10-wide well
+const AUTO_BOARD_ROWS = 22; // 20 visible + 2 buffer rows
+const AUTO_GAP = 12;
 function autoCellSize(): number {
-  return world.autoBoards.length <= 1 ? 20 : 14;
+  const n = world.autoBoards.length;
+  const pane = autoRoot.parentElement!;
+  const w = pane.clientWidth - 2 * AUTO_GAP;
+  const h = pane.clientHeight - 2 * AUTO_GAP;
+  for (let cell = n <= 1 ? 20 : 14; cell > 6; cell--) {
+    const cols = Math.max(1, Math.floor((w + AUTO_GAP) / (AUTO_BOARD_COLS * cell + AUTO_GAP)));
+    if (Math.ceil(n / cols) * (AUTO_BOARD_ROWS * cell + AUTO_GAP) - AUTO_GAP <= h) return cell;
+  }
+  return 6;
 }
 
 function ensureAutoViews(): void {
@@ -186,6 +199,19 @@ function clearLabel(r: LockResult): string | null {
   return parts.length ? parts.join(' ') : null;
 }
 
+// A bot board names only the technique its building is paid for: the full
+// clear name does not fit a board shrunk to share the pane with eight others.
+function techLabel(r: LockResult, tech: BotTech): string | null {
+  const names = ['', 'SINGLE', 'DOUBLE', 'TRIPLE', 'TETRIS'];
+  switch (tech) {
+    case 'tspin': return r.piece === 'T' && r.spin === 'full' ? `T-SPIN ${names[r.lines]}` : null;
+    case 'allspin': return r.spin === 'full' ? `${r.piece}-SPIN ${names[r.lines]}` : null;
+    case 'combo': return r.comboIndex > 0 ? `${r.comboIndex} COMBO` : null;
+    case 'b2b': return r.b2bExtended ? `B2B ${r.spin === 'full' ? 'TSD' : names[r.lines]}` : null;
+    case 'pc': return r.perfectClear ? 'PERFECT CLEAR' : null;
+  }
+}
+
 function toast(text: string): void {
   const t = document.createElement('div');
   t.className = 'toast';
@@ -218,9 +244,9 @@ function tick(): void {
           v.fx.float(`+${format(e2Earned(v))}`, v.renderer.cellX(5), v.renderer.cellY(r.clearedRows[0] ?? 30), { color: PIECE_COLORS[r.piece], size: 14, dur: 700 });
           // Technique bots announce their technique, as the manual board does.
           const tech = buildingById(world.autoBoards[autoViews.indexOf(v)]?.buildingId ?? '')?.tech;
-          const label = tech ? clearLabel(r) : null;
-          if (label && (r.spin !== 'none' || r.comboIndex > 1 || r.b2bExtended || r.perfectClear)) {
-            v.fx.float(label, v.renderer.cellX(5), v.renderer.cellY((r.clearedRows[0] ?? 30) - 2), { color: '#ffffff', size: 10, dur: 900 });
+          const label = tech ? techLabel(r, tech) : null;
+          if (label) {
+            v.fx.float(label, v.renderer.cellX(5), v.renderer.cellY((r.clearedRows[0] ?? 30) - 2), { color: '#ffffff', size: Math.max(8, Math.round(v.renderer.layout.cell * 0.8)), dur: 900 });
           }
         }
         v.anim = null;

@@ -2,7 +2,8 @@
 
 Tetris × idle clicker. Clear lines by hand to earn **Lines**, spend Lines on
 buildings, and each building is a bot that plays its own board and clears
-lines for you. MVP: one building (SINGLE), one bot, one loop.
+lines for you. Nine buildings, from a bot that only clears singles to one
+that loops perfect clears.
 
 Play: https://kjh-code.github.io/tetra-clicker/
 
@@ -11,7 +12,7 @@ Play: https://kjh-code.github.io/tetra-clicker/
 ```
 npm install
 npm run dev        # http://localhost:5173
-npm test           # everything (the bot runs take ~15 min)
+npm test           # everything (the bot runs take ~20 min)
 npm run test:fast  # all but the 10,000-piece bot runs (seconds)
 npm run build      # typecheck + static build in dist/
 ```
@@ -125,9 +126,10 @@ ratios are the design; the unit is doubled so every amount is a whole number:
 | Lines | 2 | 5 | 9 | 14 | 4 | 8 | 12 | 20 |
 
 Combo multiplies by `1 + 0.1 × [0,1,1,2,2,3,3,4,4,4,5…]` (index = clears
-before this one in the run). Back-to-back adds 20%. Minis and non-T spins pay
-as plain clears. A perfect clear replaces the base with 20 before combo and
-B2B. Bots earn none of the bonuses.
+before this one in the run). Back-to-back adds 20%. A perfect clear replaces
+the base with 20 before combo and B2B. A full spin of any other piece
+(all-spin) pays its plain clear × 1.5; minis still pay as plain clears. Bots
+are paid only for their own building's technique (below).
 
 Balances, the vault and every payout are whole Lines. Multipliers still make
 fractions, so each payout pays the whole part and carries the remainder into
@@ -176,20 +178,39 @@ base + all `add` → sum of all `add_pct` → product of all `mul` and `mul_pct`
 
 ### Buildings
 
-| building | price | largest clear | Lines / piece (measured) |
-|---|---|---|---|
-| SINGLE | 30 | 1 | 0.8 |
-| DOUBLE | 120 | 2 | 0.89 |
-| TRIPLE | 300 | 3 | 0.95 |
-| TETRIS | 1,000 | 4 | 1.24 |
+Prices are fitted with the economy simulator (below) to a player whose lives
+average level 4.
+
+| building | price | bot | PPS | Lines / piece (measured) | paid for |
+|---|---|---|---|---|---|
+| SINGLE | 110 | clears singles only | 1 | 0.8 | table value |
+| DOUBLE | 250 | clears up to doubles | 1 | 0.89 | table value |
+| TRIPLE | 900 | up to triples, keeps a well | 1 | 0.95 | table value |
+| TETRIS | 1,350 | tetrises from a well | 1 | 1.24 | table value |
+| T-SPIN | 3,400 | sets up and spins T-spin doubles, nothing else | 1.22 | 1.31 | TSD |
+| ALL-SPIN | 13,000 | spins every piece it can into a clear | 1.32 | 1.36 | every full spin (×1.5 for non-T) |
+| COMBO | 32,000 | builds a ragged stack, then cuts it down one row at a time | 1.61 | 1.24 | combo |
+| B2B | 150,000 | tetrises and TSDs without breaking back-to-back | 1.82 | 1.21 | B2B +20% (a TSD is a plain double) |
+| PERFECT | 380,000 | 4-row perfect clear, then again from the empty board | 1 | 2.45 | perfect clear |
 
 Each building unlocks after one copy of the previous tier. Its bot never
-clears more rows at once than its size, never tops out, and is paid the
-attack table for every clear it makes (no combo, B2B, spin or PC bonuses).
-Bots for TRIPLE and TETRIS keep a one-column well on the right and bank the I
-in hold; when the stack climbs they drop the well and dig flat. The measured
-Lines per piece is what the hidden-tab formula and the shop's per-second
-figure use, and a test holds each bot to it within 1%.
+tops out, and every clear that is not its own technique pays the plain table
+value. Bots for TRIPLE and TETRIS keep a one-column well on the right and bank
+the I in hold; when the stack climbs they drop the well and dig flat.
+
+The technique bots earn about the same per piece (a single is worth too
+little for a combo to beat a tetris), so a higher tier plays faster instead:
+PPS is set so PPS × Lines per piece climbs 1.6, 1.8, 2.0, 2.2 Lines a second,
+and PERFECT, which earns the most per piece, stays at 1 PPS. They are built on
+ports of Cold Clear (move generation with spins, the board evaluator, a beam
+search with hold) and pcf (the perfect clear finder); see
+[THIRD_PARTY.md](THIRD_PARTY.md). Their boards replay each piece's real path,
+so a spin shows the piece sliding down and turning in, with the technique's
+name floating over the board. When a stack climbs too high, any of them
+switches to a survival preset that digs out.
+
+The measured Lines per piece is what the hidden-tab formula and the shop's
+per-second figure use, and the slow tests hold each bot to it within 1%.
 
 ### Adding a building
 
@@ -198,17 +219,18 @@ except registering the bot's placement policy:
 
 ```ts
 //   id        name       price clear  Lines/piece  unlocked by
-tier('tspin', 'T-SPIN', 4000, 2, 1.6, 'tetris'),
+tier('ultra', 'ULTRA', 900_000, 4, 2.0, 'pc', { tech: 'pc', pps: 1.5 }),
 ```
 
-`tier` fills in the rest: price growth 1.15, 1 PPS, the
-`{ target: 'income', filter: ['building:tspin'], op: 'add_pct', value: 10,
-stack: { type: 'owned', id: 'tspin', offset: -1 } }` bonus, and the
-`unlock: [{ type: 'owned', id: 'tetris', gte: 1 }]` condition. The bot is a
+`tier` fills in the rest: price growth 1.15, 1 PPS unless given, the
+`{ target: 'income', filter: ['building:ultra'], op: 'add_pct', value: 10,
+stack: { type: 'owned', id: 'ultra', offset: -1 } }` bonus, and the
+`unlock: [{ type: 'owned', id: 'pc', gte: 1 }]` condition. `tech` names the
+technique the bot is paid for. The bot is a
 `BotPolicy` registered under the building id in `src/sim/bot/index.ts`;
 shop button, lock, price curve, income, catch-up and save all come from the
-data entry. Measure the bot's Lines per piece with a 10,000-piece run and put
-that number in the entry and in `src/data/ladder.ts`.
+data entry. Measure the bot's Lines per piece with a long run and put that
+number in the entry and in `src/data/ladder.ts`.
 
 ## Upgrades
 
@@ -225,8 +247,9 @@ unlock. All of them are data in `src/data/upgrades.ts`.
 | SHIELD | 25 back-to-back clears | one ordinary clear per chain does not break B2B |
 | NEXT+1 / HOLD2 | 500 / 2,000 manual pieces | six next pieces / a two-slot hold queue |
 
-Technique upgrades and buffs only matter on the manual board: bots earn no
-technique bonuses and always play guideline rules. GRACE, SHIELD, NEXT+1 and
+Technique upgrades and buffs only matter on the manual board: bot income
+carries no technique tags, so the SPIN / B2B / PC / COMBO multipliers never
+reach it, and bots always play guideline rules. GRACE, SHIELD, NEXT+1 and
 HOLD2 change the rules of Tetris itself and say RULE in their tooltip.
 
 Each tier of a chain needs the previous one bought, so one chip per chain
@@ -255,8 +278,9 @@ and a greedy shortest-payback buyer that also buys
 the milestone, manual ×2 and manual share upgrades (toggle UPGRADES to compare). It plots income
 over time with each building's first purchase, lists unlock times against a
 target of `first × ratio^k`, and exports the numbers as JSON in the shape of
-`src/data/ladder.ts`. The ladder file holds the nine buildings' numbers for
-tuning; the first four have bots and shop entries so far.
+`src/data/ladder.ts`. The ladder file mirrors the nine shop buildings for
+tuning; its default player averages level 4, the level the prices were
+fitted to.
 
 ## Save
 
