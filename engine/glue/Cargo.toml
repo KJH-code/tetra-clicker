@@ -1,0 +1,13 @@
+[package]
+name = "cc-glue"
+version = "0.1.0"
+edition = "2018"
+license = "MPL-2.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+cold-clear = { path = "../bot" }
+libtetris = { path = "../libtetris" }
+enumset = "1.0.4"

@@ -5,3 +5,6 @@ dist
 
 # Local bot weight sweeps; results feed the committed weights, the harness does not ship.
 sweep/
+
+# Rust build output; the built engine is committed as src/engine/cold-clear.wasm.
+engine/target/

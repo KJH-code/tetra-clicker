@@ -54,3 +54,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:slow
+
+  # The committed engine module must be what engine/ builds to: rebuild it
+  # from source (toolchain pinned in engine/rust-toolchain.toml) and run the
+  # fast tests against the fresh build.
+  engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:engine
+      - run: npm run test:fast

@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "test:fast": "vitest run --exclude 'tests/slow/**'",
-    "test:slow": "vitest run tests/slow"
+    "test:slow": "vitest run tests/slow",
+    "build:engine": "sh scripts/build-engine.sh"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
