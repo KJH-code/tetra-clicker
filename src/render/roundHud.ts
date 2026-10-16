@@ -2,13 +2,15 @@ import type { Round } from '../sim/round';
 import type { BoardRenderer } from './boardRenderer';
 import { format } from '../sim/num';
 import { TOP_VISIBLE_ROW, WIDTH } from '../sim/board';
+import { GOLD } from './theme';
 
 // Round readout drawn on the manual board: vault and a danger gauge in the
 // hold column under the hold slots, and a centred banner for the states
 // where the board is not live (waiting, paused, settling).
 const DANGER_FULL = 3; // the gauge reads full at this much danger
 
-export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, round: Round, wrath: number): void {
+export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, round: Round, wrath: number,
+  buffs: { label: string; msLeft: number }[] = []): void {
   const c = r.layout.cell;
   const colW = r.layout.leftCells * c;
   const x0 = 6;
@@ -44,6 +46,21 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
   ctx.fillStyle = '#e8e8ff';
   ctx.font = `700 ${Math.round(c * 0.5)}px system-ui, sans-serif`;
   ctx.fillText(`×${(1 + round.danger).toFixed(2)}`, x0, y);
+  // Running buffs, under the multiplier they stack with.
+  y += c * 1.0;
+  for (const b of buffs) {
+    ctx.fillStyle = GOLD;
+    ctx.shadowColor = GOLD;
+    ctx.shadowBlur = 8;
+    ctx.font = `700 ${Math.round(c * 0.36)}px system-ui, sans-serif`;
+    ctx.fillText(b.label, x0, y);
+    ctx.shadowBlur = 0;
+    y += c * 0.5;
+    ctx.fillStyle = '#e8e8ff';
+    ctx.font = `${Math.round(c * 0.36)}px system-ui, sans-serif`;
+    ctx.fillText(`${Math.ceil(b.msLeft / 1000)}s`, x0, y);
+    y += c * 0.65;
+  }
 
   const banner = bannerText(round);
   if (banner) {

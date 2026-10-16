@@ -9,7 +9,8 @@ import { buildingById } from './data/buildings';
 import { BoardRenderer, type BoardView } from './render/boardRenderer';
 import { Fx } from './render/fx';
 import { animatedPlacement, isLanded, type BotAnimation } from './render/botAnim';
-import { PIECE_COLORS } from './render/theme';
+import { GOLD, PIECE_COLORS } from './render/theme';
+import { BUFFS } from './data/golden';
 import { drawRoundHud } from './render/roundHud';
 import { InputHandler } from './ui/input';
 import { Shop } from './ui/shop';
@@ -92,7 +93,7 @@ function handleEvent(e: WorldEvent): void {
         manualFx.shakeBoard(r.lines + (r.spin !== 'none' ? 1 : 0) + (r.perfectClear ? 3 : 0));
         const cx = manual.cellX(5);
         const cy = manual.cellY(r.clearedRows[0] ?? e.at.y);
-        manualFx.float(`+${format(e.earned)}`, cx, cy, { color: PIECE_COLORS[r.piece], size: 22 + r.lines * 3 });
+        manualFx.float(`+${format(e.earned)}`, cx, cy, { color: r.golden ? GOLD : PIECE_COLORS[r.piece], size: 22 + r.lines * 3 });
         const label = clearLabel(r);
         if (label) manualFx.float(label, cx, cy - 26, { color: '#ffffff', size: 13, dur: 1100 });
       }
@@ -138,6 +139,21 @@ function handleEvent(e: WorldEvent): void {
       break;
     }
     case 'paused':
+      break;
+    case 'buff':
+      break;
+    case 'goldenSpawn':
+      manualFx.float('GOLDEN', manual.cellX(5), manual.cellY(22), { color: GOLD, size: 18, dur: 1200 });
+      break;
+    case 'golden': {
+      const o = e.outcome;
+      const text = o.kind === 'buff' ? BUFFS[o.buff]?.label ?? o.id : `LUCKY +${format(e.amount)}`;
+      manualFx.shakeBoard(3);
+      manualFx.float(text, manual.cellX(5), manual.cellY(23), { color: GOLD, size: 24, dur: 2000 });
+      break;
+    }
+    case 'goldenLost':
+      manualFx.float('GOLDEN LOST', manual.cellX(5), manual.cellY(23), { color: '#7a7aa0', size: 16, dur: 1200 });
       break;
   }
 }
@@ -198,8 +214,10 @@ function render(): void {
   const view: BoardView = {
     grid: g.grid, active: g.active, ghostY: g.active ? g.ghostY() : null,
     holds: g.holds, holdUsed: g.holdUsed, next: g.next(),
+    golden: { active: g.golden.active, holds: g.golden.holds, next: g.golden.queue },
   };
-  manual.render(view, manualFx, (ctx) => drawRoundHud(ctx, manual, world.round, world.wrath()));
+  const buffs = world.buffs.active.map((b) => ({ label: BUFFS[b.id]?.label ?? b.id, msLeft: b.msLeft }));
+  manual.render(view, manualFx, (ctx) => drawRoundHud(ctx, manual, world.round, world.wrath(), buffs));
   ensureAutoViews();
   world.autoBoards.forEach((board, i) => {
     const v = autoViews[i]!;

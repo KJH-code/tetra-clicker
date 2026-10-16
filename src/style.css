@@ -188,6 +188,9 @@ canvas { display: block; image-rendering: pixelated; }
 .chip-tip .rule { margin-left: 8px; font-size: 10px; color: #000; background: var(--ok); border-radius: 4px; padding: 1px 4px; }
 
 .chip.wrath { border-color: #ff3b3b80; color: #ff3b3b; }
+.chip.golden { border-color: #ffb80080; color: #ffb800; }
+/* PER SECOND while a buff multiplies it. */
+.buffed { color: #ffb800 !important; text-shadow: 0 0 10px #ffb80099; }
 /* During a round the shop is closed: dim it and say so once. */
 #shop-pane.in-round .building, #shop-pane.in-round .chips { opacity: 0.35; pointer-events: none; }
 #shop-pane.in-round::after {

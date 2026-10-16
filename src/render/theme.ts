@@ -12,6 +12,9 @@ export const PIECE_COLORS: Record<Piece, string> = {
   L: '#ff8c1a',
 };
 
+// Golden pieces. Brighter and warmer than the O so the two never read alike.
+export const GOLD = '#ffb800';
+
 export const THEME = {
   background: '#06060d',
   grid: '#15152a',

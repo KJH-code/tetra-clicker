@@ -58,6 +58,7 @@ export class Shop {
       this.lastBalance = balance;
     }
     this.incomeEl.textContent = `${format(this.world.incomePerSecond(true))}/s`;
+    this.incomeEl.classList.toggle('buffed', this.world.buffs.active.length > 0);
     // Shopping happens between rounds.
     this.root.classList.toggle('in-round', this.world.round.active);
     this.chips.refresh();
