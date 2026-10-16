@@ -29,13 +29,10 @@ interface Node {
   // Spin state of the last input: 0 = not a rotation, 1 = rotation, 2 = a
   // rotation that used the fifth kick (upgrades a mini T-spin to full).
   turn: 0 | 1 | 2;
-  inputs: Input[];
-  path: Placement[];
+  parent: Node | null;
+  input: Input | null;
+  depth: number;
 }
-
-const ROTATIONS: { input: Input; dir: number }[] = [
-  { input: 'CW', dir: 1 }, { input: 'CCW', dir: 3 }, { input: 'R180', dir: 2 },
-];
 
 function stateKey(p: Placement, turn: number): number {
   return (((p.x + 4) * 64 + p.y) * 4 + p.rot) * 3 + turn;
@@ -48,29 +45,27 @@ function lockKey(p: Placement, spin: SpinKind): string {
   return `${cells.join(',')}|${spin}`;
 }
 
+const TURNS: Record<string, number> = { CW: 1, CCW: 3, R180: 2 };
+
 function apply(grid: Grid, n: Node, input: Input): Node | null {
   const p = n.p;
+  const next = (q: Placement, turn: 0 | 1 | 2): Node => ({ p: q, turn, parent: n, input, depth: n.depth + 1 });
   if (input === 'L' || input === 'R') {
     const q = { ...p, x: p.x + (input === 'L' ? -1 : 1) };
-    return collides(grid, q) ? null : { p: q, turn: 0, inputs: [...n.inputs, input], path: [...n.path, q] };
+    return collides(grid, q) ? null : next(q, 0);
   }
   if (input === 'DROP') {
     const d = dropDistance(grid, p);
-    if (d === 0) return null;
-    const q = { ...p, y: p.y + d };
-    return { p: q, turn: 0, inputs: [...n.inputs, input], path: [...n.path, q] };
+    return d === 0 ? null : next({ ...p, y: p.y + d }, 0);
   }
   if (p.piece === 'O') return null;
-  const dir = ROTATIONS.find((r) => r.input === input)!.dir;
-  const to = ((p.rot + dir) % 4) as Rotation;
+  const to = ((p.rot + TURNS[input]!) % 4) as Rotation;
   const kicks = kicksFor(p.piece, p.rot, to);
   for (let i = 0; i < kicks.length; i++) {
     const [kx, ky] = kicks[i]!;
     // Kick tables are y-up; the grid is y-down.
     const q: Placement = { ...p, rot: to, x: p.x + kx, y: p.y - ky };
-    if (!collides(grid, q)) {
-      return { p: q, turn: i === 4 ? 2 : 1, inputs: [...n.inputs, input], path: [...n.path, q] };
-    }
+    if (!collides(grid, q)) return next(q, i === 4 ? 2 : 1);
   }
   return null;
 }
@@ -82,14 +77,14 @@ function apply(grid: Grid, n: Node, input: Input): Node | null {
 export function findMoves(grid: Grid, spawn: Placement, maxInputs = 16): Move[] {
   const locks = new Map<string, Move>();
   const seen = new Set<number>();
-  let frontier: Node[] = [{ p: spawn, turn: 0, inputs: [], path: [spawn] }];
+  let frontier: Node[] = [{ p: spawn, turn: 0, parent: null, input: null, depth: 0 }];
   seen.add(stateKey(spawn, 0));
   const inputs: Input[] = spawn.piece === 'O' ? ['L', 'R', 'DROP'] : ['L', 'R', 'CW', 'CCW', 'R180', 'DROP'];
   while (frontier.length > 0) {
     const next: Node[] = [];
     for (const n of frontier) {
       lockFrom(grid, n, locks);
-      if (n.inputs.length >= maxInputs) continue;
+      if (n.depth >= maxInputs) continue;
       for (const input of inputs) {
         const m = apply(grid, n, input);
         if (!m) continue;
@@ -114,7 +109,16 @@ function lockFrom(grid: Grid, n: Node, locks: Map<string, Move>): void {
   const spin: SpinKind = d > 0 ? 'none' : detectSpin(grid, p, { lastActionWasRotation: n.turn > 0, lastKickIndex: n.turn === 2 ? 4 : 0 });
   const key = lockKey(p, spin);
   if (locks.has(key)) return;
-  locks.set(key, { placement: p, spin, inputs: n.inputs, path: d > 0 ? [...n.path, p] : n.path });
+  const inputs: Input[] = [];
+  const path: Placement[] = [];
+  for (let k: Node | null = n; k; k = k.parent) {
+    path.push(k.p);
+    if (k.input) inputs.push(k.input);
+  }
+  inputs.reverse();
+  path.reverse();
+  if (d > 0) path.push(p);
+  locks.set(key, { placement: p, spin, inputs, path });
 }
 
 // Play a move's inputs on a real game (the hard drop is left to the caller).

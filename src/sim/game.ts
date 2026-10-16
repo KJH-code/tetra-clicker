@@ -64,6 +64,17 @@ export interface GameRules {
   holdSlots: number;
 }
 
+// Spawn at the top of the visible area. With no gravity a piece spawned in
+// the buffer would be invisible, so unlike the guideline it starts on the
+// first visible row. Bots plan from here too.
+export function spawnPlacementFor(piece: Piece): Placement {
+  const size = boxSize(piece);
+  const x = Math.floor((WIDTH - size) / 2);
+  // The I box has an empty top row, so shift it up to put the bar on the top visible row.
+  const y = piece === 'I' ? TOP_VISIBLE_ROW - 1 : TOP_VISIBLE_ROW;
+  return { piece, rot: 0, x, y };
+}
+
 export const DEFAULT_RULES: GameRules = { comboGrace: 0, b2bShield: false, nextCount: 5, holdSlots: 1 };
 
 // Pieces kept in the queue: enough for the longest preview a rule can show.
@@ -142,15 +153,8 @@ export class Game {
     };
   }
 
-  // Spawn at the top of the visible area. With no gravity a piece spawned in
-  // the buffer would be invisible, so unlike the guideline it starts on the
-  // first visible row. Returns false when the spawn position is blocked.
   private spawnPlacement(piece: Piece): Placement {
-    const size = boxSize(piece);
-    const x = Math.floor((WIDTH - size) / 2);
-    // The I box has an empty top row, so shift it up to put the bar on the top visible row.
-    const y = piece === 'I' ? TOP_VISIBLE_ROW - 1 : TOP_VISIBLE_ROW;
-    return { piece, rot: 0, x, y };
+    return spawnPlacementFor(piece);
   }
 
   get hasGolden(): boolean {
