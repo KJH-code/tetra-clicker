@@ -136,6 +136,12 @@ export class Game {
     return this.bag.peek(n);
   }
 
+  // Further ahead than the preview shows; the PC bot plans ten pieces out.
+  preview(n: number): Piece[] {
+    this.bag.ensure(n);
+    return this.bag.peek(n);
+  }
+
   snapshot(): GameSnapshot {
     const { queue, rng } = this.bag.snapshot();
     return {
