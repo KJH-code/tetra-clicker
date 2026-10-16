@@ -10,6 +10,8 @@ import { recordManual, emptyStats, type Stats } from './stats';
 import { ATTACK } from '../data/attackTable';
 import { upgradeById } from '../data/upgrades';
 import { Round, type RoundSnapshot } from './round';
+import { Buffs, type BuffState } from './buffs';
+import { BUFFS } from '../data/golden';
 import { DANGER } from '../data/danger';
 import { add, mul, num, toNumber, type Num } from './num';
 import type { Placement } from './board';
@@ -35,6 +37,7 @@ export interface WorldSnapshot {
   manual: GameSnapshot;
   economy: { balance: string; owned: Record<string, number>; upgrades: string[]; stats: Stats };
   round: RoundSnapshot | null;
+  buffs: BuffState[];
   autoBoards: AutoBoardSnapshot[];
 }
 
@@ -51,6 +54,7 @@ export type WorldEvent =
   | { type: 'roundEnd'; outcome: 'settled' | 'toppedOut'; deposited: Num; forfeited: Num }
   | { type: 'garbage'; rows: number }
   | { type: 'paused' }
+  | { type: 'buff'; id: string; ms: number }
   | { type: 'slept'; seconds: number };
 
 export class World {
@@ -63,10 +67,12 @@ export class World {
   private readonly seed: number;
   private boardsCreated = 0;
   round: Round;
+  buffs: Buffs;
 
   constructor(seed: number, snapshot?: WorldSnapshot) {
     this.seed = seed;
     this.round = new Round(seed, snapshot?.round ?? null);
+    this.buffs = new Buffs(snapshot?.buffs ?? []);
     if (snapshot) {
       this.manual = new Game(seed, snapshot.manual);
       this.economy = new Economy();
@@ -125,6 +131,7 @@ export class World {
       manual: this.manual.snapshot(),
       economy: { balance: String(eco.balance), owned: eco.owned, upgrades: eco.upgrades, stats: eco.stats },
       round: this.round.active ? this.round.snapshot() : null,
+      buffs: this.buffs.snapshot(),
       autoBoards: this.autoBoards.map((b) => ({ buildingId: b.buildingId, game: b.game.snapshot(), timerMs: b.timerMs })),
     };
   }
@@ -138,10 +145,12 @@ export class World {
     // earned at. Outside a round (only reachable through the API) they bank.
     const danger = this.round.active ? this.round.danger : 0;
     // Manual upgrades multiply the table value only; the share of bot income
-    // rides on top, and danger raises both.
+    // (without buffs, or a frenzy would count twice) rides on top, and danger
+    // and buffs raise both.
     const base = evaluate(this.economy.effects, 'income', earned.tags, this.economy, Number(earned.amount));
     const share = result.lines * this.economy.manualShare() * toNumber(this.incomePerSecond());
-    const final = num((base + share) * (1 + danger));
+    const buff = this.buffs.multiplier(earned.tags, this.economy);
+    const final = num((base + share) * (1 + danger) * buff);
     if (this.round.active) this.round.vault += Number(final);
     else this.economy.balance = add(this.economy.balance, final);
     recordManual(this.economy.stats, result, Number(final));
@@ -260,21 +269,25 @@ export class World {
   private botEarn(board: AutoBoard, move: BotMove): Num {
     // Every clear pays its table value; bots just get no technique bonuses.
     const flat: LockResult = { ...move.result, spin: 'none', comboIndex: 0, b2bExtended: false, perfectClear: false };
-    const amount = num(attackFor(flat).total);
-    if (toNumber(amount) === 0) return num(0);
-    return this.economy.earn(amount, this.botTags(board.buildingId, move.result.lines));
+    const amount = attackFor(flat).total;
+    if (amount === 0) return num(0);
+    const tags = this.botTags(board.buildingId, move.result.lines);
+    return this.economy.earn(num(amount * this.buffs.multiplier(tags, this.economy)), tags);
   }
 
   // Expected Lines per second from every auto board, as the catch-up formula
-  // sees it. Also what the shop shows as income.
-  incomePerSecond(): Num {
+  // sees it. The shop shows it with buffs; the formula and the manual share
+  // use it without.
+  incomePerSecond(withBuffs = false): Num {
     let total = num(0);
     for (const b of this.autoBoards) {
       const def = buildingById(b.buildingId);
       if (!def) continue;
       // The multiplier is read for the building's own clear size, which is
       // the tag its purchases' bonus filters on.
-      const rate = def.pps * def.linesPerPiece * this.economy.incomeMultiplier(this.botTags(b.buildingId, def.clearSize));
+      const tags = this.botTags(b.buildingId, def.clearSize);
+      const buff = withBuffs ? this.buffs.multiplier(tags, this.economy) : 1;
+      const rate = def.pps * def.linesPerPiece * this.economy.incomeMultiplier(tags) * buff;
       total = add(total, num(rate));
     }
     return total;
@@ -294,6 +307,9 @@ export class World {
     // A gap too long to simulate means the tab was away: the manual round
     // cannot have been played, so it waits paused.
     if (kind !== 'sim') this.pauseRound();
+    // Buffs keep running while the tab is away but pay nothing extra there,
+    // so leaving a frenzy in a hidden tab is not a way to farm it.
+    if (kind !== 'sim') this.buffs.tick(gap);
     if (kind === 'sleep') {
       this.accumulatorMs = 0;
       this.events.push({ type: 'slept', seconds: gap / 1000 });
@@ -330,6 +346,16 @@ export class World {
         this.events.push({ type: 'botMove', board: i, move, earned });
       }
     }
+    this.buffs.tick(dtMs);
+  }
+
+  // Start a buff, scaled by upgrades that lengthen buffs.
+  grantBuff(id: string): void {
+    const def = BUFFS[id];
+    if (!def) return;
+    const ms = evaluate(this.economy.effects, 'buff_duration', [], this.economy, def.durationMs);
+    this.buffs.grant(id, ms);
+    this.events.push({ type: 'buff', id, ms });
   }
 
   catchUp(seconds: number): void {
