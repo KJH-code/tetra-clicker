@@ -174,7 +174,8 @@ describe('golden piece in play', () => {
     const pps = toNumber(w.incomePerSecond());
     gildActive(w);
     tetris(w);
-    expect(w.round.vault).toBeCloseTo(10 * 7 + pps * 900, 6);
+    // Each payout is whole; the fractions carry from one to the next.
+    expect(w.round.vault).toBe(Math.floor(20 * 7 + pps * 900));
   });
 
   it('GET LUCKY doubles buff duration', () => {

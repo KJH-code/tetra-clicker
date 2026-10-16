@@ -24,7 +24,7 @@ function ranWorld(crowns = 3): World {
   w.buy('single');
   w.buy('single');
   w.economy.stats.manualLines = 5000;
-  w.buyUpgrade('manual_100');
+  w.buyUpgrade('manual_200');
   w.economy.stats.riskLines = K * crowns ** 3;
   w.grantBuff('frenzy');
   return w;
@@ -204,10 +204,10 @@ describe('prestige shop', () => {
     expect(w.buyPrestige('production_2')).toBe(false); // costs 3
   });
 
-  it('production: all ×2, start with 1K, manual ×3, all ×2', () => {
+  it('production: all ×2, start with 2K, manual ×3, all ×2', () => {
     const w = new World(1);
     ascendTo(w, ['production_1', 'production_2']);
-    expect(Number(w.economy.balance)).toBe(1000);
+    expect(Number(w.economy.balance)).toBe(2000);
     expect(w.economy.incomeMultiplier(['board:auto'])).toBeCloseTo(2, 12);
     const v = new World(1);
     ascendTo(v, ['production_1', 'production_2', 'production_3', 'production_4']);

@@ -137,7 +137,7 @@ describe('upgrades reach the manual game', () => {
     w.economy.upgrades.add('combo_2');
     expect(w.comboStep()).toBeCloseTo(0.2, 10);
     const r = { piece: 'I' as const, lines: 1, spin: 'none' as const, perfectClear: false, comboIndex: 3, b2bExtended: false, topped: false, clearedRows: [] };
-    expect(attackFor(r, w.comboStep()).total).toBeCloseTo(1 + 0.2 * 2, 10);
+    expect(attackFor(r, w.comboStep()).total).toBeCloseTo(2 * (1 + 0.2 * 2), 10);
   });
 
   it('manual clears are counted in the stats', () => {
@@ -163,7 +163,7 @@ describe('save migration', () => {
     expect(data?.version).toBe(SAVE_VERSION);
     const w = new World(9, data!.world);
     expect(w.manual.holds).toEqual(['T']);
-    expect(Number(w.economy.balance)).toBe(42);
+    expect(Number(w.economy.balance)).toBe(84); // old Lines, doubled into the whole-number unit
     expect(w.economy.owned('single')).toBe(2);
     expect(w.economy.stats.manualLines).toBe(0);
     expect(w.autoBoards[0]!.game.holds).toEqual([]);

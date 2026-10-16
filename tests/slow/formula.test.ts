@@ -5,7 +5,7 @@ import { BUILDINGS } from '../../src/data/buildings';
 // Long runs of the real bots checked against the hidden-tab formula. Kept out
 // of the fast suite that gates deploys; CI runs them as a separate job.
 describe('catch-up formula vs the real bot', () => {
-  it('10,000 bot pieces earn within 1% of seconds × PPS × 0.4 × multiplier', () => {
+  it('10,000 bot pieces earn within 1% of seconds × PPS × 0.8 × multiplier', () => {
     const w = new World(3);
     w.economy.balance = 1e9;
     w.buy('single');
@@ -16,7 +16,7 @@ describe('catch-up formula vs the real bot', () => {
     const pieces = 10_000;
     for (let i = 1; i <= pieces; i++) w.advance(i * 1000); // one piece per second at PPS 1
     const simulated = Number(w.economy.balance);
-    const formula = pieces * 1 * 0.4 * 1.2;
+    const formula = pieces * 1 * 0.8 * 1.2; // 0.4 rows a piece, two Lines a single
     expect(Math.abs(simulated - formula) / formula).toBeLessThan(0.01);
   }, 120_000);
 });

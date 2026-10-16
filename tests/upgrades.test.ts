@@ -40,18 +40,18 @@ describe('upgrade unlocks and purchase', () => {
 
   it('stat conditions read the manual stats', () => {
     const e = new Economy();
-    expect(conditionMet({ type: 'stat', stat: 'manualLines', gte: 100 }, e)).toBe(false);
-    e.stats.manualLines = 100;
-    expect(conditionMet({ type: 'stat', stat: 'manualLines', gte: 100 }, e)).toBe(true);
-    expect(e.isUpgradeUnlocked('manual_100')).toBe(true);
+    expect(conditionMet({ type: 'stat', stat: 'manualLines', gte: 200 }, e)).toBe(false);
+    e.stats.manualLines = 200;
+    expect(conditionMet({ type: 'stat', stat: 'manualLines', gte: 200 }, e)).toBe(true);
+    expect(e.isUpgradeUnlocked('manual_200')).toBe(true);
   });
 
   it('refuses an upgrade it cannot afford and charges the price', () => {
     const e = new Economy();
     e.setOwned('single', 1);
-    e.balance = 149;
+    e.balance = 299;
     expect(e.buyUpgrade('ms_single_1')).toBe(false);
-    e.balance = 150;
+    e.balance = 300;
     expect(e.buyUpgrade('ms_single_1')).toBe(true);
     expect(Number(e.balance)).toBe(0);
   });
@@ -75,7 +75,7 @@ describe('upgrade effects', () => {
 
   it('manual ×2 applies to the manual board only', () => {
     const e = new Economy();
-    e.upgrades.add('manual_100');
+    e.upgrades.add('manual_200');
     expect(e.incomeMultiplier(['board:manual', 'clear:single'])).toBe(2);
     expect(e.incomeMultiplier(['board:auto', 'building:single', 'clear:single'])).toBe(1);
   });

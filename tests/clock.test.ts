@@ -29,8 +29,8 @@ describe('world time with a fake clock', () => {
   it.each([5, 60, 119])('a %ds gap is paid with the formula', (seconds) => {
     const w = worldWithBoard();
     w.advance(seconds * 1000);
-    // PPS 1 × 0.4 lines per piece × multiplier 1 (one copy owned)
-    expect(w.economy.balance).toBeCloseTo(seconds * 0.4, 10);
+    // PPS 1 × 0.8 Lines per piece × multiplier 1 (one copy owned), paid in whole Lines
+    expect(w.economy.balance).toBe(Math.floor(seconds * 0.8 + 1e-9));
   });
 
   it.each([121, 3600])('a %ds gap is treated as sleep and pays nothing', (seconds) => {
@@ -52,12 +52,12 @@ describe('world time with a fake clock', () => {
 
   it('income per second reflects owned copies', () => {
     const w = worldWithBoard();
-    expect(w.incomePerSecond()).toBeCloseTo(0.4, 10);
+    expect(w.incomePerSecond()).toBeCloseTo(0.8, 10);
     w.economy.balance = 1e6;
     w.buy('single');
     w.buy('single');
     expect(w.autoBoards).toHaveLength(1);
-    expect(w.incomePerSecond()).toBeCloseTo(0.4 * 1.2, 10);
+    expect(w.incomePerSecond()).toBeCloseTo(0.8 * 1.2, 10);
   });
 
   it('bots earn flat singles: no combo, b2b, spin or PC bonus', () => {
@@ -67,7 +67,7 @@ describe('world time with a fake clock', () => {
     for (const m of moves) {
       if (m.type !== 'botMove') continue;
       expect(m.move.result.lines).toBeLessThanOrEqual(1);
-      expect(Number(m.earned)).toBe(m.move.result.lines);
+      expect(Number(m.earned)).toBe(m.move.result.lines * 2);
     }
   });
 });

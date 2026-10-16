@@ -19,13 +19,13 @@ export interface LadderEntry {
 // milestone and manual ×2 upgrades as they pay off. Rounded to friendly
 // numbers; every unlock stays within 25% of its target.
 export const LADDER: LadderEntry[] = [
-  { id: 'single', name: 'SINGLE', basePrice: 15, growth: 1.15, pps: 1, linesPerPiece: 0.4, bonusPct: 10 },
-  { id: 'double', name: 'DOUBLE', basePrice: 60, growth: 1.15, pps: 1, linesPerPiece: 0.445, bonusPct: 10, requires: 'single' },
-  { id: 'triple', name: 'TRIPLE', basePrice: 150, growth: 1.15, pps: 1, linesPerPiece: 0.475, bonusPct: 10, requires: 'double' },
-  { id: 'tetris', name: 'TETRIS', basePrice: 500, growth: 1.15, pps: 1, linesPerPiece: 0.62, bonusPct: 10, requires: 'triple' },
-  { id: 'tspin', name: 'T-SPIN', basePrice: 2_000, growth: 1.15, pps: 1, linesPerPiece: 0.8, bonusPct: 10, requires: 'tetris' },
-  { id: 'allspin', name: 'ALL-SPIN', basePrice: 8_000, growth: 1.15, pps: 1, linesPerPiece: 0.9, bonusPct: 10, requires: 'tspin' },
-  { id: 'combo', name: 'COMBO', basePrice: 33_000, growth: 1.15, pps: 1, linesPerPiece: 1.0, bonusPct: 10, requires: 'allspin' },
-  { id: 'b2b', name: 'B2B', basePrice: 90_000, growth: 1.15, pps: 1, linesPerPiece: 1.1, bonusPct: 10, requires: 'combo' },
-  { id: 'pc', name: 'PERFECT', basePrice: 210_000, growth: 1.15, pps: 1, linesPerPiece: 1.2, bonusPct: 10, requires: 'b2b' },
+  { id: 'single', name: 'SINGLE', basePrice: 30, growth: 1.15, pps: 1, linesPerPiece: 0.8, bonusPct: 10 },
+  { id: 'double', name: 'DOUBLE', basePrice: 120, growth: 1.15, pps: 1, linesPerPiece: 0.89, bonusPct: 10, requires: 'single' },
+  { id: 'triple', name: 'TRIPLE', basePrice: 300, growth: 1.15, pps: 1, linesPerPiece: 0.95, bonusPct: 10, requires: 'double' },
+  { id: 'tetris', name: 'TETRIS', basePrice: 1_000, growth: 1.15, pps: 1, linesPerPiece: 1.24, bonusPct: 10, requires: 'triple' },
+  { id: 'tspin', name: 'T-SPIN', basePrice: 4_000, growth: 1.15, pps: 1, linesPerPiece: 1.6, bonusPct: 10, requires: 'tetris' },
+  { id: 'allspin', name: 'ALL-SPIN', basePrice: 16_000, growth: 1.15, pps: 1, linesPerPiece: 1.8, bonusPct: 10, requires: 'tspin' },
+  { id: 'combo', name: 'COMBO', basePrice: 66_000, growth: 1.15, pps: 1, linesPerPiece: 2.0, bonusPct: 10, requires: 'allspin' },
+  { id: 'b2b', name: 'B2B', basePrice: 180_000, growth: 1.15, pps: 1, linesPerPiece: 2.2, bonusPct: 10, requires: 'combo' },
+  { id: 'pc', name: 'PERFECT', basePrice: 420_000, growth: 1.15, pps: 1, linesPerPiece: 2.4, bonusPct: 10, requires: 'b2b' },
 ];

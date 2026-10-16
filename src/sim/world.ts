@@ -11,6 +11,7 @@ import { ATTACK } from '../data/attackTable';
 import { upgradeById } from '../data/upgrades';
 import { Round, type RoundSnapshot } from './round';
 import { Buffs, type BuffState } from './buffs';
+import { Payout } from './payout';
 import { BUFFS, type GoldenOutcome } from '../data/golden';
 import { PRESTIGE, TECH_CHECKS, prestigeById, prestigeRequires } from '../data/prestige';
 import { crownGain, metaFrom, metaSnapshot, type MetaSnapshot } from './prestige';
@@ -41,6 +42,8 @@ export interface WorldSnapshot {
   round: RoundSnapshot | null;
   buffs: BuffState[];
   meta?: MetaSnapshot;
+  // Fractions of a Line waiting to be paid (see Payout).
+  carry?: { balance: number; vault: number };
   autoBoards: AutoBoardSnapshot[];
 }
 
@@ -76,6 +79,8 @@ export class World {
   private boardsCreated = 0;
   round: Round;
   buffs: Buffs;
+  private toBalance = new Payout();
+  private toVault = new Payout();
 
   constructor(seed: number, snapshot?: WorldSnapshot) {
     this.seed = seed;
@@ -103,6 +108,8 @@ export class World {
       this.economy = new Economy();
     }
     this.economy.meta = metaFrom(snapshot?.meta);
+    this.toBalance = new Payout(snapshot?.carry?.balance ?? 0);
+    this.toVault = new Payout(snapshot?.carry?.vault ?? 0);
     this.applyRules();
   }
 
@@ -142,6 +149,7 @@ export class World {
       round: this.round.active ? this.round.snapshot() : null,
       buffs: this.buffs.snapshot(),
       meta: metaSnapshot(this.economy.meta),
+      carry: { balance: this.toBalance.carry, vault: this.toVault.carry },
       autoBoards: this.autoBoards.map((b) => ({ buildingId: b.buildingId, game: b.game.snapshot(), timerMs: b.timerMs })),
     };
   }
@@ -160,9 +168,15 @@ export class World {
     const base = evaluate(this.economy.effects, 'income', earned.tags, this.economy, Number(earned.amount));
     const share = result.lines * this.economy.manualShare() * toNumber(this.incomePerSecond());
     const buff = this.buffs.multiplier(earned.tags, this.economy);
-    const final = num((base + share) * (1 + danger) * buff);
-    if (this.round.active) this.round.vault += Number(final);
-    else this.economy.balance = add(this.economy.balance, final);
+    const exact = (base + share) * (1 + danger) * buff;
+    let final: Num;
+    if (this.round.active) {
+      final = num(this.toVault.take(exact));
+      this.round.vault += Number(final);
+    } else {
+      final = num(this.toBalance.take(exact));
+      this.economy.balance = add(this.economy.balance, final);
+    }
     recordManual(this.economy.stats, result, Number(final));
     this.economy.stats.riskLines += Number(final) * danger * this.riskWeight();
     // Five back-to-back clears in a row: the chain counter reads 4 after the fifth.
@@ -186,12 +200,14 @@ export class World {
     if (outcome.kind === 'buff') {
       this.grantBuff(outcome.buff);
     } else {
-      amount = num(toNumber(this.incomePerSecond()) * outcome.seconds);
+      const exact = toNumber(this.incomePerSecond()) * outcome.seconds;
       if (this.round.active) {
+        amount = num(this.toVault.take(exact));
         this.round.vault += toNumber(amount);
         // Lucky Lines sit in the vault at risk, so they weigh like any other.
         this.economy.stats.riskLines += toNumber(amount) * this.round.danger * this.riskWeight();
       } else {
+        amount = num(this.toBalance.take(exact));
         this.economy.balance = add(this.economy.balance, amount);
       }
     }
@@ -241,13 +257,16 @@ export class World {
   private endRound(outcome: 'settled' | 'toppedOut'): void {
     const vault = this.round.vault;
     const forfeit = Math.min(1, Math.max(0, this.fx('forfeit', DANGER.forfeit)));
-    const kept = outcome === 'settled' ? vault : vault * (1 - forfeit);
+    // The vault holds whole Lines; the banked share rounds down.
+    const kept = outcome === 'settled' ? vault : Math.floor(vault * (1 - forfeit) + 1e-9);
     this.economy.balance = add(this.economy.balance, num(kept));
     if (outcome === 'settled') {
       this.economy.stats.roundsSettled += 1;
       if (this.round.danger >= PRESTIGE.hotSettleDanger) this.economy.stats.hotSettles += 1;
     }
     this.round.end();
+    // Under a Line of carry belongs to the finished round.
+    this.toVault.carry = 0;
     this.manual.reset();
     // A golden piece belongs to its round.
     this.manual.clearGolden();
@@ -322,6 +341,8 @@ export class World {
     this.manual = new Game(this.seed + meta.ascensions * 7_777);
     this.round = new Round(this.seed + meta.ascensions);
     this.buffs = new Buffs();
+    this.toBalance.carry = 0;
+    this.toVault.carry = 0;
     this.applyRules();
     this.events.push({ type: 'ascended', crowns: gain });
     return gain;
@@ -347,7 +368,7 @@ export class World {
   newRun(): boolean {
     if (!this.ascending) return false;
     this.economy.meta.ascending = false;
-    const start = this.fx('start_lines', 0);
+    const start = Math.floor(this.fx('start_lines', 0));
     this.economy.balance = num(start);
     this.applyRules();
     this.events.push({ type: 'newRun', startLines: start });
@@ -403,7 +424,10 @@ export class World {
     const amount = attackFor(flat).total;
     if (amount === 0) return num(0);
     const tags = this.botTags(board.buildingId, move.result.lines);
-    return this.economy.earn(num(amount * this.buffs.multiplier(tags, this.economy)), tags);
+    const exact = evaluate(this.economy.effects, 'income', tags, this.economy, amount * this.buffs.multiplier(tags, this.economy));
+    const paid = num(this.toBalance.take(exact));
+    this.economy.balance = add(this.economy.balance, paid);
+    return paid;
   }
 
   // Expected Lines per second from every auto board, as the catch-up formula
@@ -490,7 +514,7 @@ export class World {
   }
 
   catchUp(seconds: number): void {
-    const earned = mul(this.incomePerSecond(), num(seconds));
+    const earned = num(this.toBalance.take(toNumber(mul(this.incomePerSecond(), num(seconds)))));
     if (toNumber(earned) > 0) {
       this.economy.balance = add(this.economy.balance, earned);
     }

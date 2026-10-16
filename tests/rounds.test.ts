@@ -39,14 +39,14 @@ describe('round flow', () => {
     expect(w.startRound()).toBe(true);
     const r = tetris(w);
     expect(r.lines).toBe(4);
-    expect(w.round.vault).toBeCloseTo(10, 10); // perfect clear replaces the base with 10
+    expect(w.round.vault).toBe(20); // perfect clear replaces the base with 20
     expect(Number(w.economy.balance)).toBe(0);
     expect(w.tapSettle()).toBe(false); // first tap
     expect(w.tapSettle()).toBe(true); // second tap inside the window
     expect(w.round.phase).toBe('settling');
     run(w, DANGER.settleCountdownMs + 50, 1);
     expect(w.round.phase).toBe('idle');
-    expect(Number(w.economy.balance)).toBeCloseTo(10, 10);
+    expect(Number(w.economy.balance)).toBe(20);
     expect(w.economy.stats.roundsSettled).toBe(1);
   });
 
@@ -69,7 +69,7 @@ describe('round flow', () => {
     const r = w.manualHardDrop();
     expect(r.topped).toBe(true);
     expect(w.round.phase).toBe('idle');
-    expect(Number(w.economy.balance)).toBeCloseTo(vault * (1 - DANGER.forfeit), 10);
+    expect(Number(w.economy.balance)).toBe(Math.floor(vault * (1 - DANGER.forfeit)));
     expect(w.manual.grid.every((c) => c === 0)).toBe(true);
   });
 
@@ -80,7 +80,7 @@ describe('round flow', () => {
     w.tapSettle(); w.tapSettle();
     for (let y = 0; y < HEIGHT; y++) for (let x = 0; x < WIDTH - 1; x++) w.manual.grid[y * WIDTH + x] = 1;
     w.manualHardDrop();
-    expect(Number(w.economy.balance)).toBeCloseTo(10 * (1 - DANGER.forfeit), 10);
+    expect(Number(w.economy.balance)).toBe(Math.floor(20 * (1 - DANGER.forfeit)));
   });
 
   it('the shop is closed during a round', () => {
@@ -88,12 +88,12 @@ describe('round flow', () => {
     w.economy.balance = 1e9;
     w.startRound();
     expect(w.buy('single')).toBe(false);
-    w.economy.stats.manualLines = 1000;
-    expect(w.buyUpgrade('manual_100')).toBe(false);
+    w.economy.stats.manualLines = 2000;
+    expect(w.buyUpgrade('manual_200')).toBe(false);
     w.tapSettle(); w.tapSettle();
     run(w, DANGER.settleCountdownMs + 50, 1);
     expect(w.buy('single')).toBe(true);
-    expect(w.buyUpgrade('manual_100')).toBe(true);
+    expect(w.buyUpgrade('manual_200')).toBe(true);
   });
 });
 
@@ -124,8 +124,8 @@ describe('danger', () => {
     w.economy.upgrades.add('wrath_3');
     w.startRound(); // danger 1.0
     tetris(w);
-    expect(w.round.vault).toBeCloseTo(10 * 2, 10);
-    expect(w.economy.stats.riskLines).toBeCloseTo(20 * 1, 10);
+    expect(w.round.vault).toBe(20 * 2);
+    expect(w.economy.stats.riskLines).toBeCloseTo(40 * 1, 10);
   });
 
   it('stops while paused', () => {
@@ -214,7 +214,7 @@ describe('round saves', () => {
     const w2 = new World(1, JSON.parse(JSON.stringify(w.snapshot())));
     expect(w2.round.phase).toBe('running');
     expect(w2.round.paused).toBe(true);
-    expect(w2.round.vault).toBeCloseTo(10, 10);
+    expect(w2.round.vault).toBe(20);
   });
 
   it('a version 2 save migrates to 3 with no round', () => {
@@ -232,6 +232,6 @@ describe('round saves', () => {
     const w = new World(3, data!.world);
     expect(w.round.phase).toBe('idle');
     expect(w.economy.stats.rounds).toBe(0);
-    expect(Number(w.economy.balance)).toBe(7);
+    expect(Number(w.economy.balance)).toBe(14); // old Lines, doubled into the whole-number unit
   });
 });

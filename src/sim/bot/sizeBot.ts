@@ -8,6 +8,11 @@ import type { BotChoice, BotPolicy } from './policy';
 import { features, topRow, spawnX, reachable } from './singleBot';
 import { ATTACK } from '../../data/attackTable';
 
+// A k-line clear's table value in singles. The weights were tuned when a
+// single was worth one Line; reading the table in singles keeps the bot's
+// choices the same whatever unit the table uses.
+const clearWorth = (k: number): number => ATTACK.normal[k]! / ATTACK.normal[1]!;
+
 // A bot whose largest clear is k rows. It is paid for every clear, so it
 // prefers the big one but takes smaller ones when the stack needs it; what
 // it never does is clear more than k at once. With a well (k = 3, 4) it
@@ -146,7 +151,7 @@ function evaluate(grid: Grid, cleared: number, top: number, k: number, w: SizeWe
     for (let x = 0; x < WIDTH; x++) outside.push(columnHeight(grid, x));
     return w.height * f.agg + w.holes * f.holes + w.bump * f.bump + w.max * f.max
       + w.spread * (Math.max(...outside) - Math.min(...outside))
-      + (cleared === k ? w.clear * ATTACK.normal[k]! : 0) + w.clearAny * cleared
+      + (cleared === k ? w.clear * clearWorth(k) : 0) + w.clearAny * cleared
       + w.rowTrans * f.rowTrans + w.colTrans * f.colTrans
       + w.unfit * unfitPieces(outside);
   }
@@ -174,7 +179,7 @@ function evaluate(grid: Grid, cleared: number, top: number, k: number, w: SizeWe
   return w.height * agg + w.holes * f.holes + w.bump * bump + w.max * max + w.spread * (max - min)
     + w.wellHeight * wellHeight + w.wellBump * wellBump
     + w.ready * Math.min(ready, k) + w.over * Math.max(0, ready - w.overCap)
-    + (cleared === k ? w.clear * ATTACK.normal[k]! : 0)
+    + (cleared === k ? w.clear * clearWorth(k) : 0)
     + w.rowTrans * f.rowTrans + w.colTrans * f.colTrans
     + w.unfit * unfitPieces(outside);
 }
@@ -263,7 +268,7 @@ export function sizeBot(k: 2 | 3 | 4, base: SizeWeights = SIZE_WEIGHTS[k]): BotP
               const second = candidates(c.grid, spawnFor(piece, baseY), k, weights);
               for (const d of second) follow = Math.max(follow, d.score);
             }
-            score = follow + (c.cleared === k ? weights.clear * ATTACK.normal[k]! : 0);
+            score = follow + (c.cleared === k ? weights.clear * clearWorth(k) : 0);
           }
           score += holdBonus;
           if (!best || score > best.score) best = { choice: { placement: c.spawn, useHold: opt.useHold }, score };

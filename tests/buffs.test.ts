@@ -80,12 +80,12 @@ describe('buffs', () => {
     const a = readyManual(botWorld());
     a.grantBuff('clear_frenzy');
     tetris(a);
-    expect(a.round.vault).toBeCloseTo(10 * 777, 6);
+    expect(a.round.vault).toBe(20 * 777);
     const b = readyManual(botWorld());
     b.grantBuff('clear_frenzy');
     b.grantBuff('frenzy');
     tetris(b);
-    expect(b.round.vault).toBeCloseTo(10 * 777 * 7, 6);
+    expect(b.round.vault).toBe(20 * 777 * 7);
     const plain = botWorld();
     const cf = botWorld();
     cf.grantBuff('clear_frenzy');

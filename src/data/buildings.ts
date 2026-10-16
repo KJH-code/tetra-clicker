@@ -33,11 +33,11 @@ function tier(id: string, name: string, basePrice: number, clearSize: 1 | 2 | 3 
 }
 
 export const BUILDINGS: BuildingDef[] = [
-  tier('single', 'SINGLE', 15, 1, 0.4),
+  tier('single', 'SINGLE', 30, 1, 0.8),
   // Measured over 5 seeds × 10,000 pieces of each bot (see bots.test.ts).
-  tier('double', 'DOUBLE', 60, 2, 0.445, 'single'),
-  tier('triple', 'TRIPLE', 150, 3, 0.475, 'double'),
-  tier('tetris', 'TETRIS', 500, 4, 0.62, 'triple'),
+  tier('double', 'DOUBLE', 120, 2, 0.89, 'single'),
+  tier('triple', 'TRIPLE', 300, 3, 0.95, 'double'),
+  tier('tetris', 'TETRIS', 1_000, 4, 1.24, 'triple'),
 ];
 
 export const buildingById = (id: string): BuildingDef | undefined => BUILDINGS.find((b) => b.id === id);

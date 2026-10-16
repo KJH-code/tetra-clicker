@@ -87,7 +87,8 @@ export class Economy implements EffectContext {
     const def = buildingById(id);
     if (!def) return num(Infinity);
     const base = mul(num(def.basePrice), pow(num(def.priceGrowth), this.owned(id)));
-    return num(evaluate(this.effects, 'price', [tag.building(id)], this, toNumber(base)));
+    // Prices are whole Lines, rounded up so a discount never makes one free.
+    return num(Math.ceil(evaluate(this.effects, 'price', [tag.building(id)], this, toNumber(base)) - 1e-9));
   }
 
   canBuy(id: string): boolean {

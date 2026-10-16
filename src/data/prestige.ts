@@ -8,11 +8,11 @@ import type { Condition, Effect } from '../sim/effects';
 // short runs earn less than one long one.
 export const PRESTIGE = {
   // Calibrated so the first crown comes after about 2.5 hours of play: the
-  // simulator's default player (0.5 PPS, 0.45 Lines a piece) playing
-  // continuously earns ~3.2K Lines by hand in 2.5 h; at an assumed average
-  // round danger of 0.75 that is ~2.4K risk-weighted Lines.
-  //   1 h 0.6K · 2 h 1.8K · 2.5 h 2.4K · 3 h 3.2K · 4 h 5.6K
-  riskPerCrown: 2_500,
+  // simulator's default player (0.5 PPS, 0.9 Lines a piece) playing
+  // continuously earns ~6.5K Lines by hand in 2.5 h; at an assumed average
+  // round danger of 0.75 that is ~4.9K risk-weighted Lines.
+  //   1 h 1.2K · 2 h 3.6K · 2.5 h 4.9K · 3 h 6.4K · 4 h 11.3K
+  riskPerCrown: 5_000,
   // Ten checks at 0.15 overshoot the 1.0 cap, so seven are enough until
   // TECH CAP +0.5 lets all ten count.
   techPerCheck: 0.15,
@@ -62,7 +62,7 @@ function branch(id: Branch, steps: { name: string; effects: Effect[] }[]): Prest
 export const PRESTIGE_UPGRADES: PrestigeDef[] = [
   ...branch('production', [
     { name: 'ALL INCOME ×2', effects: [{ target: 'income', op: 'mul', value: 2 }] },
-    { name: 'START WITH 1K LINES', effects: [{ target: 'start_lines', op: 'add', value: 1_000 }] },
+    { name: 'START WITH 2K LINES', effects: [{ target: 'start_lines', op: 'add', value: 2_000 }] },
     { name: 'MANUAL ×3', effects: [{ target: 'income', filter: ['board:manual'], op: 'mul', value: 3 }] },
     { name: 'ALL INCOME ×2', effects: [{ target: 'income', op: 'mul', value: 2 }] },
   ]),

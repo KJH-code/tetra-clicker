@@ -63,7 +63,7 @@ export interface SimResult {
   manualLines: number;
 }
 
-export const DEFAULT_PLAYER: PlayerParams = { pps: 0.5, linesPerPiece: 0.45, focusMinutes: 15, dailyMinutes: 60 };
+export const DEFAULT_PLAYER: PlayerParams = { pps: 0.5, linesPerPiece: 0.9, focusMinutes: 15, dailyMinutes: 60 };
 export const DEFAULT_TARGET: TargetParams = { firstSeconds: 60, ratio: 2.5 };
 export const DEFAULT_HORIZON_SECONDS = 7 * 86_400;
 
@@ -88,7 +88,7 @@ class LadderEconomy extends Economy {
   override price(id: string): number {
     const def = this.ladder.find((b) => b.id === id);
     if (!def) return Infinity;
-    return def.basePrice * Math.pow(def.growth, this.owned(id));
+    return Math.ceil(def.basePrice * Math.pow(def.growth, this.owned(id)) - 1e-9);
   }
 }
 

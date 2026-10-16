@@ -45,11 +45,23 @@ const MIGRATIONS: Migration[] = [
     world['buffs'] ??= [];
     return raw;
   },
-  // 4 → 5: prestige arrives. A save without it has never ascended; the new
-  // tech counters default to zero when the world loads.
+  // 4 → 5: prestige arrives, and Lines become whole numbers in a unit twice
+  // the old one. A save without prestige has never ascended; the new tech
+  // counters default to zero when the world loads. Amounts in Lines double
+  // (rounded down), and upgrades named after a Lines threshold follow it.
   (raw) => {
     const world = raw['world'] as Record<string, unknown>;
     world['meta'] ??= { crowns: 0, crownsEarned: 0, riskBanked: 0, ascensions: 0, prestige: [], lifetime: {}, ascending: false };
+    const economy = world['economy'] as Record<string, unknown>;
+    economy['balance'] = String(Math.floor(Number(economy['balance'] ?? 0) * 2));
+    const stats = (economy['stats'] ?? {}) as Record<string, number>;
+    for (const k of ['manualLines', 'riskLines']) if (typeof stats[k] === 'number') stats[k] = stats[k] * 2;
+    economy['upgrades'] = ((economy['upgrades'] ?? []) as string[]).map((id) => {
+      const m = /^(manual|share)_(\d+)$/.exec(id);
+      return m ? `${m[1]}_${Number(m[2]) * 2}` : id;
+    });
+    const round = world['round'] as Record<string, number> | null;
+    if (round) round['vault'] = Math.floor((round['vault'] ?? 0) * 2);
     return raw;
   },
 ];

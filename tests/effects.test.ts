@@ -44,12 +44,13 @@ describe('effect evaluation order', () => {
 describe('economy', () => {
   it('price follows base × 1.15^n', () => {
     const e = new Economy();
-    expect(e.price('single')).toBeCloseTo(15, 10);
+    // Rounded up to whole Lines.
+    expect(e.price('single')).toBe(30);
     e.balance = 1000;
     e.buy('single');
-    expect(e.price('single')).toBeCloseTo(15 * 1.15, 10);
+    expect(e.price('single')).toBe(Math.ceil(30 * 1.15));
     e.buy('single');
-    expect(e.price('single')).toBeCloseTo(15 * 1.15 * 1.15, 10);
+    expect(e.price('single')).toBe(Math.ceil(30 * 1.15 * 1.15));
     expect(e.owned('single')).toBe(2);
   });
   it('refuses a purchase it cannot afford', () => {
