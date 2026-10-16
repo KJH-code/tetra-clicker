@@ -3,7 +3,6 @@ import { Payout } from '../src/sim/payout';
 import { World } from '../src/sim/world';
 import { num } from '../src/sim/num';
 import { migrate } from '../src/save/schema';
-import { DANGER } from '../src/data/danger';
 
 const STEP = 1000 / 60;
 const whole = (n: number) => Number.isInteger(n);
@@ -45,22 +44,23 @@ describe('whole Lines', () => {
     }
   });
 
-  it('a top-out banks the vault share rounded down', () => {
+  it('a top-out keeps the retained share rounded down', () => {
     const w = new World(1);
     w.advance(0);
+    w.economy.meta.prestige.add('survival_1');
+    w.economy.meta.prestige.add('survival_2'); // keep 25%
     w.startRound();
     w.round.vault = 1001;
-    w['endRound']('toppedOut');
-    expect(Number(w.economy.balance)).toBe(600);
-    expect(DANGER.forfeit).toBe(0.4);
+    w['endRound']();
+    expect(Number(w.economy.balance)).toBe(250);
   });
 
-  it('manual payouts with danger are whole', () => {
+  it('manual payouts at a level are whole', () => {
     const w = new World(1);
     w.advance(0);
     w.economy.upgrades.add('wrath_1');
+    w.economy.upgrades.add('combo_1'); // combo step 0.15: fractional clears
     w.startRound();
-    w.round.danger = 0.37;
     for (let i = 0; i < 200; i++) {
       w.manualHardDrop();
       if (!w.round.active) w.startRound();
@@ -77,9 +77,11 @@ describe('whole Lines', () => {
     w['round'] = { phase: 'running', paused: false, vault: 10.4, danger: 0.3, elapsedMs: 0, garbageMs: 0, settleMs: 0, rng: 1 };
     delete w['meta'];
     const m = migrate({ version: 4, savedAt: 0, settings: {}, world: w })!;
-    expect(m.world.economy.balance).toBe('247');
+    // 123.7 doubles to 247; the round's vault (10.4 → 20) is then banked when
+    // version 6 ends rounds in progress.
+    expect(m.world.economy.balance).toBe('267');
     expect(m.world.economy.upgrades).toEqual(['manual_200', 'share_2000', 'wrath_1']);
     expect(m.world.economy.stats.manualLines).toBe(300);
-    expect(m.world.round!.vault).toBe(20);
+    expect(m.world.round).toBeNull();
   });
 });

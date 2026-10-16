@@ -15,7 +15,7 @@ import { Payout } from './payout';
 import { BUFFS, type GoldenOutcome } from '../data/golden';
 import { PRESTIGE, TECH_CHECKS, prestigeById, prestigeRequires } from '../data/prestige';
 import { crownGain, metaFrom, metaSnapshot, type MetaSnapshot } from './prestige';
-import { DANGER } from '../data/danger';
+import { LEVELS } from '../data/levels';
 import { add, mul, num, toNumber, type Num } from './num';
 import type { Placement } from './board';
 
@@ -55,9 +55,10 @@ export type WorldEvent =
   | { type: 'catchUp'; seconds: number; earned: Num }
   | { type: 'bought'; buildingId: string; owned: number }
   | { type: 'upgraded'; upgradeId: string }
-  | { type: 'roundStart'; danger: number }
-  | { type: 'settleStart' }
-  | { type: 'roundEnd'; outcome: 'settled' | 'toppedOut'; deposited: Num; forfeited: Num }
+  | { type: 'roundStart'; level: number }
+  | { type: 'levelUp'; level: number }
+  | { type: 'checkpoint'; banked: Num }
+  | { type: 'roundEnd'; deposited: Num; forfeited: Num; level: number }
   | { type: 'garbage'; rows: number }
   | { type: 'paused' }
   | { type: 'buff'; id: string; ms: number }
@@ -131,8 +132,7 @@ export class World {
   }
 
   buyUpgrade(id: string): boolean {
-    // Shopping happens between rounds.
-    if (this.round.active || this.ascending) return false;
+    if (this.ascending) return false;
     if (!upgradeById(id) || !this.economy.buyUpgrade(id)) return false;
     this.applyRules();
     this.events.push({ type: 'upgraded', upgradeId: id });
@@ -159,26 +159,26 @@ export class World {
   manualLock(result: LockResult): Num {
     const at = this.manual.active!;
     const earned = earnedFor(result, [tag.board('manual')], this.comboStep());
-    // Manual Lines go into the round's vault, raised by the danger they were
-    // earned at. Outside a round (only reachable through the API) they bank.
-    const danger = this.round.active ? this.round.danger : 0;
+    // Manual Lines go into the life's vault, times the level they were earned
+    // at. Outside a life (only reachable through the API) they bank at ×1.
+    const level = this.round.active ? this.round.level : 1;
     // Manual upgrades multiply the table value only; the share of bot income
-    // (without buffs, or a frenzy would count twice) rides on top, and danger
-    // and buffs raise both.
+    // (without buffs, or a frenzy would count twice) rides on top, and the
+    // level and buffs raise both.
     const base = evaluate(this.economy.effects, 'income', earned.tags, this.economy, Number(earned.amount));
     const share = result.lines * this.economy.manualShare() * toNumber(this.incomePerSecond());
     const buff = this.buffs.multiplier(earned.tags, this.economy);
-    const exact = (base + share) * (1 + danger) * buff;
+    const exact = (base + share) * level * buff;
     let final: Num;
     if (this.round.active) {
       final = num(this.toVault.take(exact));
       this.round.vault += Number(final);
+      this.round.vaultRisk += Number(final) * level;
     } else {
       final = num(this.toBalance.take(exact));
       this.economy.balance = add(this.economy.balance, final);
     }
     recordManual(this.economy.stats, result, Number(final));
-    this.economy.stats.riskLines += Number(final) * danger * this.riskWeight();
     // Five back-to-back clears in a row: the chain counter reads 4 after the fifth.
     if (result.b2bExtended && this.manual.b2b === 4) this.economy.stats.b2b5 += 1;
     this.events.push({ type: 'manualLock', result, earned: final, tags: earned.tags, at });
@@ -189,8 +189,28 @@ export class World {
       if (result.lines > 0) this.triggerGolden();
       else this.events.push({ type: 'goldenLost' });
     }
-    if (result.topped && this.round.active) this.endRound('toppedOut');
+    if (result.topped && this.round.active) {
+      this.endRound();
+    } else if (this.round.active && result.lines > 0) {
+      const { levelUp, checkpoints } = this.round.addRows(result.lines);
+      const stats = this.economy.stats;
+      stats.maxLevel = Math.max(stats.maxLevel, this.round.level);
+      if (levelUp) this.events.push({ type: 'levelUp', level: this.round.level });
+      if (checkpoints > 0) this.checkpoint(checkpoints);
+    }
     return final;
+  }
+
+  // Bank the vault: its Lines go to the balance and its risk weight counts
+  // toward prestige. Only banked Lines ever weigh.
+  private checkpoint(passed: number): void {
+    const banked = num(this.round.vault);
+    this.economy.balance = add(this.economy.balance, banked);
+    this.economy.stats.riskLines += this.round.vaultRisk * this.riskWeight();
+    this.economy.stats.checkpoints += passed;
+    this.round.vault = 0;
+    this.round.vaultRisk = 0;
+    this.events.push({ type: 'checkpoint', banked });
   }
 
   private triggerGolden(): void {
@@ -205,7 +225,7 @@ export class World {
         amount = num(this.toVault.take(exact));
         this.round.vault += toNumber(amount);
         // Lucky Lines sit in the vault at risk, so they weigh like any other.
-        this.economy.stats.riskLines += toNumber(amount) * this.round.danger * this.riskWeight();
+        this.round.vaultRisk += toNumber(amount) * this.round.level;
       } else {
         amount = num(this.toBalance.take(exact));
         this.economy.balance = add(this.economy.balance, amount);
@@ -232,15 +252,10 @@ export class World {
 
   startRound(): boolean {
     if (this.round.active || this.ascending) return false;
-    this.round.start(this.wrath(), this.goldenScale(), this.fx('danger_floor', 0));
+    this.round.start(this.fx('start_level', LEVELS.startLevel), this.fx('rows_per_level', LEVELS.rowsPerLevel), this.goldenScale());
     this.economy.stats.rounds += 1;
-    this.events.push({ type: 'roundStart', danger: this.round.danger });
-    return true;
-  }
-
-  tapSettle(): boolean {
-    if (!this.round.tapSettle()) return false;
-    this.events.push({ type: 'settleStart' });
+    this.economy.stats.maxLevel = Math.max(this.economy.stats.maxLevel, this.round.level);
+    this.events.push({ type: 'roundStart', level: this.round.level });
     return true;
   }
 
@@ -254,42 +269,37 @@ export class World {
     this.round.paused = false;
   }
 
-  private endRound(outcome: 'settled' | 'toppedOut'): void {
+  // A top-out is the only way a life ends: the unbanked vault is lost, save
+  // the share prestige upgrades keep, which also counts as banked risk.
+  private endRound(): void {
     const vault = this.round.vault;
-    const forfeit = Math.min(1, Math.max(0, this.fx('forfeit', DANGER.forfeit)));
-    // The vault holds whole Lines; the banked share rounds down.
-    const kept = outcome === 'settled' ? vault : Math.floor(vault * (1 - forfeit) + 1e-9);
+    const level = this.round.level;
+    const retain = Math.min(1, Math.max(0, this.fx('retain', LEVELS.retain)));
+    // The vault holds whole Lines; the kept share rounds down.
+    const kept = Math.floor(vault * retain + 1e-9);
     this.economy.balance = add(this.economy.balance, num(kept));
-    if (outcome === 'settled') {
-      this.economy.stats.roundsSettled += 1;
-      if (this.round.danger >= PRESTIGE.hotSettleDanger) this.economy.stats.hotSettles += 1;
-    }
+    if (vault > 0) this.economy.stats.riskLines += this.round.vaultRisk * (kept / vault) * this.riskWeight();
+    this.economy.stats.deaths += 1;
     this.round.end();
     // Under a Line of carry belongs to the finished round.
     this.toVault.carry = 0;
     this.manual.reset();
     // A golden piece belongs to its round.
     this.manual.clearGolden();
-    this.events.push({ type: 'roundEnd', outcome, deposited: num(kept), forfeited: num(vault - kept) });
+    this.events.push({ type: 'roundEnd', deposited: num(kept), forfeited: num(vault - kept), level });
   }
 
   private stepRound(dtMs: number): void {
     if (!this.round.live) return;
-    const wrath = this.wrath();
-    const { garbage, settled, golden } = this.round.advance(dtMs, wrath, { ready: !this.manual.hasGolden, scale: this.goldenScale() },
-      { rise: this.fx('danger_rate', 1), garbage: this.fx('garbage_interval', 1) });
+    const { garbage, golden } = this.round.advance(dtMs, { ready: !this.manual.hasGolden, scale: this.goldenScale() },
+      this.fx('garbage_interval', 1));
     if (golden && this.manual.markGolden(this.manual.rules.nextCount - 1)) this.events.push({ type: 'goldenSpawn' });
     for (const hole of garbage) {
-      if (this.manual.addGarbage(hole)) { this.endRound('toppedOut'); return; }
+      if (this.manual.addGarbage(hole)) { this.endRound(); return; }
     }
     if (garbage.length) this.events.push({ type: 'garbage', rows: garbage.length });
-    const g = this.round.gravity(wrath);
-    if (g > 0) {
-      const locked = this.manual.tick(dtMs, g);
-      if (locked) this.manualLock(locked);
-      if (!this.round.active) return;
-    }
-    if (settled) this.endRound('settled');
+    const locked = this.manual.tick(dtMs, this.round.gravity() * this.fx('gravity', 1));
+    if (locked) this.manualLock(locked);
   }
 
   // A data-driven number: `base` with every effect on `target` applied.
@@ -393,7 +403,7 @@ export class World {
 
   buy(id: string): boolean {
     const def = buildingById(id);
-    if (this.round.active || this.ascending) return false;
+    if (this.ascending) return false;
     if (!def || !this.isUnlocked(id) || !this.economy.buy(id)) return false;
     // The first copy of a building is its board; later copies only add income.
     if (!this.autoBoards.some((b) => b.buildingId === id)) {

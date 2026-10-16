@@ -29,7 +29,7 @@ export class UpgradeChips {
       this.row.replaceChildren(...open.map((u) => this.chip(u)));
       this.tip.hidden = true;
     }
-    for (const [id, btn] of this.chips) btn.classList.toggle('cant', !eco.canBuyUpgrade(id) || this.world.round.active);
+    for (const [id, btn] of this.chips) btn.classList.toggle('cant', !eco.canBuyUpgrade(id));
   }
 
   private chip(u: UpgradeDef): HTMLButtonElement {

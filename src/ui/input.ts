@@ -12,7 +12,6 @@ export interface InputHost {
   gate?(): InputGate;
   start?(): void;
   resume?(): void;
-  onSettleTap?(): void;
 }
 
 // Keyboard → game actions with guideline handling. Horizontal movement
@@ -59,7 +58,6 @@ export class InputHandler {
     const gate = this.host.gate?.() ?? 'play';
     if (gate === 'start') { this.host.start?.(); return; }
     if (gate === 'resume') { this.host.resume?.(); return; }
-    if (action === 'settle') { this.host.onSettleTap?.(); return; }
     const game = this.host.game;
     switch (action) {
       case 'left':

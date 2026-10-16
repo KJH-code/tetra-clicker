@@ -10,11 +10,13 @@ export interface Stats {
   combo5: number; // runs that reached a 5 combo
   b2bs: number; // clears that extended a back-to-back chain
   pcs: number; // perfect clears
-  // Risk-weighted Lines: every manual Line times the danger it was earned at.
-  // Prestige will be paid from this; for now it is only recorded.
+  // Risk-weighted Lines: banked manual Lines times the level they were
+  // earned at. Prestige is paid from this.
   riskLines: number;
-  rounds: number;
-  roundsSettled: number;
+  rounds: number; // lives started
+  checkpoints: number;
+  deaths: number;
+  maxLevel: number; // highest level reached in a life
   goldens: number; // golden pieces that cleared a line
   // For the prestige tech checklist.
   tss: number;
@@ -23,17 +25,18 @@ export interface Stats {
   combo10: number;
   b2b5: number; // back-to-back chains that reached five clears
   tetrises: number;
-  hotSettles: number; // rounds settled at high danger
 }
 
 export const emptyStats = (): Stats => ({
-  manualLines: 0, manualPieces: 0, spins: 0, combo5: 0, b2bs: 0, pcs: 0, riskLines: 0, rounds: 0, roundsSettled: 0, goldens: 0,
-  tss: 0, tsd: 0, tst: 0, combo10: 0, b2b5: 0, tetrises: 0, hotSettles: 0,
+  manualLines: 0, manualPieces: 0, spins: 0, combo5: 0, b2bs: 0, pcs: 0, riskLines: 0, rounds: 0, checkpoints: 0, deaths: 0, maxLevel: 0, goldens: 0,
+  tss: 0, tsd: 0, tst: 0, combo10: 0, b2b5: 0, tetrises: 0,
 });
 
-// Add one run's counters into lifetime totals.
+// Add one run's counters into lifetime totals; a "max" counter keeps the larger.
 export function addStats(into: Stats, run: Stats): void {
-  for (const k of Object.keys(run) as (keyof Stats)[]) into[k] = (into[k] ?? 0) + run[k];
+  for (const k of Object.keys(run) as (keyof Stats)[]) {
+    into[k] = k.startsWith('max') ? Math.max(into[k] ?? 0, run[k]) : (into[k] ?? 0) + run[k];
+  }
 }
 
 // The combo index the HUD shows as "5 COMBO".

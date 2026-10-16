@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Game } from '../src/sim/game';
 import { HEIGHT, WIDTH, serializeGrid } from '../src/sim/board';
-import { DANGER, GARBAGE_ID } from '../src/data/danger';
+import { LEVELS, GARBAGE_ID } from '../src/data/levels';
 import type { Piece } from '../src/sim/pieces';
 
 function gridFrom(rows: string[]): string {
@@ -59,7 +59,7 @@ describe('gravity and lock delay', () => {
   it('locks after the lock delay once resting', () => {
     const g = gameWith([]);
     while (g.softDrop()) { /* to the floor */ }
-    expect(g.tick(DANGER.lockDelayMs - 1, 1)).toBeNull();
+    expect(g.tick(LEVELS.lockDelayMs - 1, 1)).toBeNull();
     const r = g.tick(1, 1);
     expect(r).not.toBeNull();
     expect(r!.piece).toBe('T');
@@ -71,12 +71,12 @@ describe('gravity and lock delay', () => {
     let resets = 0;
     let locked = false;
     for (let i = 0; i < 40 && !locked; i++) {
-      if (g.tick(DANGER.lockDelayMs - 10, 1)) { locked = true; break; }
+      if (g.tick(LEVELS.lockDelayMs - 10, 1)) { locked = true; break; }
       const moved = i % 2 === 0 ? g.moveLeft() : g.moveRight();
       if (moved) resets++;
     }
     expect(locked).toBe(true);
-    expect(resets).toBeGreaterThanOrEqual(DANGER.lockResetLimit);
-    expect(resets).toBeLessThanOrEqual(DANGER.lockResetLimit + 1);
+    expect(resets).toBeGreaterThanOrEqual(LEVELS.lockResetLimit);
+    expect(resets).toBeLessThanOrEqual(LEVELS.lockResetLimit + 1);
   });
 });

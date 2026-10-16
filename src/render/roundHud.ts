@@ -4,11 +4,10 @@ import { format } from '../sim/num';
 import { TOP_VISIBLE_ROW, WIDTH } from '../sim/board';
 import { GOLD } from './theme';
 
-// Round readout drawn on the manual board: vault and a danger gauge in the
-// hold column under the hold slots, and a centred banner for the states
-// where the board is not live (waiting, paused, settling).
-const DANGER_FULL = 3; // the gauge reads full at this much danger
-
+// Life readout drawn on the manual board, in the hold column under the hold
+// slots: vault, level with a bar to the next one, rows to the next
+// checkpoint. A centred banner covers the states where the board is not
+// live (waiting, paused).
 export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, round: Round, wrath: number,
   buffs: { label: string; msLeft: number }[] = []): void {
   const c = r.layout.cell;
@@ -18,34 +17,38 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
   ctx.save();
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillStyle = '#7a7aa0';
-  ctx.font = `${Math.round(c * 0.38)}px system-ui, sans-serif`;
-  ctx.fillText('VAULT', x0, y);
-  y += c * 0.55;
+  const label = (text: string): void => {
+    ctx.fillStyle = '#7a7aa0';
+    ctx.font = `${Math.round(c * 0.38)}px system-ui, sans-serif`;
+    ctx.fillText(text, x0, y);
+    y += c * 0.55;
+  };
+  label('VAULT');
   ctx.fillStyle = '#e8e8ff';
   ctx.font = `700 ${Math.round(c * 0.7)}px system-ui, sans-serif`;
   ctx.fillText(format(round.vault), x0, y);
-  y += c * 1.3;
-  ctx.fillStyle = '#7a7aa0';
-  ctx.font = `${Math.round(c * 0.38)}px system-ui, sans-serif`;
-  ctx.fillText(`DANGER ${'I'.repeat(wrath) || '0'}`, x0, y);
-  y += c * 0.55;
-  // Gauge: fills with danger, shifting from cyan to magenta to red.
-  const w = colW - x0 * 2;
-  const h = c * 0.45;
-  const k = Math.min(1, round.danger / DANGER_FULL);
-  ctx.fillStyle = '#15152a';
-  ctx.fillRect(x0, y, w, h);
-  const color = k < 0.34 ? '#00f0ff' : k < 0.67 ? '#ff2ed2' : '#ff3b3b';
+  y += c * 1.0;
+  label(round.active ? `CHECKPOINT IN ${round.rowsToCheckpoint}` : 'CHECKPOINT EVERY 40');
+  y += c * 0.15;
+  label(wrath > 0 ? `LEVEL · WRATH ${'I'.repeat(wrath)}` : 'LEVEL');
+  // Level and the bar to the next one; the colour warms as levels climb.
+  const level = round.active ? round.level : round.startLevel;
+  const color = level < 5 ? '#00f0ff' : level < 10 ? '#ff2ed2' : '#ff3b3b';
   ctx.fillStyle = color;
   ctx.shadowColor = color;
   ctx.shadowBlur = 10;
-  ctx.fillRect(x0, y, w * k, h);
+  ctx.font = `700 ${Math.round(c * 0.7)}px system-ui, sans-serif`;
+  ctx.fillText(`${level}  ×${level}`, x0, y);
   ctx.shadowBlur = 0;
-  y += h + 4;
-  ctx.fillStyle = '#e8e8ff';
-  ctx.font = `700 ${Math.round(c * 0.5)}px system-ui, sans-serif`;
-  ctx.fillText(`×${(1 + round.danger).toFixed(2)}`, x0, y);
+  y += c * 0.85;
+  const w = colW - x0 * 2;
+  const h = c * 0.3;
+  const k = round.active ? (round.rows % round.rowsPerLevel) / round.rowsPerLevel : 0;
+  ctx.fillStyle = '#15152a';
+  ctx.fillRect(x0, y, w, h);
+  ctx.fillStyle = color;
+  ctx.fillRect(x0, y, w * k, h);
+  y += h + c * 0.4;
   // Running buffs, under the multiplier they stack with.
   y += c * 1.0;
   for (const b of buffs) {
@@ -88,6 +91,5 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
 function bannerText(round: Round): { big: string; small?: string; color: string } | null {
   if (!round.active) return { big: 'READY', small: 'ANY KEY', color: '#00f0ff' };
   if (round.paused) return { big: 'PAUSED', small: 'ANY KEY', color: '#ffe600' };
-  if (round.phase === 'settling') return { big: `SETTLE ${Math.max(0, round.settleMs / 1000).toFixed(1)}`, color: '#39ff14' };
   return null;
 }

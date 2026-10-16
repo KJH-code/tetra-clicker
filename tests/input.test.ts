@@ -77,7 +77,6 @@ describe('round gating', () => {
       gate: () => gate,
       start: () => calls.push('start'),
       resume: () => calls.push('resume'),
-      onSettleTap: () => calls.push('settle'),
     }, structuredClone(DEFAULT_HANDLING));
     input.attach(win as unknown as Window);
     input.setActive(true);
@@ -98,11 +97,4 @@ describe('round gating', () => {
     expect(calls).toEqual(['resume']);
   });
 
-  it('the settle key reports taps during play', () => {
-    const { win, calls } = gated('play');
-    win.fire('keydown', 'Enter');
-    win.fire('keyup', 'Enter');
-    win.fire('keydown', 'Enter');
-    expect(calls).toEqual(['settle', 'settle']);
-  });
 });

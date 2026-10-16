@@ -117,16 +117,22 @@ const buffs: UpgradeDef[] = [
     unlock: [{ type: 'stat', stat: 'manualPieces', gte: 2_000 }], effects: [{ target: 'rule:hold2', op: 'flag', value: 1 }] },
 ];
 
-// Wrath: buying it turns on the manual board's death elements a stage at a
-// time (I garbage, II gravity, III faster danger) and raises the starting
-// danger, which multiplies manual income. There is no way back before prestige.
-const wrath = chain({ group: 'wrath', rule: true }, ['I', 'II', 'III'].map((n, i) => ({
+// Wrath: harder lives for more Lines. I starts every life at level 4, II
+// levels up every 8 rows instead of 10, III starts at level 8 and levels up
+// every 6. The level multiplies manual income, so a player who can survive
+// it earns more. There is no way back before prestige.
+const wrath = chain({ group: 'wrath', rule: true }, [
+  { n: 'I', what: 'start at level 4', effects: [{ target: 'start_level', op: 'add', value: 3 }] },
+  { n: 'II', what: 'level up every 8 rows', effects: [{ target: 'rows_per_level', op: 'add', value: -2 }] },
+  { n: 'III', what: 'start at level 8, level up every 6 rows', effects: [
+    { target: 'start_level', op: 'add', value: 4 }, { target: 'rows_per_level', op: 'add', value: -2 }] },
+].map((w, i) => ({
   id: `wrath_${i + 1}`,
-  name: `WRATH ${n}: ${['garbage', '+ gravity', '+ danger rises twice as fast'][i]}`,
-  label: `WRATH ${n}`,
+  name: `WRATH ${w.n}: ${w.what}`,
+  label: `WRATH ${w.n}`,
   price: [2_000, 20_000, 200_000][i]!,
   unlock: [{ type: 'stat', stat: 'rounds', gte: 1 }] as Condition[],
-  effects: [{ target: 'rule:wrath', op: 'flag', value: 1 }] as Effect[],
+  effects: [{ target: 'rule:wrath', op: 'flag', value: 1 }, ...w.effects] as Effect[],
 })));
 
 // Golden pieces: commoner, and longer buffs. Cookie Clicker's Lucky day

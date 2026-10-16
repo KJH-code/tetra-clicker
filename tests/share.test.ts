@@ -48,12 +48,12 @@ describe('manual share of PER SECOND', () => {
     expect(w3.round.vault).toBe(Math.floor(20 + 4 * 0.03 * pps));
   });
 
-  it('manual ×2 multiplies the table value only; danger multiplies both', () => {
+  it('manual ×2 multiplies the table value only; the level multiplies both', () => {
     const w = world(['manual_200', MANUAL_SHARE_UPGRADES[0]!.id]);
     const pps = toNumber(w.incomePerSecond());
-    w.round.danger = 0.5;
+    w.round.startLevel = 3;
     tetris(w);
-    expect(w.round.vault).toBe(Math.floor((20 * 2 + 4 * 0.01 * pps) * 1.5));
+    expect(w.round.vault).toBe(Math.floor((20 * 2 + 4 * 0.01 * pps) * 3));
   });
 
   it('a row-less placement earns no share', () => {

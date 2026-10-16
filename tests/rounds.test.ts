@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { World } from '../src/sim/world';
-import { DANGER } from '../src/data/danger';
+import { LEVELS, gravityAt, garbageSecondsAt } from '../src/data/levels';
 import { migrate, SAVE_VERSION } from '../src/save/schema';
 import { HEIGHT, WIDTH } from '../src/sim/board';
+import { num } from '../src/sim/num';
 import type { GameSnapshot } from '../src/sim/game';
 
 const STEP = 1000 / 60;
@@ -33,117 +34,185 @@ function run(w: World, ms: number, from = 0): number {
   return t;
 }
 
-describe('round flow', () => {
-  it('manual Lines go to the vault, and settling banks all of them', () => {
+function topOut(w: World): void {
+  for (let y = 0; y < HEIGHT; y++) for (let x = 0; x < WIDTH - 1; x++) w.manual.grid[y * WIDTH + x] = 1;
+  w.manualHardDrop();
+}
+
+describe('a life', () => {
+  it('manual Lines go to the vault, times the level', () => {
     const w = readyWorld();
     expect(w.startRound()).toBe(true);
-    const r = tetris(w);
-    expect(r.lines).toBe(4);
-    expect(w.round.vault).toBe(20); // perfect clear replaces the base with 20
+    expect(w.round.level).toBe(1);
+    tetris(w);
+    expect(w.round.vault).toBe(20); // perfect clear, level 1
     expect(Number(w.economy.balance)).toBe(0);
-    expect(w.tapSettle()).toBe(false); // first tap
-    expect(w.tapSettle()).toBe(true); // second tap inside the window
-    expect(w.round.phase).toBe('settling');
-    run(w, DANGER.settleCountdownMs + 50, 1);
-    expect(w.round.phase).toBe('idle');
-    expect(Number(w.economy.balance)).toBe(20);
-    expect(w.economy.stats.roundsSettled).toBe(1);
+    const v = readyWorld();
+    v.startRound();
+    v.round.rows = 20; // level 3
+    tetris(v);
+    expect(v.round.vault).toBe(20 * 3);
   });
 
-  it('a second tap outside the window does not settle', () => {
+  it('every 40 rows a checkpoint banks the vault', () => {
     const w = readyWorld();
     w.startRound();
-    w.tapSettle();
-    run(w, DANGER.settleDoubleTapMs + 100, 1);
-    expect(w.tapSettle()).toBe(false);
-    expect(w.round.phase).toBe('running');
+    w.round.vault = 100;
+    w.round.rows = LEVELS.checkpointRows - 4;
+    w.drainEvents();
+    tetris(w); // level 4 tetris: 80 more, then the checkpoint
+    expect(Number(w.economy.balance)).toBe(180);
+    expect(w.round.vault).toBe(0);
+    expect(w.round.rowsToCheckpoint).toBe(LEVELS.checkpointRows);
+    expect(w.economy.stats.checkpoints).toBe(1);
+    expect(w.drainEvents().some((e) => e.type === 'checkpoint')).toBe(true);
   });
 
-  it('a top-out banks only what the forfeit leaves and resets the board', () => {
+  it('there is no way out but a top-out, which takes the whole vault', () => {
     const w = readyWorld();
     w.startRound();
     tetris(w);
-    const vault = w.round.vault;
-    // Fill the board to force a top-out on the next lock.
-    for (let y = 0; y < HEIGHT; y++) for (let x = 0; x < WIDTH - 1; x++) w.manual.grid[y * WIDTH + x] = 1;
-    const r = w.manualHardDrop();
-    expect(r.topped).toBe(true);
-    expect(w.round.phase).toBe('idle');
-    expect(Number(w.economy.balance)).toBe(Math.floor(vault * (1 - DANGER.forfeit)));
+    expect('tapSettle' in w).toBe(false);
+    topOut(w);
+    expect(w.round.active).toBe(false);
+    expect(Number(w.economy.balance)).toBe(0);
+    expect(w.economy.stats.deaths).toBe(1);
     expect(w.manual.grid.every((c) => c === 0)).toBe(true);
   });
 
-  it('a top-out during the settle countdown still forfeits', () => {
+  it('the level resets with each life', () => {
     const w = readyWorld();
     w.startRound();
-    tetris(w);
-    w.tapSettle(); w.tapSettle();
-    for (let y = 0; y < HEIGHT; y++) for (let x = 0; x < WIDTH - 1; x++) w.manual.grid[y * WIDTH + x] = 1;
-    w.manualHardDrop();
-    expect(Number(w.economy.balance)).toBe(Math.floor(20 * (1 - DANGER.forfeit)));
+    w.round.rows = 55;
+    expect(w.round.level).toBe(6);
+    topOut(w);
+    w.startRound();
+    expect(w.round.level).toBe(1);
   });
 
-  it('the shop is closed during a round', () => {
+  it('the shop stays open during a life', () => {
     const w = readyWorld();
-    w.economy.balance = 1e9;
+    w.economy.balance = num(1e9);
     w.startRound();
-    expect(w.buy('single')).toBe(false);
-    w.economy.stats.manualLines = 2000;
-    expect(w.buyUpgrade('manual_200')).toBe(false);
-    w.tapSettle(); w.tapSettle();
-    run(w, DANGER.settleCountdownMs + 50, 1);
     expect(w.buy('single')).toBe(true);
+    w.economy.stats.manualLines = 2000;
     expect(w.buyUpgrade('manual_200')).toBe(true);
+    expect(w.round.active).toBe(true);
   });
 });
 
-describe('danger', () => {
-  it('starts at the wrath floor and climbs one point per five minutes', () => {
-    for (const [stage, floor] of [[0, 0], [1, 0.25], [2, 0.5], [3, 1.0]] as const) {
+describe('levels', () => {
+  it('ten rows a level, marathon style', () => {
+    const w = readyWorld();
+    w.startRound();
+    w.round.rows = 9;
+    expect(w.round.level).toBe(1);
+    w.round.rows = 10;
+    expect(w.round.level).toBe(2);
+    w.round.rows = 95;
+    expect(w.round.level).toBe(10);
+  });
+
+  it('wrath: I starts at 4, II levels every 8 rows, III starts at 8 and levels every 6', () => {
+    const at = (stages: number, rows: number): number => {
       const w = readyWorld();
-      for (let i = 1; i <= stage; i++) w.economy.upgrades.add(`wrath_${i}`);
+      for (let i = 1; i <= stages; i++) w.economy.upgrades.add(`wrath_${i}`);
       w.startRound();
-      expect(w.round.danger).toBeCloseTo(floor, 10);
-      if (stage === 3) {
-        // Short enough that garbage and gravity cannot end the round.
-        run(w, 6_000, 1);
-        expect(w.round.active).toBe(true);
-        expect(w.round.danger - floor).toBeCloseTo((6 / 300) * 2, 3);
-      }
-    }
-    const w = readyWorld();
-    w.startRound();
-    run(w, 60_000, 1);
-    expect(w.round.danger).toBeCloseTo(60 / 300, 2);
+      w.round.rows = rows;
+      return w.round.level;
+    };
+    expect(at(1, 0)).toBe(4);
+    expect(at(1, 10)).toBe(5);
+    expect(at(2, 0)).toBe(4);
+    expect(at(2, 8)).toBe(5);
+    expect(at(3, 0)).toBe(8);
+    expect(at(3, 6)).toBe(9);
+    expect(at(3, 5)).toBe(8);
   });
 
-  it('manual income is multiplied by 1 + danger and recorded as risk-weighted Lines', () => {
+  it('a level-up is announced and the highest level recorded', () => {
     const w = readyWorld();
-    w.economy.upgrades.add('wrath_1');
-    w.economy.upgrades.add('wrath_2');
-    w.economy.upgrades.add('wrath_3');
-    w.startRound(); // danger 1.0
+    w.startRound();
+    w.round.rows = 8;
+    w.drainEvents();
     tetris(w);
-    expect(w.round.vault).toBe(20 * 2);
-    expect(w.economy.stats.riskLines).toBeCloseTo(40 * 1, 10);
+    expect(w.drainEvents().some((e) => e.type === 'levelUp' && e.level === 2)).toBe(true);
+    expect(w.economy.stats.maxLevel).toBe(2);
+  });
+});
+
+describe('gravity and garbage', () => {
+  it('gravity follows the level table and is on from the first life', () => {
+    expect(gravityAt(1)).toBe(0.5);
+    expect(gravityAt(5)).toBe(1.5);
+    expect(gravityAt(10)).toBe(4);
+    expect(gravityAt(15)).toBe(10);
+    expect(gravityAt(20)).toBe(Infinity);
+    const w = readyWorld();
+    w.startRound(); // level 1: a cell every 2 s
+    const y = w.manual.active!.y;
+    run(w, 4100, 1);
+    expect(w.manual.active!.y).toBe(y + 2);
   });
 
-  it('stops while paused', () => {
+  it('at 20G a piece lands at once', () => {
     const w = readyWorld();
     w.startRound();
-    let t = run(w, 30_000, 1);
-    const d = w.round.danger;
-    w.pauseRound();
-    t = run(w, 30_000, t);
-    expect(w.round.danger).toBe(d);
-    w.resumeRound();
-    run(w, 30_000, t);
-    expect(w.round.danger).toBeGreaterThan(d);
+    w.round.rows = 190; // level 20
+    const ghost = w.manual.ghostY();
+    run(w, 50, 1);
+    expect(w.manual.active!.y).toBe(ghost);
   });
 
-  it('a long gap pauses the round while bots keep earning', () => {
+  it('garbage starts at level 3, every 24 ÷ level seconds, never under 1.5 s', () => {
+    expect(garbageSecondsAt(1)).toBeNull();
+    expect(garbageSecondsAt(2)).toBeNull();
+    expect(garbageSecondsAt(3)).toBe(8);
+    expect(garbageSecondsAt(6)).toBe(4);
+    expect(garbageSecondsAt(30)).toBe(1.5);
     const w = readyWorld();
-    w.economy.balance = 1000;
+    w.startRound();
+    run(w, 20_000, 1);
+    expect(Array.from(w.manual.grid).filter((c) => c === 8)).toHaveLength(0);
+  });
+
+  it('cheese rows on schedule with the same holes for the same seed', () => {
+    const holes = (seed: number) => {
+      const w = new World(seed);
+      w.advance(0);
+      w.startRound();
+      w.round.rows = 20; // level 3: a row every 8 s
+      let rows = 0;
+      for (let t = 1; t < 17_000; t += STEP) {
+        w.advance(t);
+        // Keep the piece from locking so only garbage changes the stack.
+        if (w.manual.active) w.manual.active = { ...w.manual.active, y: 20 };
+        rows += w.drainEvents().filter((e) => e.type === 'garbage').length;
+      }
+      return { rows, grid: Array.from(w.manual.grid) };
+    };
+    const a = holes(5);
+    const b = holes(5);
+    expect(a.rows).toBe(2);
+    expect(a.grid).toEqual(b.grid);
+    for (let y = HEIGHT - a.rows; y < HEIGHT; y++) {
+      expect(a.grid.slice(y * WIDTH, (y + 1) * WIDTH).filter((c) => c === 0)).toHaveLength(1);
+    }
+  });
+
+  it('nothing moves while paused', () => {
+    const w = readyWorld();
+    w.startRound();
+    w.pauseRound();
+    const y = w.manual.active!.y;
+    run(w, 10_000, 1);
+    expect(w.manual.active!.y).toBe(y);
+    expect(w.round.elapsedMs).toBe(0);
+  });
+
+  it('a long gap pauses the life while bots keep earning', () => {
+    const w = readyWorld();
+    w.economy.balance = num(1000);
     w.buy('single');
     w.startRound();
     run(w, 1000, 1);
@@ -154,70 +223,20 @@ describe('danger', () => {
   });
 });
 
-describe('garbage and gravity in a round', () => {
-  it('no garbage at wrath 0', () => {
+describe('saves', () => {
+  it('a life in progress comes back paused', () => {
     const w = readyWorld();
     w.startRound();
-    run(w, 120_000, 1);
-    const bottom = Array.from(w.manual.grid.subarray((HEIGHT - 1) * WIDTH));
-    expect(bottom.filter((c) => c === 8)).toHaveLength(0);
-  });
-
-  it('wrath I sends cheese garbage on schedule, same holes for the same seed', () => {
-    const holes = (seed: number) => {
-      const w = readyWorld(seed);
-      w.economy.upgrades.add('wrath_1');
-      w.startRound(); // danger 0.25 → one row every 32 s at first
-      let rows = 0;
-      let t = 1;
-      for (; t < 70_000; t += STEP) {
-        w.advance(t);
-        rows += w.drainEvents().filter((e) => e.type === 'garbage').length;
-      }
-      const grid = Array.from(w.manual.grid);
-      return { rows, grid };
-    };
-    const a = holes(5);
-    const b = holes(5);
-    // Danger climbs from 0.25, so the gaps shrink: rows land near 25 s, 45 s, 62 s.
-    expect(a.rows).toBe(3);
-    expect(a.grid).toEqual(b.grid);
-    // Every garbage row has exactly one hole.
-    for (let y = HEIGHT - a.rows; y < HEIGHT; y++) {
-      const row = a.grid.slice(y * WIDTH, (y + 1) * WIDTH);
-      expect(row.filter((c) => c === 0)).toHaveLength(1);
-    }
-  });
-
-  it('gravity only from wrath II', () => {
-    const w1 = readyWorld();
-    w1.economy.upgrades.add('wrath_1');
-    w1.startRound();
-    const y1 = w1.manual.active!.y;
-    run(w1, 3000, 1);
-    expect(w1.manual.active!.y).toBe(y1);
-    const w2 = readyWorld();
-    w2.economy.upgrades.add('wrath_1');
-    w2.economy.upgrades.add('wrath_2');
-    w2.startRound(); // danger 0.5 → a cell every 2 s
-    const y2 = w2.manual.active!.y;
-    run(w2, 4100, 1);
-    expect(w2.manual.active!.y).toBe(y2 + 2);
-  });
-});
-
-describe('round saves', () => {
-  it('a round in progress comes back paused', () => {
-    const w = readyWorld();
-    w.startRound();
+    w.round.rows = 12;
     tetris(w);
     const w2 = new World(1, JSON.parse(JSON.stringify(w.snapshot())));
     expect(w2.round.phase).toBe('running');
     expect(w2.round.paused).toBe(true);
-    expect(w2.round.vault).toBe(20);
+    expect(w2.round.vault).toBe(w.round.vault);
+    expect(w2.round.level).toBe(2);
   });
 
-  it('a version 2 save migrates to 3 with no round', () => {
+  it('a version 2 save migrates with no life in progress', () => {
     const v2 = {
       version: 2, savedAt: 1, settings: {},
       world: {
@@ -231,7 +250,20 @@ describe('round saves', () => {
     expect(data?.version).toBe(SAVE_VERSION);
     const w = new World(3, data!.world);
     expect(w.round.phase).toBe('idle');
-    expect(w.economy.stats.rounds).toBe(0);
     expect(Number(w.economy.balance)).toBe(14); // old Lines, doubled into the whole-number unit
+  });
+
+  it('a version 5 round in progress is banked in full and the settle key dropped', () => {
+    const snap = new World(1).snapshot() as unknown as Record<string, unknown>;
+    (snap['economy'] as Record<string, unknown>)['balance'] = '100';
+    (snap['economy'] as Record<string, Record<string, number>>)['stats']!['roundsSettled'] = 3;
+    snap['round'] = { phase: 'running', paused: true, vault: 55, danger: 0.7, elapsedMs: 1, garbageMs: 0, settleMs: 0, rng: 1, goldenMs: 1, goldenRng: 1 };
+    const keys = { left: ['ArrowLeft'], settle: ['Enter'] };
+    const m = migrate({ version: 5, savedAt: 0, settings: { das: 1, arr: 1, sdf: 1, keys }, world: snap })!;
+    expect(m.version).toBe(6);
+    expect(m.world.round).toBeNull();
+    expect(m.world.economy.balance).toBe('155');
+    expect('roundsSettled' in m.world.economy.stats).toBe(false);
+    expect('settle' in m.settings.keys).toBe(false);
   });
 });

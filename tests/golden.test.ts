@@ -4,7 +4,6 @@ import { Game } from '../src/sim/game';
 import { num, toNumber } from '../src/sim/num';
 import { GOLDEN, BUFFS } from '../src/data/golden';
 import { migrate, SAVE_VERSION } from '../src/save/schema';
-import { DANGER } from '../src/data/danger';
 import type { GameSnapshot } from '../src/sim/game';
 
 const STEP = 1000 / 60;
@@ -157,8 +156,7 @@ describe('golden piece in play', () => {
   it('a round end takes it away', () => {
     const w = world();
     w.manual.markGolden(3);
-    w.tapSettle(); w.tapSettle();
-    run(w, DANGER.settleCountdownMs + 100, 1);
+    w['endRound']();
     expect(w.round.active).toBe(false);
     expect(w.manual.hasGolden).toBe(false);
   });

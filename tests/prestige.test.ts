@@ -3,7 +3,7 @@ import { World } from '../src/sim/world';
 import { num, toNumber } from '../src/sim/num';
 import { PRESTIGE, PRESTIGE_UPGRADES, TECH_CHECKS, prestigeRequires } from '../src/data/prestige';
 import { crownCurve, crownGain } from '../src/sim/prestige';
-import { DANGER } from '../src/data/danger';
+import { LEVELS } from '../src/data/levels';
 import { migrate, SAVE_VERSION } from '../src/save/schema';
 import type { GameSnapshot } from '../src/sim/game';
 
@@ -76,7 +76,7 @@ describe('tech checklist', () => {
     const w = new World(1);
     expect(w.techScore()).toBe(0);
     const s = w.economy.stats;
-    s.tss = 1; s.tsd = 1; s.tst = 1; s.pcs = 1; s.combo5 = 1; s.combo10 = 1; s.b2b5 = 1; s.tetrises = 9; s.hotSettles = 1; s.goldens = 3;
+    s.tss = 1; s.tsd = 1; s.tst = 1; s.pcs = 1; s.combo5 = 1; s.combo10 = 1; s.b2b5 = 1; s.tetrises = 9; s.maxLevel = 10; s.goldens = 3;
     expect(w.techChecks().filter((c) => c.done).map((c) => c.id)).toEqual(TECH_CHECKS.map((c) => c.id).filter((id) => id !== 'tetris10'));
     expect(w.techScore()).toBeCloseTo(1.0, 12); // nine checks, capped
     s.tss = 0; s.tsd = 0; s.tst = 0;
@@ -87,47 +87,51 @@ describe('tech checklist', () => {
     const w = new World(1);
     ascendTo(w, ['proportion_1', 'proportion_2']);
     const s = w.economy.stats;
-    s.tss = s.tsd = s.tst = s.pcs = s.combo5 = s.combo10 = s.b2b5 = s.hotSettles = 1; s.tetrises = 10; s.goldens = 3;
+    s.tss = s.tsd = s.tst = s.pcs = s.combo5 = s.combo10 = s.b2b5 = 1; s.maxLevel = 10; s.tetrises = 10; s.goldens = 3;
     expect(w.techScore()).toBeCloseTo(1.5, 12); // all ten count once the cap is raised
   });
 
-  it('play records the counters: tetris, T-spins, hot settles', () => {
+  it('play records the counters: tetrises and the highest level', () => {
     const w = readyManual(new World(1));
     w.startRound();
+    w.round.rows = 86; // level 9, four rows short of 10
     tetris(w);
     expect(w.economy.stats.tetrises).toBe(1);
-    w.round.danger = PRESTIGE.hotSettleDanger;
-    w.tapSettle(); w.tapSettle();
-    run(w, DANGER.settleCountdownMs + 100, 1);
-    expect(w.economy.stats.hotSettles).toBe(1);
+    expect(w.economy.stats.maxLevel).toBe(10);
   });
 });
 
 describe('risk weight', () => {
-  it('vault Lines × danger × weight; bots add nothing', () => {
+  it('banked Lines × level × weight, counted at the checkpoint; bots add nothing', () => {
     const w = readyManual(new World(1));
     w.startRound();
-    w.round.danger = 1;
+    w.round.rows = LEVELS.checkpointRows - 8; // level 4, eight rows to the checkpoint
     tetris(w);
     const earned = w.round.vault;
-    expect(w.economy.stats.riskLines).toBeCloseTo(earned * 1, 9);
+    expect(earned).toBe(20 * 4);
+    expect(w.economy.stats.riskLines).toBe(0); // not banked yet
+    w.round.vaultRisk = earned * 4;
+    w['checkpoint'](1);
+    expect(w.economy.stats.riskLines).toBeCloseTo(earned * 4, 9);
     const bots = ranWorld(0);
     bots.economy.stats.riskLines = 0;
     run(bots, 30_000, 1);
     expect(bots.economy.stats.riskLines).toBe(0);
   });
 
-  it('RISK WEIGHT ×1.5 then ×2 scale it, and a forfeit keeps it', () => {
+  it('RISK WEIGHT ×1.5 then ×2 scale it; a top-out drops the unbanked part', () => {
     const w = new World(1);
     ascendTo(w, ['proportion_1', 'proportion_2', 'proportion_3']);
     const r = readyManual(w);
     r.startRound();
-    r.round.danger = 1;
+    r.round.rows = LEVELS.checkpointRows - 4; // level 4; this tetris reaches the checkpoint
     tetris(r);
-    expect(r.economy.stats.riskLines).toBeCloseTo(r.round.vault * 3, 9);
+    expect(r.round.vault).toBe(0);
+    expect(r.economy.stats.riskLines).toBeCloseTo(20 * 4 * 4 * 3, 9);
     const before = r.economy.stats.riskLines;
-    r.pauseRound();
-    r['endRound']('toppedOut');
+    r.round.vault = 500;
+    r.round.vaultRisk = 2000;
+    r['endRound']();
     expect(r.economy.stats.riskLines).toBe(before);
   });
 });
@@ -215,29 +219,30 @@ describe('prestige shop', () => {
     expect(v.economy.incomeMultiplier(['board:manual'])).toBeCloseTo(12, 12);
   });
 
-  it('survival: danger rise ×0.8, top-out loss 30% then 20%, garbage gaps ×1.25', () => {
+  it('survival: gravity ×0.8, keep 25% then 50% of the vault, garbage gaps ×1.25', () => {
     const a = new World(1);
     ascendTo(a, ['survival_1', 'survival_2']);
+    expect(a['fx']('gravity', 1)).toBeCloseTo(0.8, 12);
     a.startRound();
-    run(a, 300_000, 1);
-    expect(a.round.danger).toBeCloseTo(0.8, 2);
     a.round.vault = 1000;
-    a['endRound']('toppedOut');
-    expect(Number(a.economy.balance)).toBeCloseTo(700, 6);
+    a['endRound']();
+    expect(Number(a.economy.balance)).toBe(250);
     const b = new World(1);
     ascendTo(b, ['survival_1', 'survival_2', 'survival_3', 'survival_4']);
     b.startRound();
     b.round.vault = 1000;
-    b['endRound']('toppedOut');
-    expect(Number(b.economy.balance)).toBeCloseTo(800, 6);
+    b.round.vaultRisk = 4000;
+    b['endRound']();
+    expect(Number(b.economy.balance)).toBe(500);
+    expect(b.economy.stats.riskLines).toBeCloseTo(2000, 9); // the kept half counts as banked
     expect(b['fx']('garbage_interval', 1)).toBeCloseTo(1.25, 12);
   });
 
-  it('START DANGER +0.25 raises every round’s floor', () => {
+  it('START LEVEL +2 raises every life’s starting level', () => {
     const w = new World(1);
     ascendTo(w, ['proportion_1', 'proportion_2', 'proportion_3', 'proportion_4']);
     w.startRound();
-    expect(w.round.danger).toBeCloseTo(0.25, 12);
+    expect(w.round.level).toBe(3);
   });
 });
 

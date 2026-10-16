@@ -17,8 +17,6 @@ export const PRESTIGE = {
   // TECH CAP +0.5 lets all ten count.
   techPerCheck: 0.15,
   techCapBase: 1.0,
-  // Settling at or above this danger ticks the "hot settle" check.
-  hotSettleDanger: 2,
 };
 
 // Tech checklist: each met in a run adds techPerCheck to that run's score.
@@ -38,7 +36,7 @@ export const TECH_CHECKS: TechCheck[] = [
   { id: 'combo10', label: '10 COMBO', when: { type: 'stat', stat: 'combo10', gte: 1 } },
   { id: 'b2b5', label: 'B2B ×5', when: { type: 'stat', stat: 'b2b5', gte: 1 } },
   { id: 'tetris10', label: '10 TETRISES', when: { type: 'stat', stat: 'tetrises', gte: 10 } },
-  { id: 'hot', label: 'SETTLE AT DANGER 2+', when: { type: 'stat', stat: 'hotSettles', gte: 1 } },
+  { id: 'level10', label: 'REACH LEVEL 10', when: { type: 'stat', stat: 'maxLevel', gte: 10 } },
   { id: 'golden3', label: '3 GOLDEN PIECES', when: { type: 'stat', stat: 'goldens', gte: 3 } },
 ];
 
@@ -67,16 +65,16 @@ export const PRESTIGE_UPGRADES: PrestigeDef[] = [
     { name: 'ALL INCOME ×2', effects: [{ target: 'income', op: 'mul', value: 2 }] },
   ]),
   ...branch('survival', [
-    { name: 'DANGER RISES ×0.8', effects: [{ target: 'danger_rate', op: 'mul', value: 0.8 }] },
-    { name: 'TOP-OUT LOSS 40% → 30%', effects: [{ target: 'forfeit', op: 'add', value: -0.1 }] },
+    { name: 'GRAVITY ×0.8', effects: [{ target: 'gravity', op: 'mul', value: 0.8 }] },
+    { name: 'KEEP 25% OF THE VAULT ON A TOP-OUT', effects: [{ target: 'retain', op: 'add', value: 0.25 }] },
     { name: 'GARBAGE GAPS ×1.25', effects: [{ target: 'garbage_interval', op: 'mul', value: 1.25 }] },
-    { name: 'TOP-OUT LOSS 30% → 20%', effects: [{ target: 'forfeit', op: 'add', value: -0.1 }] },
+    { name: 'KEEP 50% OF THE VAULT ON A TOP-OUT', effects: [{ target: 'retain', op: 'add', value: 0.25 }] },
   ]),
   ...branch('proportion', [
     { name: 'RISK WEIGHT ×1.5', effects: [{ target: 'risk_weight', op: 'mul', value: 1.5 }] },
     { name: 'TECH CAP +0.5', effects: [{ target: 'tech_cap', op: 'add', value: 0.5 }] },
     { name: 'RISK WEIGHT ×2', effects: [{ target: 'risk_weight', op: 'mul', value: 2 }] },
-    { name: 'START DANGER +0.25', effects: [{ target: 'danger_floor', op: 'add', value: 0.25 }] },
+    { name: 'START LEVEL +2', effects: [{ target: 'start_level', op: 'add', value: 2 }] },
   ]),
 ];
 

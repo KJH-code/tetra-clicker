@@ -59,9 +59,8 @@ const input = new InputHandler({
   gate: () => (!world.round.active ? 'start' : world.round.paused ? 'resume' : 'play'),
   start: () => { world.startRound(); },
   resume: () => { world.resumeRound(); },
-  onSettleTap: () => { world.tapSettle(); },
 }, settings);
-// A round cannot be played from another tab or window: pause it.
+// A life cannot be played from another tab or window: pause it.
 document.addEventListener('visibilitychange', () => { if (document.hidden) world.pauseRound(); });
 window.addEventListener('blur', () => world.pauseRound());
 input.attach(window);
@@ -91,7 +90,10 @@ startAutosave(store, snapshot);
 function mergeSettings(s: Partial<HandlingSettings> | undefined): HandlingSettings {
   const d = structuredClone(DEFAULT_HANDLING);
   if (!s) return d;
-  return { das: s.das ?? d.das, arr: s.arr ?? d.arr, sdf: s.sdf ?? d.sdf, keys: { ...d.keys, ...(s.keys ?? {}) } };
+  // Only actions that still exist: an old save may bind keys to one that was removed.
+  const keys = { ...d.keys };
+  for (const a of Object.keys(keys) as (keyof typeof keys)[]) if (s.keys?.[a]) keys[a] = s.keys[a];
+  return { das: s.das ?? d.das, arr: s.arr ?? d.arr, sdf: s.sdf ?? d.sdf, keys };
 }
 
 // --- events → effects -----------------------------------------------------
@@ -131,21 +133,24 @@ function handleEvent(e: WorldEvent): void {
     case 'slept':
       break;
     case 'roundStart':
-      manualFx.float('GO', manual.cellX(5), manual.cellY(29), { color: '#00f0ff', size: 30, dur: 700 });
-      shop.refresh(true);
+      manualFx.float(`GO · LEVEL ${e.level}`, manual.cellX(5), manual.cellY(29), { color: '#00f0ff', size: 26, dur: 900 });
       break;
-    case 'settleStart':
-      manualFx.float('SETTLING', manual.cellX(5), manual.cellY(24), { color: '#39ff14', size: 18, dur: 900 });
+    case 'levelUp':
+      manualFx.float(`LEVEL ${e.level}`, manual.cellX(5), manual.cellY(24), { color: '#00f0ff', size: 22, dur: 1100 });
+      break;
+    case 'checkpoint':
+      manualFx.float(`CHECKPOINT +${format(e.banked)}`, manual.cellX(5), manual.cellY(22), { color: '#39ff14', size: 22, dur: 1600 });
+      shop.refresh(true);
       break;
     case 'garbage':
       manualFx.shakeBoard(1);
       break;
     case 'roundEnd': {
-      const settled = e.outcome === 'settled';
-      manualFx.shakeBoard(settled ? 2 : 6);
-      manualFx.float(settled ? `+${format(e.deposited)}` : `−${format(e.forfeited)}`, manual.cellX(5), manual.cellY(25),
-        { color: settled ? '#39ff14' : '#ff3b3b', size: 30, dur: 1600 });
-      manualFx.float(settled ? 'BANKED' : 'TOPPED OUT', manual.cellX(5), manual.cellY(23), { color: '#ffffff', size: 16, dur: 1600 });
+      manualFx.shakeBoard(6);
+      if (Number(e.forfeited) > 0) {
+        manualFx.float(`−${format(e.forfeited)}`, manual.cellX(5), manual.cellY(25), { color: '#ff3b3b', size: 30, dur: 1600 });
+      }
+      manualFx.float(`TOPPED OUT · LEVEL ${e.level}`, manual.cellX(5), manual.cellY(23), { color: '#ffffff', size: 16, dur: 1600 });
       shop.refresh(true);
       break;
     }

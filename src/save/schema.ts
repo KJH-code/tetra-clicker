@@ -1,7 +1,7 @@
 import type { WorldSnapshot } from '../sim/world';
 import type { HandlingSettings } from '../data/handling';
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 export interface SaveData {
   version: number;
@@ -62,6 +62,24 @@ const MIGRATIONS: Migration[] = [
     });
     const round = world['round'] as Record<string, number> | null;
     if (round) round['vault'] = Math.floor((round['vault'] ?? 0) * 2);
+    return raw;
+  },
+  // 5 → 6: rounds become lives with levels and checkpoints, and settling is
+  // gone. A round in progress ends with its vault banked in full, so nobody
+  // loses Lines to the change; the settle key binding is dropped.
+  (raw) => {
+    const world = raw['world'] as Record<string, unknown>;
+    const economy = world['economy'] as Record<string, unknown>;
+    const round = world['round'] as Record<string, number> | null;
+    if (round) economy['balance'] = String(Number(economy['balance'] ?? 0) + Math.floor(round['vault'] ?? 0));
+    world['round'] = null;
+    const stats = economy['stats'] as Record<string, number> | undefined;
+    if (stats) { delete stats['roundsSettled']; delete stats['hotSettles']; }
+    const meta = world['meta'] as Record<string, unknown> | undefined;
+    const lifetime = meta?.['lifetime'] as Record<string, number> | undefined;
+    if (lifetime) { delete lifetime['roundsSettled']; delete lifetime['hotSettles']; }
+    const keys = (raw['settings'] as Record<string, unknown> | undefined)?.['keys'] as Record<string, unknown> | undefined;
+    if (keys) delete keys['settle'];
     return raw;
   },
 ];

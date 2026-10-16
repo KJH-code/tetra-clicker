@@ -8,7 +8,7 @@ import { kicksFor } from './kicks';
 import { createBag, type Bag } from './bag';
 import { createRng, restoreRng } from './rng';
 import { detectSpin, type SpinKind } from './spin';
-import { DANGER, GARBAGE_ID } from '../data/danger';
+import { LEVELS, GARBAGE_ID } from '../data/levels';
 
 // What one locked piece did. attack.ts turns this into Lines; the renderer
 // turns it into flashes.
@@ -226,7 +226,7 @@ export class Game {
   // A move or turn while resting buys more lock delay, up to the reset limit,
   // so a piece cannot be stalled forever.
   private touched(): void {
-    if (this.lockMs > 0 && this.lockResets < DANGER.lockResetLimit) {
+    if (this.lockMs > 0 && this.lockResets < LEVELS.lockResetLimit) {
       this.lockMs = 0;
       this.lockResets += 1;
     }
@@ -236,9 +236,18 @@ export class Game {
   // rests. Returns the lock result if the piece locked on its own.
   tick(dtMs: number, cellsPerSecond: number): LockResult | null {
     if (!this.active || cellsPerSecond <= 0) return null;
-    this.fallMs += dtMs;
-    const interval = 1000 / cellsPerSecond;
     let piece: Placement = this.active;
+    // 20G: the piece sits on the floor the moment it appears.
+    if (!Number.isFinite(cellsPerSecond)) {
+      const d = dropDistance(this.grid, piece);
+      if (d > 0) {
+        this.active = piece = { ...piece, y: piece.y + d };
+        this.lastActionWasRotation = false;
+        this.lockMs = 0;
+      }
+    }
+    this.fallMs += dtMs;
+    const interval = Number.isFinite(cellsPerSecond) ? 1000 / cellsPerSecond : Infinity;
     while (this.fallMs >= interval) {
       this.fallMs -= interval;
       const down: Placement = { ...piece, y: piece.y + 1 };
@@ -251,7 +260,7 @@ export class Game {
     }
     if (dropDistance(this.grid, piece) === 0) {
       this.lockMs += dtMs;
-      if (this.lockMs >= DANGER.lockDelayMs) return this.lock();
+      if (this.lockMs >= LEVELS.lockDelayMs) return this.lock();
     } else {
       this.lockMs = 0;
     }

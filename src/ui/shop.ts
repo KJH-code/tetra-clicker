@@ -66,8 +66,6 @@ export class Shop {
     }
     this.incomeEl.textContent = `${format(this.world.incomePerSecond(true))}/s`;
     this.incomeEl.classList.toggle('buffed', this.world.buffs.active.length > 0);
-    // Shopping happens between rounds.
-    this.root.classList.toggle('in-round', this.world.round.active);
     this.chips.refresh();
     const meta = this.world.economy.meta;
     this.crownEl.hidden = meta.crownsEarned === 0;
@@ -94,7 +92,7 @@ export class Shop {
       ui.owned.textContent = String(this.world.economy.owned(b.id));
       ui.price.textContent = format(price);
       ui.price.classList.toggle('cant', !can);
-      ui.btn.disabled = !can || this.world.round.active;
+      ui.btn.disabled = !can;
     }
   }
 }
