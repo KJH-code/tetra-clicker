@@ -1,14 +1,22 @@
 import type { Game } from '../game';
 import type { BotPolicy, BotChoice } from './policy';
 import { STANDARD, maxHeight, type Weights } from './cc/eval';
+
+// Digging out: Cold Clear's stock weights avoid singles (a versus habit),
+// which is exactly what a holey stack needs, so here every clear pays.
+export const SURVIVE: Weights = {
+  ...STANDARD,
+  clear1: 150, clear2: 250, clear3: 350, clear4: 500, tspin1: 300, tspin2: 500, tspin3: 600,
+  height: -80, top_half: -400, top_quarter: -1000, wasted_t: 0,
+};
 import { search, type SearchOptions } from './cc/search';
 import { findMoves } from './cc/movegen';
 
 // A bot driven by the ported Cold Clear evaluation and search. Each building
 // gives it its own weights (what it is paid for) and may veto moves, and may
 // switch weights with the state of its board (a combo bot builds, then
-// cuts). Above `panicHeight` rows it falls back to Cold Clear's stock
-// weights, which are built to survive, so a bot never tops out chasing its
+// cuts). Above `panicHeight` rows it switches to SURVIVE, which pays for any
+// clear and punishes height hard, so a bot never tops out chasing its
 // technique; vetoes marked `strict` still hold then.
 export interface Mode {
   weights: Weights;
@@ -30,8 +38,8 @@ export function ccBot(cfg: CcBotConfig): BotPolicy {
       const active = game.active;
       if (!active) return null;
       const height = maxHeight(game.grid);
-      const panic = height >= (cfg.panicHeight ?? 12);
-      const mode: Mode = panic ? { weights: STANDARD } : cfg.mode?.(game, height) ?? cfg;
+      const panic = height >= (cfg.panicHeight ?? 10);
+      const mode: Mode = panic ? { weights: SURVIVE } : cfg.mode?.(game, height) ?? cfg;
       const allow = mode.allow ?? (panic ? undefined : cfg.allow);
       const veto = (allow || cfg.strict)
         ? (m: Parameters<NonNullable<SearchOptions['allow']>>[0], l: Parameters<NonNullable<SearchOptions['allow']>>[1]) =>

@@ -71,6 +71,8 @@ export const tspinBot = (): BotPolicy => ccBot({
 export const b2bBot = (): BotPolicy => ccBot({
   ...SEARCH,
   weights: B2B_WEIGHTS,
+  // Tetrises need a tall stack; survival takes over a little later.
+  panicHeight: 12,
   allow: (_m, l) => l.lines === 0 || l.lines === 4 || isTsd(l),
 });
 
@@ -84,10 +86,10 @@ export const COMBO_BUILD: Weights = {
   height: 0, top_half: 0, jeopardy: 0, well_depth: 0, tslot: [0, 0, 0, 0],
   cavity_cells: -40, bumpiness: -5, row_transitions: 0,
 };
-export const comboBot = (buildTo = 12): BotPolicy => ccBot({
+export const comboBot = (buildTo = 10): BotPolicy => ccBot({
   ...SEARCH,
   weights: COMBO_WEIGHTS,
-  panicHeight: 16,
+  panicHeight: 13,
   mode: (game, height) => (game.combo < 0 && height < buildTo ? { weights: COMBO_BUILD } : { weights: COMBO_WEIGHTS }),
 });
 
