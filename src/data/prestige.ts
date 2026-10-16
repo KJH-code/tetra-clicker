@@ -7,8 +7,12 @@ import type { Condition, Effect } from '../sim/effects';
 // score), rounded down. The cube root makes each next crown dearer, so many
 // short runs earn less than one long one.
 export const PRESTIGE = {
-  // See the calibration note below.
-  riskPerCrown: 1, // placeholder until calibrated
+  // Calibrated so the first crown comes after about 2.5 hours of play: the
+  // simulator's default player (0.5 PPS, 0.45 Lines a piece) playing
+  // continuously earns ~3.2K Lines by hand in 2.5 h; at an assumed average
+  // round danger of 0.75 that is ~2.4K risk-weighted Lines.
+  //   1 h 0.6K · 2 h 1.8K · 2.5 h 2.4K · 3 h 3.2K · 4 h 5.6K
+  riskPerCrown: 2_500,
   // Ten checks at 0.15 overshoot the 1.0 cap, so seven are enough until
   // TECH CAP +0.5 lets all ten count.
   techPerCheck: 0.15,

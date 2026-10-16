@@ -59,6 +59,8 @@ export interface SimResult {
   series: Sample[];
   finalBalance: number;
   finalIncome: number;
+  // Lines earned by hand over the run, what risk weight is built from.
+  manualLines: number;
 }
 
 export const DEFAULT_PLAYER: PlayerParams = { pps: 0.5, linesPerPiece: 0.45, focusMinutes: 15, dailyMinutes: 60 };
@@ -229,5 +231,6 @@ export function simulate(params: SimParams): SimResult {
     series,
     finalBalance: balance,
     finalIncome: income(t),
+    manualLines: eco.stats.manualLines,
   };
 }
