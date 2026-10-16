@@ -1,7 +1,7 @@
 import type { WorldSnapshot } from '../sim/world';
 import type { HandlingSettings } from '../data/handling';
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export interface SaveData {
   version: number;
@@ -36,6 +36,13 @@ const MIGRATIONS: Migration[] = [
   (raw) => {
     const world = raw['world'] as Record<string, unknown>;
     world['round'] ??= null;
+    return raw;
+  },
+  // 3 → 4: buffs and golden pieces arrive. No buff is running; the golden
+  // timer and marks start fresh when the world loads.
+  (raw) => {
+    const world = raw['world'] as Record<string, unknown>;
+    world['buffs'] ??= [];
     return raw;
   },
 ];

@@ -8,7 +8,7 @@ export interface UpgradeDef {
   id: string;
   label: string;
   name: string;
-  group: 'milestone' | 'manual' | 'tech' | 'buff' | 'wrath';
+  group: 'milestone' | 'manual' | 'tech' | 'buff' | 'wrath' | 'golden';
   price: number;
   unlock: Condition[];
   effects: Effect[];
@@ -129,6 +129,15 @@ const wrath = chain({ group: 'wrath', rule: true }, ['I', 'II', 'III'].map((n, i
   effects: [{ target: 'rule:wrath', op: 'flag', value: 1 }] as Effect[],
 })));
 
-export const UPGRADES: UpgradeDef[] = [...BUILDINGS.flatMap(milestonesFor), ...MANUAL_UPGRADES, ...MANUAL_SHARE_UPGRADES, ...tech, ...buffs, ...wrath];
+// Golden pieces: commoner, and longer buffs. Cookie Clicker's Lucky day
+// and Get lucky, unlocked by golden pieces cashed in.
+const golden: UpgradeDef[] = [
+  { id: 'lucky_day', name: 'LUCKY DAY: golden pieces twice as often', label: 'LUCKY', group: 'golden', price: 7_777,
+    unlock: [{ type: 'stat', stat: 'goldens', gte: 7 }], effects: [{ target: 'golden_interval', op: 'mul', value: 0.5 }] },
+  { id: 'get_lucky', name: 'GET LUCKY: buffs last twice as long', label: 'BUFF×2', group: 'golden', price: 77_777,
+    unlock: [{ type: 'stat', stat: 'goldens', gte: 27 }], effects: [{ target: 'buff_duration', op: 'mul', value: 2 }] },
+];
+
+export const UPGRADES: UpgradeDef[] = [...BUILDINGS.flatMap(milestonesFor), ...MANUAL_UPGRADES, ...MANUAL_SHARE_UPGRADES, ...tech, ...buffs, ...wrath, ...golden];
 
 export const upgradeById = (id: string): UpgradeDef | undefined => UPGRADES.find((u) => u.id === id);

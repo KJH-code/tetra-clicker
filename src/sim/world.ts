@@ -11,7 +11,7 @@ import { ATTACK } from '../data/attackTable';
 import { upgradeById } from '../data/upgrades';
 import { Round, type RoundSnapshot } from './round';
 import { Buffs, type BuffState } from './buffs';
-import { BUFFS } from '../data/golden';
+import { BUFFS, type GoldenOutcome } from '../data/golden';
 import { DANGER } from '../data/danger';
 import { add, mul, num, toNumber, type Num } from './num';
 import type { Placement } from './board';
@@ -55,6 +55,9 @@ export type WorldEvent =
   | { type: 'garbage'; rows: number }
   | { type: 'paused' }
   | { type: 'buff'; id: string; ms: number }
+  | { type: 'goldenSpawn' }
+  | { type: 'golden'; outcome: GoldenOutcome; amount: Num }
+  | { type: 'goldenLost' }
   | { type: 'slept'; seconds: number };
 
 export class World {
@@ -156,8 +159,33 @@ export class World {
     recordManual(this.economy.stats, result, Number(final));
     this.economy.stats.riskLines += Number(final) * danger;
     this.events.push({ type: 'manualLock', result, earned: final, tags: earned.tags, at });
+    // The golden piece pays only when it clears a line; placed flat it is gone.
+    // It triggers after its own clear is paid, so a clear frenzy starts on
+    // the next clear, and lucky Lines sit in the vault at the same risk.
+    if (result.golden) {
+      if (result.lines > 0) this.triggerGolden();
+      else this.events.push({ type: 'goldenLost' });
+    }
     if (result.topped && this.round.active) this.endRound('toppedOut');
     return final;
+  }
+
+  private triggerGolden(): void {
+    const outcome = this.round.drawOutcome();
+    this.economy.stats.goldens += 1;
+    let amount = num(0);
+    if (outcome.kind === 'buff') {
+      this.grantBuff(outcome.buff);
+    } else {
+      amount = num(toNumber(this.incomePerSecond()) * outcome.seconds);
+      if (this.round.active) this.round.vault += toNumber(amount);
+      else this.economy.balance = add(this.economy.balance, amount);
+    }
+    this.events.push({ type: 'golden', outcome, amount });
+  }
+
+  goldenScale(): number {
+    return evaluate(this.economy.effects, 'golden_interval', [], this.economy, 1);
   }
 
   manualHardDrop(): LockResult {
@@ -174,7 +202,7 @@ export class World {
 
   startRound(): boolean {
     if (this.round.active) return false;
-    this.round.start(this.wrath());
+    this.round.start(this.wrath(), this.goldenScale());
     this.economy.stats.rounds += 1;
     this.events.push({ type: 'roundStart', danger: this.round.danger });
     return true;
@@ -203,13 +231,16 @@ export class World {
     if (outcome === 'settled') this.economy.stats.roundsSettled += 1;
     this.round.end();
     this.manual.reset();
+    // A golden piece belongs to its round.
+    this.manual.clearGolden();
     this.events.push({ type: 'roundEnd', outcome, deposited: num(kept), forfeited: num(vault - kept) });
   }
 
   private stepRound(dtMs: number): void {
     if (!this.round.live) return;
     const wrath = this.wrath();
-    const { garbage, settled } = this.round.advance(dtMs, wrath);
+    const { garbage, settled, golden } = this.round.advance(dtMs, wrath, { ready: !this.manual.hasGolden, scale: this.goldenScale() });
+    if (golden && this.manual.markGolden(this.manual.rules.nextCount - 1)) this.events.push({ type: 'goldenSpawn' });
     for (const hole of garbage) {
       if (this.manual.addGarbage(hole)) { this.endRound('toppedOut'); return; }
     }

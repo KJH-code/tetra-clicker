@@ -108,6 +108,6 @@ describe('manual stats', () => {
     recordManual(s, lock({ lines: 4, comboIndex: 5, b2bExtended: true }), 8.4);
     recordManual(s, lock({ lines: 1, perfectClear: true, comboIndex: 6 }), 10);
     recordManual(s, lock({ piece: 'T', spin: 'mini', lines: 1, comboIndex: 0 }), 1);
-    expect(s).toEqual({ manualPieces: 5, manualLines: 23.4, spins: 1, combo5: 1, b2bs: 1, pcs: 1, riskLines: 0, rounds: 0, roundsSettled: 0 });
+    expect(s).toEqual({ manualPieces: 5, manualLines: 23.4, spins: 1, combo5: 1, b2bs: 1, pcs: 1, riskLines: 0, rounds: 0, roundsSettled: 0, goldens: 0 });
   });
 });

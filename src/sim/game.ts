@@ -25,6 +25,16 @@ export interface LockResult {
   // The board was reset because the next piece could not spawn.
   topped: boolean;
   clearedRows: number[]; // absolute row indices, for effects
+  // The piece was the golden one.
+  golden?: boolean;
+}
+
+// Where the golden piece is: a queue index (-1 = not in the queue), the
+// piece in play, or a hold slot (parallel to `holds`).
+export interface GoldenMarks {
+  queue: number;
+  active: boolean;
+  holds: boolean[];
 }
 
 export interface GameSnapshot {
@@ -39,6 +49,7 @@ export interface GameSnapshot {
   active: Placement | null;
   graceUsed: number;
   shieldSpent: boolean;
+  golden?: GoldenMarks;
 }
 
 // Rule changes upgrades can buy for the manual board. The defaults are plain
@@ -64,6 +75,7 @@ export class Game {
   holds: Piece[] = [];
   holdUsed = false;
   rules: GameRules = { ...DEFAULT_RULES };
+  golden: GoldenMarks = { queue: -1, active: false, holds: [] };
   // Non-clearing pieces placed since the combo's last clear.
   private graceUsed = 0;
   private shieldSpent = false;
@@ -90,6 +102,7 @@ export class Game {
       this.shieldSpent = snapshot.shieldSpent;
       this.bag = createBag(restoreRng(snapshot.rng), QUEUE_LOOKAHEAD, snapshot.queue);
       this.active = snapshot.active;
+      if (snapshot.golden) this.golden = { ...snapshot.golden, holds: [...snapshot.golden.holds] };
       if (!this.active) this.spawn();
     } else {
       this.bag = createBag(createRng(seed), QUEUE_LOOKAHEAD);
@@ -125,6 +138,7 @@ export class Game {
       active: this.active ? { ...this.active } : null,
       graceUsed: this.graceUsed,
       shieldSpent: this.shieldSpent,
+      golden: { ...this.golden, holds: [...this.golden.holds] },
     };
   }
 
@@ -139,7 +153,28 @@ export class Game {
     return { piece, rot: 0, x, y };
   }
 
-  private spawn(piece?: Piece): boolean {
+  get hasGolden(): boolean {
+    return this.golden.queue >= 0 || this.golden.active || this.golden.holds.some(Boolean);
+  }
+
+  // Gild the queue piece at `index` (the last one shown, so it scrolls into
+  // view). Only one golden piece exists at a time.
+  markGolden(index: number): boolean {
+    if (this.hasGolden) return false;
+    this.golden.queue = index;
+    return true;
+  }
+
+  clearGolden(): void {
+    this.golden = { queue: -1, active: false, holds: this.holds.map(() => false) };
+  }
+
+  private spawn(piece?: Piece, golden = false): boolean {
+    if (piece === undefined) {
+      golden = this.golden.queue === 0;
+      if (this.golden.queue >= 0) this.golden.queue -= 1;
+    }
+    this.golden.active = golden;
     const p = this.spawnPlacement(piece ?? this.bag.take());
     this.lastActionWasRotation = false;
     this.lastKickIndex = -1;
@@ -254,9 +289,11 @@ export class Game {
   swapHold(): boolean {
     if (!this.active || this.holdUsed) return false;
     this.holds.push(this.active.piece);
+    this.golden.holds.push(this.golden.active);
     const incoming = this.holds.length > this.rules.holdSlots ? this.holds.shift() : undefined;
+    const incomingGolden = incoming !== undefined ? this.golden.holds.shift() ?? false : false;
     this.holdUsed = true;
-    this.spawn(incoming);
+    this.spawn(incoming, incomingGolden);
     return true;
   }
 
@@ -280,6 +317,7 @@ export class Game {
   // placement directly, can commit it.
   lock(): LockResult {
     const p = this.active!;
+    const golden = this.golden.active;
     const spin = detectSpin(this.grid, p, {
       lastActionWasRotation: this.lastActionWasRotation,
       lastKickIndex: this.lastKickIndex,
@@ -332,7 +370,7 @@ export class Game {
       topped = true;
       this.resetBoard();
     }
-    return { piece: p.piece, lines, spin, perfectClear, comboIndex, b2bExtended, topped, clearedRows };
+    return { piece: p.piece, lines, spin, perfectClear, comboIndex, b2bExtended, topped, clearedRows, golden };
   }
 
   // Reaching the ceiling costs the stack, the combo, the back-to-back chain
@@ -342,6 +380,7 @@ export class Game {
     this.combo = -1;
     this.b2b = -1;
     this.holds = [];
+    this.golden.holds = [];
     this.holdUsed = false;
     this.graceUsed = 0;
     this.shieldSpent = false;

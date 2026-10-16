@@ -15,10 +15,11 @@ export interface Stats {
   riskLines: number;
   rounds: number;
   roundsSettled: number;
+  goldens: number; // golden pieces that cleared a line
 }
 
 export const emptyStats = (): Stats => ({
-  manualLines: 0, manualPieces: 0, spins: 0, combo5: 0, b2bs: 0, pcs: 0, riskLines: 0, rounds: 0, roundsSettled: 0,
+  manualLines: 0, manualPieces: 0, spins: 0, combo5: 0, b2bs: 0, pcs: 0, riskLines: 0, rounds: 0, roundsSettled: 0, goldens: 0,
 });
 
 // The combo index the HUD shows as "5 COMBO".

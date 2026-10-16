@@ -1,4 +1,5 @@
 import { DANGER } from '../data/danger';
+import { GOLDEN, type GoldenOutcome } from '../data/golden';
 import { createRng, restoreRng, type Rng } from './rng';
 
 // A round is one stretch of manual play. Lines earned during it go into the
@@ -15,6 +16,8 @@ export interface RoundSnapshot {
   garbageMs: number;
   settleMs: number;
   rng: number;
+  goldenMs?: number;
+  goldenRng?: number;
 }
 
 export class Round {
@@ -25,7 +28,13 @@ export class Round {
   elapsedMs = 0;
   garbageMs = 0;
   settleMs = 0;
+  // Round time left until the next golden piece. It only counts down while
+  // no golden piece is on the board, so there is never more than one.
+  goldenMs = 0;
   private rng: Rng;
+  // Golden pieces draw from their own stream so they do not shift the
+  // garbage holes a seed produces.
+  private goldenRng: Rng;
   // Round-local clock for the settle double tap.
   private clockMs = 0;
   private lastTapMs = -Infinity;
@@ -41,8 +50,11 @@ export class Round {
       this.garbageMs = snapshot.garbageMs;
       this.settleMs = snapshot.settleMs;
       this.rng = restoreRng(snapshot.rng);
+      this.goldenRng = snapshot.goldenRng !== undefined ? restoreRng(snapshot.goldenRng) : createRng(seed ^ 0x6a09e667);
+      this.goldenMs = snapshot.goldenMs ?? this.drawGoldenMs(1);
     } else {
       this.rng = createRng(seed ^ 0x9e3779b9);
+      this.goldenRng = createRng(seed ^ 0x6a09e667);
     }
   }
 
@@ -59,10 +71,12 @@ export class Round {
     return {
       phase: this.phase, paused: this.paused, vault: this.vault, danger: this.danger,
       elapsedMs: this.elapsedMs, garbageMs: this.garbageMs, settleMs: this.settleMs, rng: this.rng.state(),
+      goldenMs: this.goldenMs, goldenRng: this.goldenRng.state(),
     };
   }
 
-  start(wrath: number): void {
+  // `goldenScale` shortens the wait (upgrades that make golden pieces commoner).
+  start(wrath: number, goldenScale = 1): void {
     this.phase = 'running';
     this.paused = false;
     this.vault = 0;
@@ -71,6 +85,22 @@ export class Round {
     this.garbageMs = 0;
     this.settleMs = 0;
     this.lastTapMs = -Infinity;
+    this.goldenMs = this.drawGoldenMs(goldenScale);
+  }
+
+  private drawGoldenMs(scale: number): number {
+    const s = GOLDEN.minSeconds + this.goldenRng.next() * (GOLDEN.maxSeconds - GOLDEN.minSeconds);
+    return s * 1000 * scale;
+  }
+
+  drawOutcome(): GoldenOutcome {
+    const total = GOLDEN.outcomes.reduce((n, o) => n + o.weight, 0);
+    let r = this.goldenRng.next() * total;
+    for (const o of GOLDEN.outcomes) {
+      r -= o.weight;
+      if (r < 0) return o;
+    }
+    return GOLDEN.outcomes[GOLDEN.outcomes.length - 1]!;
   }
 
   end(): void {
@@ -93,13 +123,20 @@ export class Round {
     return true;
   }
 
-  // Advance round time. Returns how many garbage rows are due and whether
-  // the settle countdown just finished.
-  advance(dtMs: number, wrath: number): { garbage: number[]; settled: boolean } {
+  // Advance round time. Returns the garbage rows due, whether the settle
+  // countdown just finished, and whether a golden piece is due.
+  advance(dtMs: number, wrath: number, golden?: { ready: boolean; scale: number }): { garbage: number[]; settled: boolean; golden: boolean } {
     this.clockMs += dtMs;
-    const out = { garbage: [] as number[], settled: false };
+    const out = { garbage: [] as number[], settled: false, golden: false };
     if (!this.live) return out;
     this.elapsedMs += dtMs;
+    if (golden?.ready) {
+      this.goldenMs -= dtMs;
+      if (this.goldenMs <= 0) {
+        out.golden = true;
+        this.goldenMs = this.drawGoldenMs(golden.scale);
+      }
+    }
     const rise = DANGER.risePerSecond * (wrath >= 3 ? DANGER.wrath3RiseMultiplier : 1);
     this.danger += (rise * dtMs) / 1000;
     if (wrath >= 1 && this.danger > 0) {
