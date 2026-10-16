@@ -122,11 +122,12 @@ Every amount of Lines carries tags such as `board:manual`, `board:auto`,
 ```
 
 `target` is what the effect changes (`income`, `price`, …), `filter` is the
-set of tags the amount must carry, `op` is `add_pct` (summed), `mul`
-(multiplied) or `flag` (turns a feature on), and `stack` scales the value by
-how many copies are owned plus an offset. Conditions are data too:
-`when: [{ type: 'owned', id: 'single', gte: 5 }]`. Evaluation order is fixed:
-base → sum of all `add_pct` → product of all `mul`.
+set of tags the amount must carry, `op` is `add` (flat, onto the base),
+`add_pct` (summed), `mul` or `mul_pct` (multiplied) or `flag` (turns a feature
+on), and `stack` scales the value by copies owned (plus an offset) or by a
+statistic. Conditions are data too: `when: [{ type: 'owned', id: 'single', gte: 5 }]`,
+or `stat`, `upgrade`, `prestige`. Evaluation order is fixed:
+base + all `add` → sum of all `add_pct` → product of all `mul` and `mul_pct`.
 
 ### Buildings
 

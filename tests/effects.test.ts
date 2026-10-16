@@ -90,3 +90,31 @@ describe('number formatting', () => {
     expect(format(1e40)).toBe('1.00e40');
   });
 });
+
+describe('flat adds, percentage muls, prestige conditions, stat stacks', () => {
+  it('order is base + add, then add_pct, then mul and mul_pct', () => {
+    const effects: Effect[] = [
+      { target: 'forfeit', op: 'add', value: -0.1 },
+      { target: 'forfeit', op: 'add', value: -0.1 },
+      { target: 'x', op: 'add', value: 5 },
+      { target: 'x', op: 'add_pct', value: 50 },
+      { target: 'x', op: 'mul', value: 2 },
+      { target: 'x', op: 'mul_pct', value: 10 },
+    ];
+    expect(evaluate(effects, 'forfeit', [], ctx({}), 0.4)).toBeCloseTo(0.2, 10);
+    // (10 + 5) × 1.5 × 2 × 1.1
+    expect(evaluate(effects, 'x', [], ctx({}), 10)).toBeCloseTo(49.5, 10);
+  });
+
+  it('a prestige condition reads hasPrestige', () => {
+    const e: Effect[] = [{ target: 'income', op: 'mul', value: 2, when: [{ type: 'prestige', id: 'p1' }] }];
+    expect(multiplier(e, 'income', [], { owned: () => 0 })).toBe(1);
+    expect(multiplier(e, 'income', [], { owned: () => 0, hasPrestige: (id) => id === 'p1' })).toBe(2);
+  });
+
+  it('a stat stack scales the value: 10 crowns at 1% each is ×1.10', () => {
+    const e: Effect[] = [{ target: 'income', op: 'mul_pct', value: 1, stack: { type: 'stat', stat: 'crownsEarned' } }];
+    expect(multiplier(e, 'income', [], { owned: () => 0, stat: (s) => (s === 'crownsEarned' ? 10 : 0) })).toBeCloseTo(1.1, 12);
+    expect(multiplier(e, 'income', [], { owned: () => 0 })).toBe(1);
+  });
+});

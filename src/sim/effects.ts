@@ -4,21 +4,23 @@ import { hasAll, type Tag } from './tags';
 // `target`, apply `op` with `value`. `stack` scales the value by how many of
 // a building are owned (plus an offset, so the first copy can be "unlock only").
 export type EffectTarget = 'income' | 'price' | (string & {});
-export type EffectOp = 'add_pct' | 'mul' | 'flag';
+export type EffectOp = 'add' | 'add_pct' | 'mul' | 'mul_pct' | 'flag';
 
 // Conditions are data too: owning enough of a building, a play statistic
-// reaching a threshold, or having bought an upgrade.
+// reaching a threshold, having bought an upgrade, or a prestige upgrade.
 export type Condition =
   | { type: 'owned'; id: string; gte: number }
   | { type: 'stat'; stat: string; gte: number }
-  | { type: 'upgrade'; id: string };
+  | { type: 'upgrade'; id: string }
+  | { type: 'prestige'; id: string };
 
 export interface Effect {
   target: EffectTarget;
   filter?: Tag[];
   op: EffectOp;
   value: number;
-  stack?: { type: 'owned'; id: string; offset: number };
+  // Scale the value by a count: copies of a building owned, or a statistic.
+  stack?: { type: 'owned'; id: string; offset: number } | { type: 'stat'; stat: string };
   when?: Condition[];
 }
 
@@ -26,6 +28,7 @@ export interface EffectContext {
   owned(id: string): number;
   stat?(name: string): number;
   hasUpgrade?(id: string): boolean;
+  hasPrestige?(id: string): boolean;
 }
 
 export function conditionMet(c: Condition, ctx: EffectContext): boolean {
@@ -33,12 +36,15 @@ export function conditionMet(c: Condition, ctx: EffectContext): boolean {
     case 'owned': return ctx.owned(c.id) >= c.gte;
     case 'stat': return (ctx.stat?.(c.stat) ?? 0) >= c.gte;
     case 'upgrade': return ctx.hasUpgrade?.(c.id) ?? false;
+    case 'prestige': return ctx.hasPrestige?.(c.id) ?? false;
   }
 }
 
 function effectiveValue(e: Effect, ctx: EffectContext): number {
   if (!e.stack) return e.value;
-  const n = Math.max(0, ctx.owned(e.stack.id) + e.stack.offset);
+  const n = e.stack.type === 'owned'
+    ? Math.max(0, ctx.owned(e.stack.id) + e.stack.offset)
+    : Math.max(0, ctx.stat?.(e.stack.stat) ?? 0);
   return e.value * n;
 }
 
@@ -49,22 +55,34 @@ function applicable(e: Effect, target: EffectTarget, tags: readonly Tag[], ctx: 
   return true;
 }
 
-// Fixed order: base, then all add_pct summed into one factor, then every mul
+// Fixed order: base, plus every flat add, then all add_pct summed into one
+// factor, then every mul (and mul_pct, a mul written as a percentage)
 // multiplied. Summing the percentages first is what keeps repeat purchases
 // from compounding into a second exponential on top of the price curve.
-export function multiplier(effects: readonly Effect[], target: EffectTarget, tags: readonly Tag[], ctx: EffectContext): number {
+function fold(effects: readonly Effect[], target: EffectTarget, tags: readonly Tag[], ctx: EffectContext): { add: number; factor: number } {
+  let add = 0;
   let pct = 0;
   let mul = 1;
   for (const e of effects) {
     if (!applicable(e, target, tags, ctx)) continue;
-    if (e.op === 'add_pct') pct += effectiveValue(e, ctx);
-    else if (e.op === 'mul') mul *= effectiveValue(e, ctx);
+    const v = effectiveValue(e, ctx);
+    if (e.op === 'add') add += v;
+    else if (e.op === 'add_pct') pct += v;
+    else if (e.op === 'mul') mul *= v;
+    else if (e.op === 'mul_pct') mul *= 1 + v / 100;
   }
-  return (1 + pct / 100) * mul;
+  return { add, factor: (1 + pct / 100) * mul };
+}
+
+// The factor alone, for callers that apply it to a base they hold
+// themselves. Flat adds are ignored here; they need `evaluate`.
+export function multiplier(effects: readonly Effect[], target: EffectTarget, tags: readonly Tag[], ctx: EffectContext): number {
+  return fold(effects, target, tags, ctx).factor;
 }
 
 export function evaluate(effects: readonly Effect[], target: EffectTarget, tags: readonly Tag[], ctx: EffectContext, base: number): number {
-  return base * multiplier(effects, target, tags, ctx);
+  const { add, factor } = fold(effects, target, tags, ctx);
+  return (base + add) * factor;
 }
 
 export function flag(effects: readonly Effect[], target: EffectTarget, tags: readonly Tag[], ctx: EffectContext): boolean {
