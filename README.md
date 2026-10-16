@@ -44,18 +44,19 @@ Wrath is bought as three upgrades (unlocked after the first round):
 
 | | price | floor | adds |
 |---|---|---|---|
-| WRATH I | 1K | 0.25 | cheese garbage, one row every `max(1.5, 8 / danger)` s |
-| WRATH II | 10K | 0.5 | gravity of `danger` cells/s, 500 ms lock delay (15 resets) |
-| WRATH III | 100K | 1.0 | danger rises twice as fast |
+| WRATH I | 2K | 0.25 | cheese garbage, one row every `max(1.5, 8 / danger)` s |
+| WRATH II | 20K | 0.5 | gravity of `danger` cells/s, 500 ms lock delay (15 resets) |
+| WRATH III | 200K | 1.0 | danger rises twice as fast |
 
-Every manual Line times the danger it was earned at is summed into the
-`riskLines` stat for later prestige. All numbers live in `src/data/danger.ts`.
+Every Line that goes into the vault (manual clears and lucky payouts) times
+the danger at that moment is summed into the `riskLines` stat, which pays for
+prestige. A top-out does not take it back. All numbers live in `src/data/danger.ts`.
 
 ## Keeping the manual board worth playing
 
 Bots outgrow the attack table, so two things keep hand play in step:
 
-- **Manual share.** Five upgrades (unlocked at 1K / 10K / 100K / 1M / 10M Lines
+- **Manual share.** Five upgrades (unlocked at 2K / 20K / 200K / 2M / 20M Lines
   by hand, priced at ten times that) each add 1% of PER SECOND to every row
   cleared by hand. A manual clear pays
   `(table value × manual upgrades + share × PER SECOND × rows) × (1 + danger) × buffs`,
@@ -73,22 +74,59 @@ Bots outgrow the attack table, so two things keep hand play in step:
 
 Buffs run on game time whether or not a round is on; different buffs
 multiply, the same one restarts its timer. A hidden-tab stretch uses up buff
-time without paying it. LUCKY DAY (7,777, after 7 golden pieces) halves the
-wait; GET LUCKY (77,777, after 27) doubles buff time. Numbers live in
+time without paying it. LUCKY DAY (15,554, after 7 golden pieces) halves the
+wait; GET LUCKY (155,554, after 27) doubles buff time. Numbers live in
 `src/data/golden.ts`.
+
+## Prestige
+
+Ascending trades a run for CROWNs. Crowns ever earned =
+`∛(lifetime risk-weighted Lines / 5,000)`; an ascension pays the growth of
+that since the last one, times `1 + tech score`, rounded down, and needs at
+least one. The cube root makes each next crown dearer, so one long run beats
+many short ones. K is set so the first crown comes after about 2.5 hours.
+
+- **Tech score**: ten checks per run, 0.15 each, capped at 1.0 — T-spin
+  single / double / triple, perfect clear, 5 and 10 combo, five B2B in a row,
+  10 tetrises, a settle at danger 2+, 3 golden pieces.
+- **Every crown earned** adds 1% to all income, spent or not.
+- **Resets**: Lines, buildings, run upgrades (wrath too), run stats, round,
+  buffs, golden piece. **Stays**: crowns, prestige upgrades, lifetime stats,
+  settings.
+
+ASCEND (under the shop, locked during a round) shows the crowns on offer and
+the checklist; ascending opens the prestige shop, which a reload returns to
+until NEW RUN. Three chains, 1 / 3 / 9 / 27 crowns, each step needing the one
+before:
+
+| production | survival | proportion |
+|---|---|---|
+| all income ×2 | danger rises ×0.8 | risk weight ×1.5 |
+| start with 2K Lines | top-out loss 40% → 30% | tech cap +0.5 |
+| manual ×3 | garbage gaps ×1.25 | risk weight ×2 |
+| all income ×2 | top-out loss 30% → 20% | start danger +0.25 |
+
+Everything is data in `src/data/prestige.ts`.
 
 ## Attack table
 
-Lines earned per placement (the project's own table, not TETR.IO's):
+Lines earned per placement (the project's own table, not TETR.IO's). The
+ratios are the design; the unit is doubled so every amount is a whole number:
 
 | clear | single | double | triple | tetris | TSS | TSD | TST | PC |
 |---|---|---|---|---|---|---|---|---|
-| Lines | 1 | 2.5 | 4.5 | 7 | 2 | 4 | 6 | 10 |
+| Lines | 2 | 5 | 9 | 14 | 4 | 8 | 12 | 20 |
 
 Combo multiplies by `1 + 0.1 × [0,1,1,2,2,3,3,4,4,4,5…]` (index = clears
 before this one in the run). Back-to-back adds 20%. Minis and non-T spins pay
-as plain clears. A perfect clear replaces the base with 10 before combo and
+as plain clears. A perfect clear replaces the base with 20 before combo and
 B2B. Bots earn none of the bonuses.
+
+Balances, the vault and every payout are whole Lines. Multipliers still make
+fractions, so each payout pays the whole part and carries the remainder into
+the next (one carry for the balance, one for the vault): nothing is lost and
+long-run income equals the exact sum. Building prices round up; a top-out
+banks its share rounded down.
 
 ## Layout
 
@@ -106,7 +144,7 @@ tests/        vitest
 
 The sim never touches the DOM. The main loop measures real elapsed time on
 every tick: gaps up to 2 s are simulated step by step, gaps up to 120 s
-(hidden tab) are settled with `seconds × PPS × 0.4 × multiplier`, and longer
+(hidden tab) are settled with `seconds × PPS × Lines per piece × multiplier`, and longer
 gaps count as the computer having been asleep and earn nothing. There is no
 offline income.
 
@@ -133,10 +171,10 @@ base + all `add` → sum of all `add_pct` → product of all `mul` and `mul_pct`
 
 | building | price | largest clear | Lines / piece (measured) |
 |---|---|---|---|
-| SINGLE | 15 | 1 | 0.4 |
-| DOUBLE | 60 | 2 | 0.445 |
-| TRIPLE | 150 | 3 | 0.475 |
-| TETRIS | 500 | 4 | 0.62 |
+| SINGLE | 30 | 1 | 0.8 |
+| DOUBLE | 120 | 2 | 0.89 |
+| TRIPLE | 300 | 3 | 0.95 |
+| TETRIS | 1,000 | 4 | 1.24 |
 
 Each building unlocks after one copy of the previous tier. Its bot never
 clears more rows at once than its size, never tops out, and is paid the
@@ -153,7 +191,7 @@ except registering the bot's placement policy:
 
 ```ts
 //   id        name       price clear  Lines/piece  unlocked by
-tier('tspin', 'T-SPIN', 2000, 2, 0.8, 'tetris'),
+tier('tspin', 'T-SPIN', 4000, 2, 1.6, 'tetris'),
 ```
 
 `tier` fills in the rest: price growth 1.15, 1 PPS, the
@@ -173,7 +211,7 @@ unlock. All of them are data in `src/data/upgrades.ts`.
 | group | unlock | effect |
 |---|---|---|
 | milestone ×2 (generated per building) | own 1 / 5 / 25 / 50 / 100 | that building's income ×2 |
-| manual ×2 | 100 / 1K / 10K / 100K / 1M Lines earned by hand | manual income ×2 |
+| manual ×2 | 200 / 2K / 20K / 200K / 2M Lines earned by hand | manual income ×2 |
 | SPIN / B2B / PC | that technique done 10 / 50 / 200 times (PC 1 / 5 / 20) | ×1.5, ×2, ×2 on clears with that tag |
 | COMBO | 5 / 25 / 100 runs reaching a 5 combo | combo step 0.1 → 0.15 → 0.2 → 0.25 |
 | GRACE | 5 combo 10 / 50 times | a combo survives 1, then 2, empty pieces |
@@ -190,7 +228,7 @@ shows at a time. Conditions are data — `{ type: 'owned' | 'stat' |
 the upgrade, so an entry is only:
 
 ```ts
-{ id: 'pc_1', name: 'PC ×1.5 (1)', label: 'PC×1.5', group: 'tech', price: 1_000,
+{ id: 'pc_1', name: 'PC ×1.5 (1)', label: 'PC×1.5', group: 'tech', price: 2_000,
   unlock: [{ type: 'stat', stat: 'pcs', gte: 1 }],
   effects: [{ target: 'income', filter: ['tech:pc'], op: 'mul', value: 1.5 }] }
 ```
@@ -215,7 +253,8 @@ tuning; the first four have bots and shop entries so far.
 ## Save
 
 localStorage, key `tetra-clicker/save`, every 10 s plus on tab hide and
-unload. The file has a `version` (now 4); `src/save/schema.ts` upgrades
+unload. The file has a `version` (now 5); `src/save/schema.ts` upgrades
 older saves step by step, so a version 1 save loads with no upgrades and
-zeroed stats, a version 2 save loads with no round in play, and a version 3
-save loads with no buffs or golden piece.
+zeroed stats, a version 2 save loads with no round in play, a version 3
+save loads with no buffs or golden piece, and a version 4 save has never
+ascended and has its Lines doubled into the whole-number unit.
