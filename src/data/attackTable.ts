@@ -18,4 +18,6 @@ export const ATTACK = {
   b2bMultiplier: 1.2,
   // A perfect clear replaces the base value outright; combo and b2b still apply.
   perfectClear: 20,
+  // A full spin by S, Z, L, J or I pays its plain clear times this (all-spin).
+  allSpinMultiplier: 1.5,
 } as const;

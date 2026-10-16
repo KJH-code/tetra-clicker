@@ -1,6 +1,6 @@
 import { Game, type GameSnapshot, type LockResult } from './game';
 import { Economy } from './economy';
-import { earnedFor, attackFor } from './attack';
+import { earnedFor, botAttack } from './attack';
 import { tag, type Tag } from './tags';
 import { POLICIES, playOne, type BotMove } from './bot/index';
 import { buildingById, BUILDINGS } from '../data/buildings';
@@ -427,16 +427,13 @@ export class World {
 
   // --- time ---------------------------------------------------------------
 
-  // Income tags a bot's clear carries. Bots earn no technique bonuses, so the
-  // result is flattened before pricing.
+  // Income tags a bot's clear carries.
   private botTags(buildingId: string, lines: number): Tag[] {
     return [tag.board('auto'), tag.building(buildingId), tag.clear(lines)];
   }
 
   private botEarn(board: AutoBoard, move: BotMove): Num {
-    // Every clear pays its table value; bots just get no technique bonuses.
-    const flat: LockResult = { ...move.result, spin: 'none', comboIndex: 0, b2bExtended: false, perfectClear: false };
-    const amount = attackFor(flat).total;
+    const amount = botAttack(move.result, buildingById(board.buildingId)?.tech);
     if (amount === 0) return num(0);
     const tags = this.botTags(board.buildingId, move.result.lines);
     const exact = evaluate(this.economy.effects, 'income', tags, this.economy, amount * this.buffs.multiplier(tags, this.economy));

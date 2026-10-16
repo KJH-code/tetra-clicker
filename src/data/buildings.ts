@@ -1,4 +1,5 @@
 import type { Effect } from '../sim/effects';
+import type { BotTech } from '../sim/attack';
 
 // A building is a bot skill tier. Owning the first copy unlocks its board;
 // every further copy is a flat percentage on that building's income.
@@ -16,6 +17,9 @@ export interface BuildingDef {
   pps: number;
   skill: string;
   clearSize: 1 | 2 | 3 | 4;
+  // The technique the bot is paid for; every other clear pays its plain
+  // table value. None for the clear-size buildings.
+  tech?: BotTech;
   linesPerPiece: number;
   effects: Effect[];
   unlock?: Effect['when'];

@@ -18,10 +18,12 @@ describe('attack table', () => {
     expect(attackFor(base({ piece: 'T', spin: 'full', lines: 2 })).total).toBe(8);
     expect(attackFor(base({ piece: 'T', spin: 'full', lines: 3 })).total).toBe(12);
   });
-  it('mini spins and non-T spins are worth a plain clear', () => {
+  it('mini spins are worth a plain clear; all-spins pay ×1.5', () => {
     expect(attackFor(base({ piece: 'T', spin: 'mini', lines: 1 })).total).toBe(2);
     expect(attackFor(base({ piece: 'T', spin: 'mini', lines: 2 })).total).toBe(5);
-    expect(attackFor(base({ piece: 'S', spin: 'full', lines: 2 })).total).toBe(5);
+    expect(attackFor(base({ piece: 'S', spin: 'full', lines: 2 })).total).toBe(7.5);
+    expect(attackFor(base({ piece: 'L', spin: 'full', lines: 1 })).total).toBe(3);
+    expect(attackFor(base({ piece: 'S', spin: 'mini', lines: 2 })).total).toBe(5);
   });
   it('combo multiplies by 1 + 0.1 × table, capped at ×1.5', () => {
     const table = [0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5, 5];

@@ -38,7 +38,7 @@ npm run build      # typecheck + vite build (base /tetra-clicker/)
   effects are `{ target, filter, op, value }` and are applied base + add → add_pct sum → mul (and mul_pct) product.
 - Sim is a fixed time step with a seeded RNG. Same seed and inputs give the same result.
 - Attack table (`src/data/attackTable.ts`) is the project's own, not TETR.IO's. Do not change its
-  ratios (1 : 2.5 : 4.5 : 7, spins 2/4/6, PC 10); the unit is ×2 so every Line amount is whole.
+  ratios (1 : 2.5 : 4.5 : 7, T-spins 2/4/6, all-spins ×1.5, PC 10); the unit is ×2 so every Line amount is whole.
 - Comments explain why, not what. No AI model identifiers anywhere in the repository.
 - Do not commit until all tests pass. Long bot runs live in tests/slow and
   run as a separate CI job; run them locally before merging bot changes.
