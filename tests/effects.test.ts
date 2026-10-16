@@ -45,12 +45,12 @@ describe('economy', () => {
   it('price follows base × 1.15^n', () => {
     const e = new Economy();
     // Rounded up to whole Lines.
-    expect(e.price('single')).toBe(30);
+    expect(e.price('single')).toBe(110);
     e.balance = 1000;
     e.buy('single');
-    expect(e.price('single')).toBe(Math.ceil(30 * 1.15));
+    expect(e.price('single')).toBe(Math.ceil(110 * 1.15));
     e.buy('single');
-    expect(e.price('single')).toBe(Math.ceil(30 * 1.15 * 1.15));
+    expect(e.price('single')).toBe(Math.ceil(110 * 1.15 * 1.15));
     expect(e.owned('single')).toBe(2);
   });
   it('refuses a purchase it cannot afford', () => {

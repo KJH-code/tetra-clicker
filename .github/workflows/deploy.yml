@@ -42,7 +42,7 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v4
 
-  # 10,000-piece bot survival and formula checks. Runs alongside the deploy;
+  # Long bot runs: survival, technique and formula checks. Runs alongside the deploy;
   # a failure marks the push red without holding the site back.
   bots:
     runs-on: ubuntu-latest

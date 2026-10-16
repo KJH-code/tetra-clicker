@@ -49,9 +49,10 @@ describe('upgrade unlocks and purchase', () => {
   it('refuses an upgrade it cannot afford and charges the price', () => {
     const e = new Economy();
     e.setOwned('single', 1);
-    e.balance = 299;
+    const price = upgradeById('ms_single_1')!.price;
+    e.balance = price - 1;
     expect(e.buyUpgrade('ms_single_1')).toBe(false);
-    e.balance = 300;
+    e.balance = price;
     expect(e.buyUpgrade('ms_single_1')).toBe(true);
     expect(Number(e.balance)).toBe(0);
   });

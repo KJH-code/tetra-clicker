@@ -39,20 +39,22 @@ function tier(id: string, name: string, basePrice: number, clearSize: 1 | 2 | 3 
 }
 
 export const BUILDINGS: BuildingDef[] = [
-  tier('single', 'SINGLE', 30, 1, 0.8),
+  tier('single', 'SINGLE', 110, 1, 0.8),
   // Measured over 5 seeds × 10,000 pieces of each bot (see bots.test.ts).
-  tier('double', 'DOUBLE', 120, 2, 0.89, 'single'),
-  tier('triple', 'TRIPLE', 300, 3, 0.95, 'double'),
-  tier('tetris', 'TETRIS', 1_000, 4, 1.24, 'triple'),
+  tier('double', 'DOUBLE', 250, 2, 0.89, 'single'),
+  tier('triple', 'TRIPLE', 900, 3, 0.95, 'double'),
+  tier('tetris', 'TETRIS', 1_350, 4, 1.24, 'triple'),
   // Technique bots, paid only for their own technique. Their Lines per
   // piece come out close to each other (a single is worth too little for
   // combos to beat tetrises), so a higher tier plays faster instead: PPS is
-  // set so PPS × Lines per piece hits the ladder's design step.
-  tier('tspin', 'T-SPIN', 4_000, 4, 1.27, 'tetris', { tech: 'tspin', pps: 1.26 }),
-  tier('allspin', 'ALL-SPIN', 16_000, 4, 1.33, 'tspin', { tech: 'allspin', pps: 1.35 }),
-  tier('combo', 'COMBO', 66_000, 4, 1.17, 'allspin', { tech: 'combo', pps: 1.71 }),
-  tier('b2b', 'B2B', 180_000, 4, 1.36, 'combo', { tech: 'b2b', pps: 1.62 }),
-  tier('pc', 'PERFECT', 420_000, 4, 2.45, 'b2b', { tech: 'pc', pps: 1 }),
+  // set so PPS × Lines per piece hits the ladder's design step (1.6, 1.8,
+  // 2.0, 2.2 Lines a second; PERFECT earns 2.45 at 1 PPS). Measured over
+  // 3 seeds × 3,000 pieces (see tests/slow/techbots.test.ts).
+  tier('tspin', 'T-SPIN', 3_400, 4, 1.31, 'tetris', { tech: 'tspin', pps: 1.22 }),
+  tier('allspin', 'ALL-SPIN', 13_000, 4, 1.36, 'tspin', { tech: 'allspin', pps: 1.32 }),
+  tier('combo', 'COMBO', 32_000, 4, 1.24, 'allspin', { tech: 'combo', pps: 1.61 }),
+  tier('b2b', 'B2B', 150_000, 4, 1.21, 'combo', { tech: 'b2b', pps: 1.82 }),
+  tier('pc', 'PERFECT', 380_000, 4, 2.45, 'b2b', { tech: 'pc', pps: 1 }),
 ];
 
 export const buildingById = (id: string): BuildingDef | undefined => BUILDINGS.find((b) => b.id === id);

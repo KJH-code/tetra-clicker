@@ -24,7 +24,7 @@ building type is a bot that clears lines on its own board.
 
 ```
 npm run dev        # vite dev server
-npm test           # vitest run, everything (bot runs take ~15 min)
+npm test           # vitest run, everything (bot runs take ~20 min)
 npm run test:fast  # all but tests/slow (seconds); what the deploy runs
 npm run typecheck  # tsc --noEmit
 npm run build      # typecheck + vite build (base /tetra-clicker/)

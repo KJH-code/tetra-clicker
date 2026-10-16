@@ -3,7 +3,7 @@ import { simulate, DEFAULT_PLAYER, DEFAULT_TARGET, type BuildingParams, type Sim
 import { LADDER } from '../src/data/ladder';
 import { World } from '../src/sim/world';
 
-const single: BuildingParams = { id: 'single', name: 'SINGLE', basePrice: 30, growth: 1.15, pps: 1, linesPerPiece: 0.8, bonusPct: 10 };
+const single: BuildingParams = { ...LADDER[0]! };
 
 const base = (over: Partial<SimParams> = {}): SimParams => ({
   buildings: [single], player: { ...DEFAULT_PLAYER }, horizonSeconds: 3600, target: { ...DEFAULT_TARGET }, ...over,
@@ -13,8 +13,8 @@ describe('economy simulator', () => {
   it('first purchase lands at price ÷ manual rate when only manual income exists', () => {
     const r = simulate(base({ player: { pps: 0.5, linesPerPiece: 0.9, focusMinutes: 60, dailyMinutes: 60 } }));
     expect(r.purchases[0]?.id).toBe('single');
-    expect(r.purchases[0]?.t).toBeCloseTo(30 / (0.5 * 0.9), 6);
-    expect(r.firstUnlock['single']).toBeCloseTo(30 / 0.45, 6);
+    expect(r.purchases[0]?.t).toBeCloseTo(single.basePrice / (0.5 * 0.9), 6);
+    expect(r.firstUnlock['single']).toBeCloseTo(single.basePrice / 0.45, 6);
   });
 
   it('prices and bot income match the game for the same owned count', () => {

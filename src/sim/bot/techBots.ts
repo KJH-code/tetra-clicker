@@ -63,6 +63,9 @@ const isTsd = (l: { piece: string; spin: string; lines: number }): boolean => l.
 export const tspinBot = (): BotPolicy => ccBot({
   ...SEARCH,
   weights: TSPIN_WEIGHTS,
+  // A TSD slot sits on a stack a few rows high; panicking at the default
+  // height flattened half of them before the T came.
+  panicHeight: 12,
   strict: (_m, l) => !(l.piece === 'T' && l.spin === 'full' && (l.lines === 1 || l.lines === 3)),
 });
 

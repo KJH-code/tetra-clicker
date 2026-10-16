@@ -21,7 +21,7 @@ export interface PlayerParams {
   focusMinutes: number;
   dailyMinutes: number;
   // Average level the player's lives run at; manual income is multiplied by
-  // the level. 1 models the economy the ladder prices were fitted to.
+  // the level. Missing means 1.
   avgLevel?: number;
 }
 
@@ -67,7 +67,8 @@ export interface SimResult {
   manualLines: number;
 }
 
-export const DEFAULT_PLAYER: PlayerParams = { pps: 0.5, linesPerPiece: 0.9, focusMinutes: 15, dailyMinutes: 60 };
+// The ladder prices were fitted to this player, at an average life level of 4.
+export const DEFAULT_PLAYER: PlayerParams = { pps: 0.5, linesPerPiece: 0.9, focusMinutes: 15, dailyMinutes: 60, avgLevel: 4 };
 export const DEFAULT_TARGET: TargetParams = { firstSeconds: 60, ratio: 2.5 };
 export const DEFAULT_HORIZON_SECONDS = 7 * 86_400;
 
