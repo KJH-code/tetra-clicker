@@ -70,6 +70,19 @@ function techChain(key: 'spin' | 'b2b' | 'pc', label: string, stat: string, coun
   })));
 }
 
+// Manual share: every row cleared by hand also pays this share of the bots'
+// Lines per second, so the manual board keeps pace once bots dwarf the attack
+// table. Cookie Clicker's mouse upgrades (+1% of CpS per click).
+const SHARE_STEPS = [1_000, 10_000, 100_000, 1_000_000, 10_000_000];
+export const MANUAL_SHARE_UPGRADES = chain({ group: 'manual' }, SHARE_STEPS.map((n) => ({
+  id: `share_${n}`,
+  name: `+1% OF PER SECOND per row (${n} by hand)`,
+  label: '+1%/s',
+  price: n * 10,
+  unlock: [{ type: 'stat', stat: 'manualLines', gte: n }],
+  effects: [{ target: 'manual_pps_share', op: 'add_pct', value: 1 }],
+})));
+
 const tech = [
   ...techChain('spin', 'SPIN', 'spins', [10, 50, 200], [500, 5_000, 50_000]),
   ...techChain('b2b', 'B2B', 'b2bs', [10, 50, 200], [500, 5_000, 50_000]),
@@ -116,6 +129,6 @@ const wrath = chain({ group: 'wrath', rule: true }, ['I', 'II', 'III'].map((n, i
   effects: [{ target: 'rule:wrath', op: 'flag', value: 1 }] as Effect[],
 })));
 
-export const UPGRADES: UpgradeDef[] = [...BUILDINGS.flatMap(milestonesFor), ...MANUAL_UPGRADES, ...tech, ...buffs, ...wrath];
+export const UPGRADES: UpgradeDef[] = [...BUILDINGS.flatMap(milestonesFor), ...MANUAL_UPGRADES, ...MANUAL_SHARE_UPGRADES, ...tech, ...buffs, ...wrath];
 
 export const upgradeById = (id: string): UpgradeDef | undefined => UPGRADES.find((u) => u.id === id);

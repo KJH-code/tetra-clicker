@@ -137,8 +137,11 @@ export class World {
     // Manual Lines go into the round's vault, raised by the danger they were
     // earned at. Outside a round (only reachable through the API) they bank.
     const danger = this.round.active ? this.round.danger : 0;
+    // Manual upgrades multiply the table value only; the share of bot income
+    // rides on top, and danger raises both.
     const base = evaluate(this.economy.effects, 'income', earned.tags, this.economy, Number(earned.amount));
-    const final = num(base * (1 + danger));
+    const share = result.lines * this.economy.manualShare() * toNumber(this.incomePerSecond());
+    const final = num((base + share) * (1 + danger));
     if (this.round.active) this.round.vault += Number(final);
     else this.economy.balance = add(this.economy.balance, final);
     recordManual(this.economy.stats, result, Number(final));

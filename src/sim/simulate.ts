@@ -2,7 +2,7 @@ import { Economy } from './economy';
 import type { Effect } from './effects';
 import { tag } from './tags';
 import type { LadderEntry } from '../data/ladder';
-import { milestonesFor, MANUAL_UPGRADES, type UpgradeDef } from '../data/upgrades';
+import { milestonesFor, MANUAL_UPGRADES, MANUAL_SHARE_UPGRADES, type UpgradeDef } from '../data/upgrades';
 import { upgradeEffects } from '../data/index';
 
 // Economy simulator: how fast a player climbs the building ladder under a
@@ -76,7 +76,7 @@ export function effectsFor(b: BuildingParams): Effect[] {
 
 // Economy keyed on the simulator's own ladder rather than the game's data file.
 export function ladderUpgrades(ladder: BuildingParams[]): UpgradeDef[] {
-  return [...ladder.flatMap(milestonesFor), ...MANUAL_UPGRADES];
+  return [...ladder.flatMap(milestonesFor), ...MANUAL_UPGRADES, ...MANUAL_SHARE_UPGRADES];
 }
 
 class LadderEconomy extends Economy {
@@ -105,7 +105,12 @@ export function simulate(params: SimParams): SimResult {
   const manualTags = [tag.board('manual')];
   const botIncome = (): number =>
     buildings.reduce((sum, b) => sum + (eco.owned(b.id) > 0 ? b.pps * b.linesPerPiece * eco.incomeMultiplier(botTags(b.id)) : 0), 0);
-  const manualIncome = (at: number): number => manualRate(player, at) * eco.incomeMultiplier(manualTags);
+  // The model player clears singles, so Lines by hand and rows cleared are
+  // the same count; each row also pays the share of bot income.
+  const manualIncome = (at: number): number => {
+    const rate = manualRate(player, at);
+    return rate * eco.incomeMultiplier(manualTags) + rate * eco.manualShare() * botIncome();
+  };
   const income = (at: number): number => botIncome() + manualIncome(at);
   const unlocked = (b: BuildingParams): boolean => !b.requires || eco.owned(b.requires) > 0;
 

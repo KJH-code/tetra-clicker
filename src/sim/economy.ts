@@ -1,6 +1,6 @@
 import { BUILDINGS, buildingById } from '../data/buildings';
 import { allEffects } from '../data/index';
-import { conditionMet, evaluate, type Effect, type EffectContext } from './effects';
+import { conditionMet, evaluate, multiplier, type Effect, type EffectContext } from './effects';
 import { UPGRADES, type UpgradeDef } from '../data/upgrades';
 import { emptyStats, type Stats } from './stats';
 import { tag } from './tags';
@@ -92,6 +92,11 @@ export class Economy implements EffectContext {
   // the per-second display.
   incomeMultiplier(tags: readonly string[]): number {
     return evaluate(this.effects, 'income', tags, this, 1);
+  }
+
+  // Fraction of bot Lines per second each manually cleared row also pays.
+  manualShare(): number {
+    return multiplier(this.effects, 'manual_pps_share', [], this) - 1;
   }
 
   snapshot(): { balance: Num; owned: Record<string, number>; upgrades: string[]; stats: Stats } {
