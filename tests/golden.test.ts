@@ -202,7 +202,6 @@ describe('save v4', () => {
     delete (v3.world.manual as Partial<GameSnapshot>).golden;
     const m = migrate(v3)!;
     expect(m.version).toBe(SAVE_VERSION);
-    expect(SAVE_VERSION).toBe(4);
     expect(m.world.buffs).toEqual([]);
     const w = new World(1, m.world);
     expect(w.manual.hasGolden).toBe(false);

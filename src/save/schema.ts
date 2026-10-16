@@ -1,7 +1,7 @@
 import type { WorldSnapshot } from '../sim/world';
 import type { HandlingSettings } from '../data/handling';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export interface SaveData {
   version: number;
@@ -43,6 +43,13 @@ const MIGRATIONS: Migration[] = [
   (raw) => {
     const world = raw['world'] as Record<string, unknown>;
     world['buffs'] ??= [];
+    return raw;
+  },
+  // 4 → 5: prestige arrives. A save without it has never ascended; the new
+  // tech counters default to zero when the world loads.
+  (raw) => {
+    const world = raw['world'] as Record<string, unknown>;
+    world['meta'] ??= { crowns: 0, crownsEarned: 0, riskBanked: 0, ascensions: 0, prestige: [], lifetime: {}, ascending: false };
     return raw;
   },
 ];

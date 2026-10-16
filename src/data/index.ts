@@ -1,5 +1,6 @@
 import { BUILDINGS } from './buildings';
 import { UPGRADES, type UpgradeDef } from './upgrades';
+import { CROWN_EFFECT, PRESTIGE_UPGRADES } from './prestige';
 import type { Effect } from '../sim/effects';
 
 // Every effect in the game, gathered from the data files. An upgrade's
@@ -9,6 +10,11 @@ export function upgradeEffects(upgrades: readonly UpgradeDef[]): Effect[] {
   return upgrades.flatMap((u) => u.effects.map((e) => ({ ...e, when: [...(e.when ?? []), { type: 'upgrade' as const, id: u.id }] })));
 }
 
+// Prestige upgrades the same way, on the prestige condition.
+export function prestigeEffects(): Effect[] {
+  return PRESTIGE_UPGRADES.flatMap((u) => u.effects.map((e) => ({ ...e, when: [...(e.when ?? []), { type: 'prestige' as const, id: u.id }] })));
+}
+
 export function allEffects(): Effect[] {
-  return [...BUILDINGS.flatMap((b) => b.effects), ...upgradeEffects(UPGRADES)];
+  return [...BUILDINGS.flatMap((b) => b.effects), ...upgradeEffects(UPGRADES), ...prestigeEffects(), CROWN_EFFECT];
 }

@@ -3,6 +3,7 @@ import { allEffects } from '../data/index';
 import { conditionMet, evaluate, multiplier, type Effect, type EffectContext } from './effects';
 import { UPGRADES, type UpgradeDef } from '../data/upgrades';
 import { emptyStats, type Stats } from './stats';
+import { emptyMeta, type Meta } from './prestige';
 import { tag } from './tags';
 import { add, gte, mul, num, pow, sub, toNumber, ZERO, type Num } from './num';
 
@@ -11,6 +12,7 @@ export class Economy implements EffectContext {
   private ownedCount = new Map<string, number>();
   readonly upgrades = new Set<string>();
   stats: Stats = emptyStats();
+  meta: Meta = emptyMeta();
   readonly effects: Effect[];
   private readonly upgradeDefs: Map<string, UpgradeDef>;
 
@@ -37,12 +39,29 @@ export class Economy implements EffectContext {
     this.ownedCount.set(id, n);
   }
 
+  // Run statistics first; the prestige counters (crownsEarned, ascensions)
+  // are readable the same way so effects can stack on them.
   stat(name: string): number {
-    return (this.stats as unknown as Record<string, number>)[name] ?? 0;
+    const run = (this.stats as unknown as Record<string, number>)[name];
+    if (run !== undefined) return run;
+    const meta = (this.meta as unknown as Record<string, unknown>)[name];
+    return typeof meta === 'number' ? meta : 0;
   }
 
   hasUpgrade(id: string): boolean {
     return this.upgrades.has(id);
+  }
+
+  hasPrestige(id: string): boolean {
+    return this.meta.prestige.has(id);
+  }
+
+  // Everything a run owns goes; meta stays.
+  resetRun(): void {
+    this.balance = ZERO;
+    this.ownedCount.clear();
+    this.upgrades.clear();
+    this.stats = emptyStats();
   }
 
   // --- upgrades ---------------------------------------------------------------

@@ -6,12 +6,14 @@ import { POLICIES, playOne, type BotMove } from './bot/index';
 import { buildingById, BUILDINGS } from '../data/buildings';
 import { classifyGap, STEP_MS } from './clock';
 import { conditionMet, evaluate, flagCount } from './effects';
-import { recordManual, emptyStats, type Stats } from './stats';
+import { recordManual, emptyStats, addStats, type Stats } from './stats';
 import { ATTACK } from '../data/attackTable';
 import { upgradeById } from '../data/upgrades';
 import { Round, type RoundSnapshot } from './round';
 import { Buffs, type BuffState } from './buffs';
 import { BUFFS, type GoldenOutcome } from '../data/golden';
+import { PRESTIGE, TECH_CHECKS, prestigeById, prestigeRequires } from '../data/prestige';
+import { crownGain, metaFrom, metaSnapshot, type MetaSnapshot } from './prestige';
 import { DANGER } from '../data/danger';
 import { add, mul, num, toNumber, type Num } from './num';
 import type { Placement } from './board';
@@ -38,6 +40,7 @@ export interface WorldSnapshot {
   economy: { balance: string; owned: Record<string, number>; upgrades: string[]; stats: Stats };
   round: RoundSnapshot | null;
   buffs: BuffState[];
+  meta?: MetaSnapshot;
   autoBoards: AutoBoardSnapshot[];
 }
 
@@ -58,6 +61,8 @@ export type WorldEvent =
   | { type: 'goldenSpawn' }
   | { type: 'golden'; outcome: GoldenOutcome; amount: Num }
   | { type: 'goldenLost' }
+  | { type: 'ascended'; crowns: number }
+  | { type: 'newRun'; startLines: number }
   | { type: 'slept'; seconds: number };
 
 export class World {
@@ -97,6 +102,7 @@ export class World {
       this.manual = new Game(seed);
       this.economy = new Economy();
     }
+    this.economy.meta = metaFrom(snapshot?.meta);
     this.applyRules();
   }
 
@@ -119,7 +125,7 @@ export class World {
 
   buyUpgrade(id: string): boolean {
     // Shopping happens between rounds.
-    if (this.round.active) return false;
+    if (this.round.active || this.ascending) return false;
     if (!upgradeById(id) || !this.economy.buyUpgrade(id)) return false;
     this.applyRules();
     this.events.push({ type: 'upgraded', upgradeId: id });
@@ -135,6 +141,7 @@ export class World {
       economy: { balance: String(eco.balance), owned: eco.owned, upgrades: eco.upgrades, stats: eco.stats },
       round: this.round.active ? this.round.snapshot() : null,
       buffs: this.buffs.snapshot(),
+      meta: metaSnapshot(this.economy.meta),
       autoBoards: this.autoBoards.map((b) => ({ buildingId: b.buildingId, game: b.game.snapshot(), timerMs: b.timerMs })),
     };
   }
@@ -157,7 +164,9 @@ export class World {
     if (this.round.active) this.round.vault += Number(final);
     else this.economy.balance = add(this.economy.balance, final);
     recordManual(this.economy.stats, result, Number(final));
-    this.economy.stats.riskLines += Number(final) * danger;
+    this.economy.stats.riskLines += Number(final) * danger * this.riskWeight();
+    // Five back-to-back clears in a row: the chain counter reads 4 after the fifth.
+    if (result.b2bExtended && this.manual.b2b === 4) this.economy.stats.b2b5 += 1;
     this.events.push({ type: 'manualLock', result, earned: final, tags: earned.tags, at });
     // The golden piece pays only when it clears a line; placed flat it is gone.
     // It triggers after its own clear is paid, so a clear frenzy starts on
@@ -178,8 +187,13 @@ export class World {
       this.grantBuff(outcome.buff);
     } else {
       amount = num(toNumber(this.incomePerSecond()) * outcome.seconds);
-      if (this.round.active) this.round.vault += toNumber(amount);
-      else this.economy.balance = add(this.economy.balance, amount);
+      if (this.round.active) {
+        this.round.vault += toNumber(amount);
+        // Lucky Lines sit in the vault at risk, so they weigh like any other.
+        this.economy.stats.riskLines += toNumber(amount) * this.round.danger * this.riskWeight();
+      } else {
+        this.economy.balance = add(this.economy.balance, amount);
+      }
     }
     this.events.push({ type: 'golden', outcome, amount });
   }
@@ -201,8 +215,8 @@ export class World {
   }
 
   startRound(): boolean {
-    if (this.round.active) return false;
-    this.round.start(this.wrath(), this.goldenScale());
+    if (this.round.active || this.ascending) return false;
+    this.round.start(this.wrath(), this.goldenScale(), this.fx('danger_floor', 0));
     this.economy.stats.rounds += 1;
     this.events.push({ type: 'roundStart', danger: this.round.danger });
     return true;
@@ -226,9 +240,13 @@ export class World {
 
   private endRound(outcome: 'settled' | 'toppedOut'): void {
     const vault = this.round.vault;
-    const kept = outcome === 'settled' ? vault : vault * (1 - DANGER.forfeit);
+    const forfeit = Math.min(1, Math.max(0, this.fx('forfeit', DANGER.forfeit)));
+    const kept = outcome === 'settled' ? vault : vault * (1 - forfeit);
     this.economy.balance = add(this.economy.balance, num(kept));
-    if (outcome === 'settled') this.economy.stats.roundsSettled += 1;
+    if (outcome === 'settled') {
+      this.economy.stats.roundsSettled += 1;
+      if (this.round.danger >= PRESTIGE.hotSettleDanger) this.economy.stats.hotSettles += 1;
+    }
     this.round.end();
     this.manual.reset();
     // A golden piece belongs to its round.
@@ -239,7 +257,8 @@ export class World {
   private stepRound(dtMs: number): void {
     if (!this.round.live) return;
     const wrath = this.wrath();
-    const { garbage, settled, golden } = this.round.advance(dtMs, wrath, { ready: !this.manual.hasGolden, scale: this.goldenScale() });
+    const { garbage, settled, golden } = this.round.advance(dtMs, wrath, { ready: !this.manual.hasGolden, scale: this.goldenScale() },
+      { rise: this.fx('danger_rate', 1), garbage: this.fx('garbage_interval', 1) });
     if (golden && this.manual.markGolden(this.manual.rules.nextCount - 1)) this.events.push({ type: 'goldenSpawn' });
     for (const hole of garbage) {
       if (this.manual.addGarbage(hole)) { this.endRound('toppedOut'); return; }
@@ -252,6 +271,87 @@ export class World {
       if (!this.round.active) return;
     }
     if (settled) this.endRound('settled');
+  }
+
+  // A data-driven number: `base` with every effect on `target` applied.
+  private fx(target: string, base: number): number {
+    return evaluate(this.economy.effects, target, [], this.economy, base);
+  }
+
+  // --- prestige -----------------------------------------------------------
+
+  get ascending(): boolean {
+    return this.economy.meta.ascending;
+  }
+
+  riskWeight(): number {
+    return this.fx('risk_weight', 1);
+  }
+
+  techChecks(): { id: string; label: string; done: boolean }[] {
+    return TECH_CHECKS.map((c) => ({ id: c.id, label: c.label, done: conditionMet(c.when, this.economy) }));
+  }
+
+  techScore(): number {
+    const done = this.techChecks().filter((c) => c.done).length;
+    return Math.min(this.fx('tech_cap', PRESTIGE.techCapBase), done * PRESTIGE.techPerCheck);
+  }
+
+  crownPreview(): number {
+    return crownGain(this.economy.meta.riskBanked, this.economy.stats.riskLines, this.techScore());
+  }
+
+  canAscend(): boolean {
+    return !this.round.active && !this.ascending && this.crownPreview() >= 1;
+  }
+
+  // Bank the crowns and wipe the run. The world then waits on the prestige
+  // shop until newRun().
+  ascend(): number {
+    if (!this.canAscend()) return 0;
+    const gain = this.crownPreview();
+    const meta = this.economy.meta;
+    meta.crowns += gain;
+    meta.crownsEarned += gain;
+    meta.riskBanked += this.economy.stats.riskLines;
+    meta.ascensions += 1;
+    addStats(meta.lifetime, this.economy.stats);
+    meta.ascending = true;
+    this.economy.resetRun();
+    this.autoBoards = [];
+    this.manual = new Game(this.seed + meta.ascensions * 7_777);
+    this.round = new Round(this.seed + meta.ascensions);
+    this.buffs = new Buffs();
+    this.applyRules();
+    this.events.push({ type: 'ascended', crowns: gain });
+    return gain;
+  }
+
+  canBuyPrestige(id: string): boolean {
+    const def = prestigeById(id);
+    const meta = this.economy.meta;
+    if (!def || !meta.ascending || meta.prestige.has(id)) return false;
+    const req = prestigeRequires(id);
+    if (req && !meta.prestige.has(req)) return false;
+    return meta.crowns >= def.price;
+  }
+
+  buyPrestige(id: string): boolean {
+    if (!this.canBuyPrestige(id)) return false;
+    const meta = this.economy.meta;
+    meta.crowns -= prestigeById(id)!.price;
+    meta.prestige.add(id);
+    return true;
+  }
+
+  newRun(): boolean {
+    if (!this.ascending) return false;
+    this.economy.meta.ascending = false;
+    const start = this.fx('start_lines', 0);
+    this.economy.balance = num(start);
+    this.applyRules();
+    this.events.push({ type: 'newRun', startLines: start });
+    return true;
   }
 
   // --- shop ---------------------------------------------------------------
@@ -272,7 +372,7 @@ export class World {
 
   buy(id: string): boolean {
     const def = buildingById(id);
-    if (this.round.active) return false;
+    if (this.round.active || this.ascending) return false;
     if (!def || !this.isUnlocked(id) || !this.economy.buy(id)) return false;
     // The first copy of a building is its board; later copies only add income.
     if (!this.autoBoards.some((b) => b.buildingId === id)) {

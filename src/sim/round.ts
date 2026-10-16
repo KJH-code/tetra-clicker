@@ -76,11 +76,12 @@ export class Round {
   }
 
   // `goldenScale` shortens the wait (upgrades that make golden pieces commoner).
-  start(wrath: number, goldenScale = 1): void {
+  // `floorAdd` raises the starting danger (a prestige upgrade).
+  start(wrath: number, goldenScale = 1, floorAdd = 0): void {
     this.phase = 'running';
     this.paused = false;
     this.vault = 0;
-    this.danger = DANGER.wrathFloor[Math.min(wrath, DANGER.wrathFloor.length - 1)]!;
+    this.danger = DANGER.wrathFloor[Math.min(wrath, DANGER.wrathFloor.length - 1)]! + floorAdd;
     this.elapsedMs = 0;
     this.garbageMs = 0;
     this.settleMs = 0;
@@ -125,7 +126,9 @@ export class Round {
 
   // Advance round time. Returns the garbage rows due, whether the settle
   // countdown just finished, and whether a golden piece is due.
-  advance(dtMs: number, wrath: number, golden?: { ready: boolean; scale: number }): { garbage: number[]; settled: boolean; golden: boolean } {
+  // `scales` slow the danger rise and stretch garbage gaps (prestige upgrades).
+  advance(dtMs: number, wrath: number, golden?: { ready: boolean; scale: number },
+    scales: { rise: number; garbage: number } = { rise: 1, garbage: 1 }): { garbage: number[]; settled: boolean; golden: boolean } {
     this.clockMs += dtMs;
     const out = { garbage: [] as number[], settled: false, golden: false };
     if (!this.live) return out;
@@ -137,11 +140,11 @@ export class Round {
         this.goldenMs = this.drawGoldenMs(golden.scale);
       }
     }
-    const rise = DANGER.risePerSecond * (wrath >= 3 ? DANGER.wrath3RiseMultiplier : 1);
+    const rise = DANGER.risePerSecond * (wrath >= 3 ? DANGER.wrath3RiseMultiplier : 1) * scales.rise;
     this.danger += (rise * dtMs) / 1000;
     if (wrath >= 1 && this.danger > 0) {
       this.garbageMs += dtMs;
-      const interval = Math.max(DANGER.garbageMinSeconds, DANGER.garbageSecondsAtDanger1 / this.danger) * 1000;
+      const interval = Math.max(DANGER.garbageMinSeconds, DANGER.garbageSecondsAtDanger1 / this.danger) * 1000 * scales.garbage;
       while (this.garbageMs >= interval) {
         this.garbageMs -= interval;
         out.garbage.push(this.rng.nextInt(10));
