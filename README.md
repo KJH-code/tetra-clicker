@@ -51,6 +51,32 @@ Wrath is bought as three upgrades (unlocked after the first round):
 Every manual Line times the danger it was earned at is summed into the
 `riskLines` stat for later prestige. All numbers live in `src/data/danger.ts`.
 
+## Keeping the manual board worth playing
+
+Bots outgrow the attack table, so two things keep hand play in step:
+
+- **Manual share.** Five upgrades (unlocked at 1K / 10K / 100K / 1M / 10M Lines
+  by hand, priced at ten times that) each add 1% of PER SECOND to every row
+  cleared by hand. A manual clear pays
+  `(table value × manual upgrades + share × PER SECOND × rows) × (1 + danger) × buffs`,
+  with PER SECOND taken without buffs.
+- **Golden pieces.** Every 1–5 minutes of round time the last NEXT piece turns
+  gold. It stays gold through hold and pays only if it clears a line; placed
+  flat it is lost, and a round's end takes it away. The outcome is drawn when
+  it clears:
+
+| | chance | effect |
+|---|---|---|
+| FRENZY | 45% | all income ×7 for 77 s |
+| LUCKY | 45% | 15 minutes of PER SECOND into the vault |
+| CLEAR FRENZY | 10% | manual income ×777 for 13 s |
+
+Buffs run on game time whether or not a round is on; different buffs
+multiply, the same one restarts its timer. A hidden-tab stretch uses up buff
+time without paying it. LUCKY DAY (7,777, after 7 golden pieces) halves the
+wait; GET LUCKY (77,777, after 27) doubles buff time. Numbers live in
+`src/data/golden.ts`.
+
 ## Attack table
 
 Lines earned per placement (the project's own table, not TETR.IO's):
@@ -179,7 +205,7 @@ A second page that runs the whole building ladder through the catch-up
 formula (`PPS × lines per piece × multiplier`) with the game's own pricing
 and bonus code, under a player model (PPS, lines per piece, a focus window,
 then a daily allowance) and a greedy shortest-payback buyer that also buys
-the milestone and manual ×2 upgrades (toggle UPGRADES to compare). It plots income
+the milestone, manual ×2 and manual share upgrades (toggle UPGRADES to compare). It plots income
 over time with each building's first purchase, lists unlock times against a
 target of `first × ratio^k`, and exports the numbers as JSON in the shape of
 `src/data/ladder.ts`. The ladder file holds the nine buildings' numbers for
@@ -188,6 +214,7 @@ tuning; the first four have bots and shop entries so far.
 ## Save
 
 localStorage, key `tetra-clicker/save`, every 10 s plus on tab hide and
-unload. The file has a `version` (now 3); `src/save/schema.ts` upgrades
+unload. The file has a `version` (now 4); `src/save/schema.ts` upgrades
 older saves step by step, so a version 1 save loads with no upgrades and
-zeroed stats, and a version 2 save loads with no round in play.
+zeroed stats, a version 2 save loads with no round in play, and a version 3
+save loads with no buffs or golden piece.
