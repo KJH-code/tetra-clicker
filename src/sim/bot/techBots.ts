@@ -78,18 +78,19 @@ export const b2bBot = (): BotPolicy => ccBot({
 
 // Build without clearing until the stack is tall, then cut it down a row a
 // piece for as long as the combo lasts.
-// Building tolerates a ragged, slightly holey stack: rows with a gap or two
-// at different places are what a long cut-down combo is made of.
+// Building tolerates a ragged stack (rows with gaps at different places are
+// what a cut-down combo is made of) but not holes, which a combo cannot
+// reach and which once let a long run top out.
 export const COMBO_BUILD: Weights = {
   ...STANDARD,
   clear1: -2000, clear2: -2000, clear3: -2000, clear4: -2000, tspin1: -2000, tspin2: -2000, tspin3: -2000,
   height: 0, top_half: 0, jeopardy: 0, well_depth: 0, tslot: [0, 0, 0, 0],
-  cavity_cells: -40, bumpiness: -5, row_transitions: 0,
+  bumpiness: -5, row_transitions: 0,
 };
 export const comboBot = (buildTo = 10): BotPolicy => ccBot({
   ...SEARCH,
   weights: COMBO_WEIGHTS,
-  panicHeight: 13,
+  panicHeight: 12,
   mode: (game, height) => (game.combo < 0 && height < buildTo ? { weights: COMBO_BUILD } : { weights: COMBO_WEIGHTS }),
 });
 
