@@ -1,6 +1,7 @@
 import { Economy } from './economy';
 import type { Effect } from './effects';
 import { tag } from './tags';
+import { ATTACK } from '../data/attackTable';
 import type { LadderEntry } from '../data/ladder';
 import { milestonesFor, MANUAL_UPGRADES, MANUAL_SHARE_UPGRADES, type UpgradeDef } from '../data/upgrades';
 import { upgradeEffects } from '../data/index';
@@ -19,6 +20,9 @@ export interface PlayerParams {
   // The player plays flat out for this long, then only `dailyMinutes` a day.
   focusMinutes: number;
   dailyMinutes: number;
+  // Average level the player's lives run at; manual income is multiplied by
+  // the level. 1 models the economy the ladder prices were fitted to.
+  avgLevel?: number;
 }
 
 export interface TargetParams {
@@ -94,7 +98,7 @@ class LadderEconomy extends Economy {
 
 function manualRate(p: PlayerParams, t: number): number {
   const share = t < p.focusMinutes * 60 ? 1 : p.dailyMinutes / 1440;
-  return p.pps * p.linesPerPiece * share;
+  return p.pps * p.linesPerPiece * share * (p.avgLevel ?? 1);
 }
 
 export let lastIterations = 0;
@@ -107,11 +111,11 @@ export function simulate(params: SimParams): SimResult {
   const manualTags = [tag.board('manual')];
   const botIncome = (): number =>
     buildings.reduce((sum, b) => sum + (eco.owned(b.id) > 0 ? b.pps * b.linesPerPiece * eco.incomeMultiplier(botTags(b.id)) : 0), 0);
-  // The model player clears singles, so Lines by hand and rows cleared are
-  // the same count; each row also pays the share of bot income.
+  // The model player clears singles, worth two Lines a row; each row also
+  // pays the share of bot income, and the level multiplies both.
   const manualIncome = (at: number): number => {
     const rate = manualRate(player, at);
-    return rate * eco.incomeMultiplier(manualTags) + rate * eco.manualShare() * botIncome();
+    return rate * eco.incomeMultiplier(manualTags) + (rate / ATTACK.normal[1]) * eco.manualShare() * botIncome();
   };
   const income = (at: number): number => botIncome() + manualIncome(at);
   const unlocked = (b: BuildingParams): boolean => !b.requires || eco.owned(b.requires) > 0;

@@ -133,6 +133,7 @@ function buildControls(): void {
   controls.append(h2('PLAYER'));
   controls.append(slider('PPS', () => state.player.pps, (v) => { state.player.pps = v; }, 0.1, 3, 0.05));
   controls.append(slider('LINES / PIECE', () => state.player.linesPerPiece, (v) => { state.player.linesPerPiece = v; }, 0.2, 3, 0.05));
+  controls.append(slider('AVG LEVEL', () => state.player.avgLevel ?? 1, (v) => { state.player.avgLevel = v; }, 1, 15, 0.5));
   controls.append(slider('FOCUS MIN', () => state.player.focusMinutes, (v) => { state.player.focusMinutes = v; }, 0, 180, 1));
   controls.append(slider('DAILY MIN', () => state.player.dailyMinutes, (v) => { state.player.dailyMinutes = v; }, 0, 480, 5));
   controls.append(h2('TARGET'));

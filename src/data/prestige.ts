@@ -9,10 +9,10 @@ import type { Condition, Effect } from '../sim/effects';
 export const PRESTIGE = {
   // Calibrated so the first crown comes after about 2.5 hours of play: the
   // simulator's default player (0.5 PPS, 0.9 Lines a piece) playing
-  // continuously earns ~6.5K Lines by hand in 2.5 h; at an assumed average
-  // round danger of 0.75 that is ~4.9K risk-weighted Lines.
-  //   1 h 1.2K · 2 h 3.6K · 2.5 h 4.9K · 3 h 6.4K · 4 h 11.3K
-  riskPerCrown: 5_000,
+  // continuously at an average level of 4 earns ~48K Lines by hand in 2.5 h;
+  // assuming 70% of it is banked before a top-out, at level 4 that weighs
+  // ~135K.   1 h 32K · 2 h 99K · 2.5 h 135K · 3 h 171K · 4 h 252K
+  riskPerCrown: 135_000,
   // Ten checks at 0.15 overshoot the 1.0 cap, so seven are enough until
   // TECH CAP +0.5 lets all ten count.
   techPerCheck: 0.15,
