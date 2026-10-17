@@ -4,6 +4,7 @@ import { CROWN_EFFECT, PRESTIGE_UPGRADES } from './prestige';
 import type { Effect } from '../sim/effects';
 import { HARDCORE_EFFECTS } from './hardcore';
 import { ACHIEVEMENT_EFFECT } from './achievements';
+import { CHALLENGE_EFFECT, challengeEffects } from './challenges';
 
 // Every effect in the game, gathered from the data files. An upgrade's
 // effects only apply once it is bought, so the loader adds that condition
@@ -18,5 +19,5 @@ export function prestigeEffects(): Effect[] {
 }
 
 export function allEffects(): Effect[] {
-  return [...BUILDINGS.flatMap((b) => b.effects), ...upgradeEffects(UPGRADES), ...prestigeEffects(), CROWN_EFFECT, ACHIEVEMENT_EFFECT, ...HARDCORE_EFFECTS];
+  return [...BUILDINGS.flatMap((b) => b.effects), ...upgradeEffects(UPGRADES), ...prestigeEffects(), CROWN_EFFECT, ACHIEVEMENT_EFFECT, CHALLENGE_EFFECT, ...HARDCORE_EFFECTS, ...challengeEffects()];
 }

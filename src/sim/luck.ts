@@ -1,5 +1,6 @@
 import { BUFFS, GOLDEN, WRATH, type GoldenOutcome } from '../data/golden';
 import { LEVELS } from '../data/levels';
+import { EVENTS } from '../data/events';
 import { hasAll } from './tags';
 
 // Expected value of a golden or wrath piece, in Lines, for a given moment of
@@ -56,6 +57,19 @@ export function expectedValue(table: readonly GoldenOutcome[], s: LuckState, mod
 
 export const goldenValue = (s: LuckState, mods?: LuckMods): number => expectedValue(GOLDEN.outcomes, s, mods);
 export const wrathValue = (s: LuckState, mods?: LuckMods): number => expectedValue(WRATH.outcomes, s, mods);
+
+// Expected Lines of one life event at `level` (none below the first level
+// events come at). `win` is the chance of beating a rival or outlasting an
+// invader; a helper's rows are small change and left out.
+export function eventValue(s: LuckState, level: number, win: number): number {
+  if (level < EVENTS.fromLevel) return 0;
+  const w = EVENTS.weights(level);
+  const total = w.rival + w.invader + w.helper;
+  const rival = win * s.bots * EVENTS.rival.rewardSecondsPerLevel * level;
+  const invader = win * EVENTS.invader.payout * s.manual * EVENTS.invader.seconds;
+  return (w.rival * rival + w.invader * invader) / total;
+}
+export const eventMeanSeconds = (EVENTS.minSeconds + EVENTS.maxSeconds) / 2;
 
 // Mean life time between golden pieces, in seconds.
 export const goldenMeanSeconds = (GOLDEN.minSeconds + GOLDEN.maxSeconds) / 2;

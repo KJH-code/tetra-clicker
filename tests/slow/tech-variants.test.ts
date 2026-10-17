@@ -30,3 +30,9 @@ it('COMBO + B2B: back to back still, with combos on top', () => {
   expect(rs.filter((r) => r.b2bExtended).length / rs.length).toBeGreaterThan(0.06);
   expect(rs.filter((r) => r.comboIndex === 3).length).toBeGreaterThan(40);
 }, 3_600_000);
+
+it('4-WIDE + OPENER: PCs still, a combo after each instead of the TSD', () => {
+  const rs = runSkill('opener_combo');
+  expect(rs.filter((r) => r.perfectClear).length / rs.length).toBeGreaterThan(0.04);
+  expect(rs.filter((r) => r.comboIndex >= 2 && !r.perfectClear).length).toBeGreaterThan(30);
+}, 3_600_000);

@@ -22,7 +22,7 @@ export interface SynergyDef {
   name: string;
   effects: Effect[];
   // A manual clear that starts a buff (link synergies).
-  trigger?: { on: 'tetris' | 'pc'; buff: string };
+  trigger?: { on: 'tetris' | 'pc' | 'garbage'; buff: string };
   // The upper building's bot switches to this skill (play synergies).
   variant?: { building: string; skill: string };
   price: number;
@@ -53,6 +53,11 @@ const SPECS: Spec[] = [
     variant: { building: 'b2b', skill: 'b2b_combo' } },
   { kind: 'link', name: 'B2B + PERFECT: your perfect clear doubles every bot for 30 s', effects: [],
     trigger: { on: 'pc', buff: 'syn_pc' } },
+  { kind: 'reward', name: 'PERFECT + DOWNSTACK: the DOWNSTACK bot shares perfect-clear pay (×1.25)', effects: [income('downstack', FIXED_REWARD)] },
+  { kind: 'link', name: 'DOWNSTACK + 4-WIDE: a garbage row you clear doubles the 4-WIDE bot for 30 s', effects: [],
+    trigger: { on: 'garbage', buff: 'syn_fourwide' } },
+  { kind: 'play', name: '4-WIDE + OPENER: the OPENER bot runs a combo after each PC instead of a TSD (×1.25)', effects: [income('opener', FIXED_REWARD)],
+    variant: { building: 'opener', skill: 'opener_combo' } },
 ];
 
 export const SYNERGIES: SynergyDef[] = SPECS.map((s, i) => {

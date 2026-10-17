@@ -77,3 +77,39 @@ export const b2bComboBot = (): BotPolicy => ccWasmBot({
   ...B2B, nodes: 10_000,
   mode: (game) => (stackHeight(game.grid) >= B2B_PANIC ? { weights: CC_DEFAULT } : game.combo >= 0 ? B2B_COMBO_RUN : null),
 });
+
+// DOWNSTACK: its board fills with garbage on its own (BoardMode in
+// buildings.ts); it digs. Holes and covered cells cost much more than
+// stock, and plain clears are free so it takes every garbage row it can.
+export const DOWNSTACK: CcMode = {
+  weights: w({
+    clear1: 0, clear2: 0, clear3: 0, height: -60, top_half: -300, cavity_cells: -300, covered_cells: -60,
+    tslot: [0, 0, 0, 0], well_depth: 0, max_well_depth: 0,
+  }),
+};
+export const downstackBot = (): BotPolicy => ccWasmBot({ ...DOWNSTACK, nodes: 6_000 });
+
+// 4-WIDE: the walls stand full on both sides, so every row is four cells
+// and a combo can run as long as the queue allows. Height means nothing in
+// a full-height well; only the combo counts.
+export const FOURWIDE: CcMode = {
+  weights: w({
+    combo_garbage: 2000, clear1: 0, clear2: 0, clear3: 0, clear4: 0, height: 0, top_half: 0, top_quarter: 0, jeopardy: 0,
+    tslot: [0, 0, 0, 0], well_depth: 0, max_well_depth: 0, well_column: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  }),
+};
+// A broken combo leaves the well filling up; past this many rows any clear
+// will do until it is low again.
+const FOURWIDE_PANIC = 12;
+const FOURWIDE_DIG: CcMode = { weights: w({ ...FOURWIDE.weights, combo_garbage: 0, clear1: 200, clear2: 300, clear3: 400, clear4: 500 }) };
+const WALL = 3;
+// Rows from the floor to the highest filled cell in the four middle columns.
+export function wellHeight(grid: readonly number[] | Uint8Array): number {
+  const rows = grid.length / 10;
+  for (let y = 0; y < rows; y++) for (let x = WALL; x < 10 - WALL; x++) if (grid[y * 10 + x]) return rows - y;
+  return 0;
+}
+export const fourWideBot = (): BotPolicy => ccWasmBot({
+  ...FOURWIDE, nodes: 6_000,
+  mode: (game) => (wellHeight(game.grid) >= FOURWIDE_PANIC ? FOURWIDE_DIG : null),
+});

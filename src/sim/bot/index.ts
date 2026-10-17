@@ -1,8 +1,11 @@
 import type { BotPolicy } from './policy';
 import { singleBot } from './singleBot';
 import { sizeBot } from './sizeBot';
-import { tspinBot, allspinBot, comboBot, b2bBot, tspinTstBot, b2bComboBot } from './techBots';
+import { tspinBot, allspinBot, comboBot, b2bBot, tspinTstBot, b2bComboBot, downstackBot, fourWideBot } from './techBots';
 import { pcBot } from './pcBot';
+import { openerBot } from './openerBot';
+import { OPENERS } from '../../data/openers';
+import { decodeBuild } from '../fumen';
 import type { Game, LockResult } from '../game';
 import { cloneGrid, type Grid, type Placement } from '../board';
 import { replay } from './cc/movegen';
@@ -17,10 +20,32 @@ export const POLICIES: Record<string, BotPolicy> = {
   combo: comboBot(),
   b2b: b2bBot(),
   pc: pcBot(),
+  downstack: downstackBot(),
+  fourwide: fourWideBot(),
+  opener: openerBot(),
+  opener_combo: openerBot([], 'combo'),
   // Switched to by play synergies.
   tspin_tst: tspinTstBot(),
   b2b_combo: b2bComboBot(),
 };
+
+// A skill name to its policy. "opener:a,b" is the OPENER bot with those
+// named builds researched (the world spells it out, so a worker that only
+// has the name plays the same builds).
+const variants = new Map<string, BotPolicy>();
+export function policyFor(skill: string): BotPolicy | undefined {
+  const fixed = POLICIES[skill];
+  if (fixed) return fixed;
+  const [base, list] = skill.split(':');
+  if (base !== 'opener' || !list) return undefined;
+  let p = variants.get(skill);
+  if (!p) {
+    const builds = list.split(',').map((id) => OPENERS.find((o) => o.id === id)).filter((o) => o !== undefined).map((o) => decodeBuild(o.fumen));
+    p = openerBot(builds);
+    variants.set(skill, p);
+  }
+  return p;
+}
 
 export interface BotMove {
   from: Placement; // where the piece started (spawn)

@@ -1,6 +1,7 @@
 import type { Condition, Effect } from '../sim/effects';
 import { SYNERGIES } from './synergies';
 import { buildingById } from './buildings';
+import { OPENERS } from './openers';
 
 // Prestige: CROWNs from risk-weighted Lines, spent between runs.
 //
@@ -51,7 +52,7 @@ export const TECH_CHECKS: TechCheck[] = [
 ];
 
 // Prestige upgrades: chains, bought only on the ascension screen.
-export type Branch = 'production' | 'survival' | 'proportion' | 'synergy' | 'elder';
+export type Branch = 'production' | 'survival' | 'proportion' | 'synergy' | 'elder' | 'opener';
 
 export interface PrestigeDef {
   id: string;
@@ -100,6 +101,9 @@ export const PRESTIGE_UPGRADES: PrestigeDef[] = [
   ...SYNERGIES.map((s, i): PrestigeDef => ({
     id: s.research, branch: 'synergy', name: `${s.pair.map((p) => buildingById(p)?.name ?? p).join(' + ')}`, price: i + 1, effects: [],
   })),
+  // Named builds for the OPENER bot, one step each, two crowns dearer each
+  // time (src/data/openers.ts; empty until their fumens are in).
+  ...OPENERS.map((o, i): PrestigeDef => ({ id: `opener_${i + 1}`, branch: 'opener', name: `OPENER BUILD: ${o.name}`, price: 2 * (i + 1), effects: [] })),
 ];
 
 export const prestigeById = (id: string): PrestigeDef | undefined => PRESTIGE_UPGRADES.find((u) => u.id === id);

@@ -1,5 +1,6 @@
 import type { World } from '../sim/world';
 import { ACHIEVEMENTS } from '../data/achievements';
+import { statsView } from './stats';
 
 // The achievement list: met ones lit, the rest dim, hidden ones unnamed
 // until met. Read-only, so it closes on any click outside or Escape.
@@ -11,12 +12,33 @@ export class AchievementsPanel {
     }, true);
   }
 
-  open(): void {
+  private tab: 'achievements' | 'stats' = 'achievements';
+
+  open(tab: 'achievements' | 'stats' = this.tab): void {
+    this.tab = tab;
     const met = this.world.economy.meta.achievements;
     const box = document.createElement('div');
     box.className = 'settings achievements';
+    const tabs = document.createElement('div');
+    tabs.className = 'tabs';
+    for (const t of ['achievements', 'stats'] as const) {
+      const b = document.createElement('button');
+      b.className = 'btn tab' + (t === tab ? ' on' : '');
+      b.dataset['tab'] = t;
+      b.textContent = t === 'achievements' ? `ACHIEVEMENTS ${met.size}/${ACHIEVEMENTS.length}` : 'STATS';
+      b.addEventListener('click', () => this.open(t));
+      tabs.append(b);
+    }
+    box.append(tabs);
+    if (tab === 'stats') {
+      box.append(statsView(this.world), this.closeRow());
+      this.overlay.replaceChildren(box);
+      this.overlay.hidden = false;
+      this.onOpenChange(true);
+      return;
+    }
     const title = document.createElement('h2');
-    title.textContent = `ACHIEVEMENTS ${met.size}/${ACHIEVEMENTS.length} · +${met.size}% income`;
+    title.textContent = `+${met.size}% income`;
     const list = document.createElement('ul');
     list.className = 'ach-list';
     for (const a of ACHIEVEMENTS) {
@@ -34,6 +56,13 @@ export class AchievementsPanel {
       li.append(name, desc);
       list.append(li);
     }
+    box.append(title, list, this.closeRow());
+    this.overlay.replaceChildren(box);
+    this.overlay.hidden = false;
+    this.onOpenChange(true);
+  }
+
+  private closeRow(): HTMLElement {
     const close = document.createElement('button');
     close.className = 'btn';
     close.textContent = 'CLOSE';
@@ -41,10 +70,7 @@ export class AchievementsPanel {
     const row = document.createElement('div');
     row.className = 'row';
     row.append(close);
-    box.append(title, list, row);
-    this.overlay.replaceChildren(box);
-    this.overlay.hidden = false;
-    this.onOpenChange(true);
+    return row;
   }
 
   close(): void {

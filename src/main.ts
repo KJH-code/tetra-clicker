@@ -15,6 +15,7 @@ import { animatedPlacement, isLanded, type BotAnimation } from './render/botAnim
 import { GOLD, PIECE_COLORS, WRATH_RIM } from './render/theme';
 import { BUFFS } from './data/golden';
 import { drawRoundHud } from './render/roundHud';
+import { drawEventHud } from './render/eventHud';
 import { InputHandler, type Action } from './ui/input';
 import { Shop } from './ui/shop';
 import { SettingsPanel } from './ui/settings';
@@ -207,6 +208,7 @@ function cueFor(e: WorldEvent): Cue | null {
     case 'golden': return e.wrath ? 'wrath' : 'golden';
     case 'goldenSpawn': return e.wrath ? 'wrath' : null;
     case 'achievement': return 'achievement';
+    case 'lifeEvent': return e.phase === 'start' ? 'wrath' : e.phase === 'won' ? 'checkpoint' : null;
     case 'bought': return 'buy';
     default: return null;
   }
@@ -301,6 +303,13 @@ function handleEvent(e: WorldEvent): void {
         : { color: GOLD, size: 24, dur: 2000 });
       break;
     }
+    case 'lifeEvent': {
+      const names = { rival: 'RIVAL', invader: 'INVADER', helper: 'HELPER' };
+      const text = e.phase === 'start' ? `${names[e.kind]}!` : e.phase === 'won' ? `${names[e.kind]} BEATEN +${format(e.amount)}` : e.phase === 'lost' ? `${names[e.kind]} WINS` : `${names[e.kind]} LEAVES`;
+      manualFx.float(text, manual.cellX(5), manual.cellY(24), { color: e.phase === 'lost' ? '#7a7aa0' : '#ff8c1a', size: e.phase === 'start' ? 30 : 24, dur: 2200 });
+      if (e.phase === 'start') manualFx.shakeBoard(4);
+      break;
+    }
     case 'achievement':
       toast(`★ ${achievementById(e.id)?.name ?? e.id} · +1% income`, 'achievement');
       shop.refresh(true);
@@ -333,6 +342,12 @@ function techLabel(r: LockResult, tech: BotTech): string | null {
     case 'combo': return r.comboIndex > 0 ? `${r.comboIndex} COMBO` : null;
     case 'b2b': return r.b2bExtended ? `B2B ${r.spin === 'full' ? 'TSD' : names[r.lines]}` : null;
     case 'pc': return r.perfectClear ? 'PERFECT CLEAR' : null;
+    case 'downstack': {
+      const g = r.garbageCleared;
+      return g ? `${g.clean + g.cheese} GARBAGE${g.cheese ? ' · CHEESE' : ''}` : null;
+    }
+    case 'fourwide': return r.comboIndex > 0 ? `${r.comboIndex} COMBO` : null;
+    case 'opener': return r.perfectClear ? 'PERFECT CLEAR' : r.piece === 'T' && r.spin === 'full' ? `T-SPIN ${names[r.lines]}` : null;
   }
 }
 
@@ -395,7 +410,10 @@ function render(): void {
     golden: { active: g.golden.active, holds: g.golden.holds, next: g.golden.queue, wrath: !!g.golden.wrath },
   };
   const buffs = world.buffs.active.map((b) => ({ label: BUFFS[b.id]?.label ?? b.id, msLeft: b.msLeft }));
-  manual.render(view, manualFx, (ctx) => drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore));
+  manual.render(view, manualFx, (ctx) => {
+    drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore);
+    drawEventHud(ctx, manual, world.lifeEvent, view.next.length);
+  });
   manualPane.classList.toggle('hardcore', world.economy.meta.hardcore);
   ensureAutoViews();
   world.autoBoards.forEach((board, i) => {

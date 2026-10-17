@@ -1,5 +1,5 @@
 import type { World, AutoBoard } from '../sim/world';
-import { POLICIES } from '../sim/bot/index';
+import { policyFor } from '../sim/bot/index';
 import { PrefetchedPolicy } from '../sim/bot/prefetch';
 import type { BotPolicy } from '../sim/bot/policy';
 import type { Game } from '../sim/game';
@@ -28,7 +28,7 @@ export class BotPrefetch {
   private ensure(board: AutoBoard): number | undefined {
     let id = this.ids.get(board.game);
     if (id !== undefined) return id;
-    if (!POLICIES[this.world.skillFor(board)]) return undefined;
+    if (!policyFor(this.world.skillFor(board))) return undefined;
     id = this.nextId++;
     this.ids.set(board.game, id);
     this.tracked.set(id, { board, misses: -1, skill: '' });
@@ -42,7 +42,7 @@ export class BotPrefetch {
     const t = this.tracked.get(id)!;
     let policy = this.policies.get(id);
     if (!policy || t.skill !== skill) {
-      policy = new PrefetchedPolicy(POLICIES[skill]!);
+      policy = new PrefetchedPolicy(policyFor(skill)!);
       this.policies.set(id, policy);
       t.skill = skill;
       t.misses = -1;

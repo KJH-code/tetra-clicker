@@ -125,3 +125,15 @@ describe('simulator options', () => {
     }
   });
 });
+
+describe('simulator life events', () => {
+  it('count only at an average level of 5 or more, and grow with the win rate', () => {
+    const base = { buildings: LADDER, player: { ...DEFAULT_PLAYER }, horizonSeconds: 86_400, target: { ...DEFAULT_TARGET }, wrath: 0 };
+    const low = simulate(base);
+    const high = simulate({ ...base, player: { ...DEFAULT_PLAYER, avgLevel: 8 } });
+    const sure = simulate({ ...base, player: { ...DEFAULT_PLAYER, avgLevel: 8 }, eventWin: 1 });
+    const at = (r: ReturnType<typeof simulate>) => r.series.find((s) => s.t >= 6 * 3600)!;
+    expect(at(high).luck / at(high).bots).toBeGreaterThan(at(low).luck / at(low).bots);
+    expect(at(sure).luck / at(sure).bots).toBeGreaterThan(at(high).luck / at(high).bots);
+  });
+});

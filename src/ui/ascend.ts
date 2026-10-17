@@ -1,5 +1,6 @@
 import type { World } from '../sim/world';
 import { PRESTIGE_UPGRADES, prestigeRequires, type Branch } from '../data/prestige';
+import { CHALLENGE, CHALLENGE_RULES, challengePoints } from '../data/challenges';
 
 const BRANCHES: { id: Branch; title: string }[] = [
   { id: 'production', title: 'PRODUCTION' },
@@ -7,6 +8,7 @@ const BRANCHES: { id: Branch; title: string }[] = [
   { id: 'proportion', title: 'PROPORTION' },
   { id: 'synergy', title: 'SYNERGY' },
   { id: 'elder', title: 'WRATH' },
+  { id: 'opener', title: 'OPENER' },
 ];
 
 // The ascension screen: a confirmation that shows what the run is worth,
@@ -75,7 +77,8 @@ export class AscendPanel {
     box.append(line('big crown', `${meta.crowns} CROWN`), line('dim', `${meta.crownsEarned} earned · +${meta.crownsEarned}% income`));
     const cols = document.createElement('div');
     cols.className = 'branches';
-    for (const b of BRANCHES) {
+    // A chain with no steps yet (OPENER before its builds are in) shows no column.
+    for (const b of BRANCHES.filter((x) => PRESTIGE_UPGRADES.some((u) => u.branch === x.id))) {
       const col = document.createElement('div');
       col.className = 'branch';
       col.append(line('title', b.title));
@@ -100,27 +103,78 @@ export class AscendPanel {
     // The next run's mode: a pick here, kept from the last run otherwise.
     const mode = document.createElement('div');
     mode.className = 'mode';
+    const challenge = challengePoints(meta.nextChallenge) > 0;
     for (const hc of [false, true]) {
       const b = button(hc ? 'HARDCORE' : 'NORMAL', `btn mode-btn${hc ? ' hc' : ''}`, () => {
         this.world.setNextHardcore(hc);
+        this.world.setNextChallenge({});
         this.showShop(note);
       });
-      b.classList.toggle('on', meta.nextHardcore === hc);
+      b.classList.toggle('on', !challenge && meta.nextHardcore === hc);
       b.dataset['mode'] = hc ? 'hardcore' : 'normal';
+      mode.append(b);
+    }
+    // Challenge runs: opened by the hidden HARDCORE 20 achievement.
+    if (this.world.challengeUnlocked()) {
+      const b = button('CHALLENGE', 'btn mode-btn ch', () => {
+        if (!challenge) this.world.setNextChallenge({ no_hold: 1, next: 1 });
+        this.showShop(note);
+      });
+      b.classList.toggle('on', challenge);
+      b.dataset['mode'] = 'challenge';
       mode.append(b);
     }
     const best = meta.hardcoreBest;
     const record = line('dim', best.level > 0
       ? `HARDCORE BEST · LEVEL ${best.level} · ${best.rows} ROWS`
       : 'HARDCORE: one life, a top-out ascends · garbage from level 1, start +3 levels, 3 next · manual ×2, risk ×3');
-    row.append(mode, record, button('NEW RUN', 'btn primary', () => {
+    const start = button('NEW RUN', 'btn primary', () => {
       if (this.world.newRun()) {
         this.onChanged();
         this.close();
       }
-    }));
-    box.append(cols, row);
+    });
+    start.disabled = !this.world.canStartRun();
+    row.append(mode, record, start);
+    box.append(cols);
+    if (challenge) box.append(this.challengePicker(note));
+    box.append(row);
     this.show(box);
+  }
+
+  // Each rule a row of steps (OFF, then each step with its points); the
+  // total must reach the minimum before NEW RUN starts it.
+  private challengePicker(note?: string): HTMLElement {
+    const pick = { ...this.world.economy.meta.nextChallenge };
+    const wrap = document.createElement('div');
+    wrap.className = 'challenge';
+    const pts = challengePoints(pick);
+    const best = this.world.economy.meta.challengeBest;
+    const needs = pts < CHALLENGE.minPoints ? ` (needs ${CHALLENGE.minPoints})` : '';
+    wrap.append(line('title', `CHALLENGE · ${pts} POINTS${needs} · hardcore + these rules · cleared by ascending alive · best ${best} (+${best * CHALLENGE.incomePctPerPoint}% income)`));
+    const grid = document.createElement('div');
+    grid.className = 'rules';
+    for (const r of CHALLENGE_RULES) {
+      const rowEl = document.createElement('div');
+      rowEl.className = `rule ${r.group}`;
+      rowEl.append(line('name', r.name));
+      const steps = [{ label: 'OFF', points: 0 }, ...r.steps];
+      steps.forEach((s, i) => {
+        const b = button(i === 0 ? 'OFF' : `${s.label} · ${s.points}`, 'btn step', () => {
+          const next = { ...pick };
+          if (i === 0) delete next[r.id]; else next[r.id] = i;
+          this.world.setNextChallenge(next);
+          this.showShop(note);
+        });
+        b.dataset['rule'] = r.id;
+        b.dataset['step'] = String(i);
+        b.classList.toggle('on', (pick[r.id] ?? 0) === i);
+        rowEl.append(b);
+      });
+      grid.append(rowEl);
+    }
+    wrap.append(grid);
+    return wrap;
   }
 
   private show(box: HTMLElement): void {

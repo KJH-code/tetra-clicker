@@ -17,7 +17,9 @@ export type Condition =
   | { type: 'career'; stat: string; gte: number }
   | { type: 'upgrade'; id: string }
   | { type: 'prestige'; id: string }
-  | { type: 'hardcore' };
+  | { type: 'hardcore' }
+  // This run's challenge has rule `id` at exactly `step`.
+  | { type: 'challenge'; id: string; step: number };
 
 export interface Effect {
   target: EffectTarget;
@@ -36,6 +38,7 @@ export interface EffectContext {
   hasUpgrade?(id: string): boolean;
   hasPrestige?(id: string): boolean;
   isHardcore?(): boolean;
+  challengeStep?(id: string): number;
 }
 
 export function conditionMet(c: Condition, ctx: EffectContext): boolean {
@@ -49,6 +52,7 @@ export function conditionMet(c: Condition, ctx: EffectContext): boolean {
     case 'upgrade': return ctx.hasUpgrade?.(c.id) ?? false;
     case 'prestige': return ctx.hasPrestige?.(c.id) ?? false;
     case 'hardcore': return ctx.isHardcore?.() ?? false;
+    case 'challenge': return (ctx.challengeStep?.(c.id) ?? 0) === c.step;
   }
 }
 

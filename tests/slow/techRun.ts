@@ -16,11 +16,12 @@ export function checkTechBot(id: string, technique: (rs: LockResult[]) => void):
   let paid = 0;
   for (const seed of SEEDS) {
     const g = new Game(seed);
+    if (def.mode) g.setMode(def.mode, seed);
     for (let i = 0; i < PIECES; i++) {
       const m = playOne(g, POLICIES[def.skill]!);
       expect(m).not.toBeNull();
       results.push(m!.result);
-      paid += botAttack(m!.result, def.tech);
+      paid += botAttack(m!.result, def.tech, def.garbageBonus);
     }
   }
   expect(results.filter((r) => r.topped)).toHaveLength(0);

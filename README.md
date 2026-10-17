@@ -195,6 +195,9 @@ research.
 | ALL-SPIN + COMBO | 320,000 | reward | the ALL-SPIN bot shares combo pay: ×1.25 |
 | COMBO + B2B | 1,500,000 | play | the B2B bot keeps combos going, ×1.25 |
 | B2B + PERFECT | 3,800,000 | link | a perfect clear by hand doubles every bot for 30 s |
+| PERFECT + DOWNSTACK | 14,000,000 | reward | the DOWNSTACK bot shares perfect-clear pay: ×1.25 |
+| DOWNSTACK + 4-WIDE | 38,000,000 | link | a garbage row you clear doubles the 4-WIDE bot for 30 s |
+| 4-WIDE + OPENER | 160,000,000 | play | the OPENER bot runs a short combo after each PC instead of the TSD, ×1.25 |
 
 Reward and play synergies are a fixed ×1.25 on that bot's income, in play
 and in the hidden-tab formula alike; the bot is still paid only for its own
@@ -208,16 +211,64 @@ lifts them. All of it is data in `src/data/synergies.ts`.
 
 ### Achievements
 
-57, made from templates in `src/data/achievements.ts`: owning 1 / 10 / 50 /
-100 of each building in a run (36), Lines earned over all runs (1K / 100K /
+77, made from templates in `src/data/achievements.ts`: owning 1 / 10 / 50 /
+100 of each building in a run (48), Lines earned over all runs (1K / 100K /
 10M / 1B), technique counts (TSD 10 / 100, PC 1 / 10, a 10 combo), level
-10 / 15 / 20, ascending 1 / 5 / 25 times, two hardcore ones, and four hidden
-ones that show as ??? until met. Each is met once and kept for good, through
+10 / 15 / 20, ascending 1 / 5 / 25 times, two hardcore ones, challenge runs
+cleared at 3 / 6 / 10 / 15 points, one per life event, and five hidden ones
+(HARDCORE 20, which opens challenge runs, among them) that show as ??? until
+met. A building's own achievements are named only once it has been bought
+in some run, so the list does not give the ladder away. Each is met once and kept for good, through
 ascension, and adds 1% to all income (the same shape as crowns). Their
 conditions are the effect engine's own, plus `career`, which reads a stat as
 every finished run plus this one. The world checks them after a manual lock,
 a purchase, an ascension and once a second; a toast announces each, and ★
-N/57 under the shop opens the list.
+N/77 under the shop opens the list. Its STATS tab shows this run beside all
+runs (Lines, lives, top-outs, checkpoints, play time, techniques by hand,
+records) and two charts: PER SECOND through the run (a point every 30 s of
+play, the gap doubling past 240 points) and each building's PER SECOND now.
+
+### Challenge runs
+
+Opened by the hidden HARDCORE 20 achievement, picked on the prestige shop as
+a third mode. A challenge run is a hardcore run with rules on top, each in
+steps worth difficulty points (`src/data/challenges.ts`):
+
+| rule | steps (points) |
+|---|---|
+| NO HOLD | 2 |
+| FEWER NEXT (below hardcore's 3) | NEXT 2 (1), NEXT 1 (2) |
+| MORE GARBAGE | ×1.5 (1), ×2 (2) |
+| FASTER GRAVITY | ×1.5 (1), ×3 (2), 20G (3) |
+| FEW BUILDINGS | 3 kinds (1), 1 kind (2), none (3) |
+| NO RUN UPGRADES | 2 |
+| NO SYNERGIES | 1 |
+| DEARER BUILDINGS | prices ×2 (1) |
+
+A run needs 3 points to start and is cleared by ascending alive; a top-out
+fails it. The best cleared total is kept, and each of its points adds 2% to
+all income for good. The rules are effects on a `{ type: 'challenge', id,
+step }` condition, so a harder step replaces the one below it.
+
+### Life events
+
+From level 5, every 3–8 minutes of life time (a timer of their own), one of
+three turns up; the higher the level, the likelier the first two
+(`src/data/events.ts`). Attack is the table value ÷ 2 in garbage rows.
+
+- **Rival**: a Cold Clear bot on a board of its own, drawn small under NEXT,
+  trading garbage with you until one of you tops out. Your attack cancels the
+  rows coming at you first and sends the rest across; a piece that clears
+  nothing takes what is waiting (up to 6 rows). Stronger with the level
+  (0.5 + 0.06 × level PPS, up to 2); beating it pays 120 s of PER SECOND per
+  level into the vault.
+- **Invader**: 45 s of garbage three times as fast. Your attack is banked
+  and blocks rows before they land. Outlasting it adds three times the Lines
+  made by hand meanwhile.
+- **Helper**: for 60 s, each clear that keeps a combo or back-to-back going
+  lifts the lowest garbage row out and pays it like a single.
+
+A top-out or an ascension ends an event, and a save does not keep one.
 
 ## Attack table
 
@@ -297,6 +348,9 @@ average level 4.
 | COMBO | 32,000 | builds a ragged stack 12 rows high, then cuts it down one row at a time (combos up to 10) | 1.69 | 1.18 | combo |
 | B2B | 150,000 | only tetrises and TSDs, so the chain holds (13 B2B clears per 100 pieces) | 1.48 | 1.49 | B2B +20% (a TSD is a plain double) |
 | PERFECT | 380,000 | 4-row perfect clear, then again from the empty board | 1 | 2.45 | perfect clear |
+| DOWNSTACK | 1,400,000 | its board throws up a garbage row every 4th piece (half of them cheese); it digs | 1.125 | 2.40 | table value + 2 a garbage row, 4 a cheese row |
+| 4-WIDE | 3,800,000 | walls stand full on both sides; endless combos in the 4-wide well (up to 165) | 1.03 | 2.918 | combo |
+| OPENER | 16,000,000 | a DPC loop by search: PC, TSD, PC from the leftovers (a PC per 15 pieces, a TSD per 29) | 1.6 | 2.064 | PC, TSD and B2B |
 
 Each building unlocks after one copy of the previous tier. Its bot never
 tops out, and every clear that is not its own technique pays the plain table
@@ -306,7 +360,16 @@ the I in hold; when the stack climbs they drop the well and dig flat.
 The technique bots earn about the same per piece (a single is worth too
 little for a combo to beat a tetris), so a higher tier plays faster instead:
 PPS is set so PPS × Lines per piece climbs 1.6, 1.8, 2.0, 2.2 Lines a second,
-and PERFECT, which earns the most per piece, stays at 1 PPS.
+and PERFECT, which earns the most per piece, stays at 1 PPS; past it the
+step is 0.3: 2.7, 3.0, 3.3.
+
+DOWNSTACK and 4-WIDE play on boards with rules of their own (`BoardMode`
+in `src/sim/game.ts`: its own garbage, walls), kept in the board's snapshot
+so the worker's copy plays the same game. OPENER's named builds (TEAL,
+산악 2호, 신DT, Sarcell, SDPC, GA spin, Eternal Return …) are a prestige
+chain, one step a build, once their fumen diagrams are in
+(`src/data/openers.ts`, decoded with tetris-fumen); a researched build the
+queue fits is played ahead of the search.
 
 T-SPIN, ALL-SPIN, COMBO and B2B are [Cold Clear](https://github.com/MinusKelvin/cold-clear)
 itself: the Rust engine in `engine/`, built to a 150 KB WebAssembly module,
@@ -401,7 +464,7 @@ fitted to.
 ## Save
 
 localStorage, key `tetra-clicker/save`, every 10 s plus on tab hide and
-unload. The file has a `version` (now 8); `src/save/schema.ts` upgrades
+unload. The file has a `version` (now 9); `src/save/schema.ts` upgrades
 older saves step by step, so a version 1 save loads with no upgrades and
 zeroed stats, a version 2 save loads with no round in play, a version 3
 save loads with no buffs or golden piece, a version 4 save has never
@@ -410,5 +473,7 @@ version 5 save has any round in progress banked in full (lives replaced
 settled rounds) and its settle key dropped, and a version 6 save has only
 ever played normal runs, with no hardcore record, and a version 7 save has
 met no achievements yet (the first sweep awards what it qualifies for) and
-holds no wrath piece. Lines earned were not counted before version 8, so that
-total starts at the upgrade.
+holds no wrath piece, and a version 8 save has its buildings ever bought
+filled in from FIRST achievements and what it owns, and its lifetime Lines
+(not counted before version 8) raised to a floor estimated from the balance,
+what it bought, Lines by hand and banked risk.

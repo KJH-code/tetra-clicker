@@ -188,9 +188,10 @@ describe('wrath pieces', () => {
 });
 
 describe('wrath value', () => {
-  // The state of the simulator's default player at `hours`.
+  // The state of the simulator's default player at `hours` (one run, shared).
+  let run: ReturnType<typeof simulate> | null = null;
   function at(hours: number) {
-    const r = simulate({ buildings: LADDER, player: DEFAULT_PLAYER, horizonSeconds: DEFAULT_HORIZON_SECONDS, target: DEFAULT_TARGET });
+    const r = (run ??= simulate({ buildings: LADDER, player: DEFAULT_PLAYER, horizonSeconds: DEFAULT_HORIZON_SECONDS, target: DEFAULT_TARGET }));
     const s = r.series.find((x) => x.t >= hours * 3600)!;
     const rowsPerSecond = (DEFAULT_PLAYER.pps * DEFAULT_PLAYER.linesPerPiece) / 2;
     return { bots: s.bots, manual: s.manualActive, vault: averageVault(s.manualActive, rowsPerSecond) };

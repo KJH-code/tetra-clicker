@@ -13,5 +13,8 @@ export default defineConfig(({ command }) => ({
     include: ['tests/**/*.test.ts'],
     environment: 'node',
     setupFiles: ['tests/setup.ts'],
+    // Simulator runs over the twelve-building ladder take a few seconds each;
+    // on a loaded runner the default 5 s is too tight.
+    testTimeout: 30_000,
   },
 }));

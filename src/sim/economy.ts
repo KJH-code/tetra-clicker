@@ -68,6 +68,10 @@ export class Economy implements EffectContext {
     return this.meta.hardcore;
   }
 
+  challengeStep(id: string): number {
+    return this.meta.challenge[id] ?? 0;
+  }
+
   // Everything a run owns goes; meta stays.
   resetRun(): void {
     this.balance = ZERO;

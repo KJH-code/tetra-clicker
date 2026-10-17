@@ -23,6 +23,11 @@ export interface Meta {
   // Buildings bought at least once in any run: the achievement list names
   // only these, so it does not give the ladder away.
   buildingsSeen: Set<string>;
+  // This run's challenge rules (rule id → step; empty when it is not a
+  // challenge run), the pick for the next run, and the best cleared points.
+  challenge: Record<string, number>;
+  nextChallenge: Record<string, number>;
+  challengeBest: number;
 }
 
 export interface MetaSnapshot {
@@ -40,12 +45,16 @@ export interface MetaSnapshot {
   emptyAscensions: number;
   achievements: string[];
   buildingsSeen: string[];
+  challenge: Record<string, number>;
+  nextChallenge: Record<string, number>;
+  challengeBest: number;
 }
 
 export const emptyMeta = (): Meta => ({
   crowns: 0, crownsEarned: 0, riskBanked: 0, ascensions: 0, prestige: new Set(), lifetime: emptyStats(), ascending: false,
   hardcore: false, nextHardcore: false, hardcoreBest: { level: 0, rows: 0 },
   hardcoreAscensions: 0, emptyAscensions: 0, achievements: new Set(), buildingsSeen: new Set(),
+  challenge: {}, nextChallenge: {}, challengeBest: 0,
 });
 
 export function metaFrom(s: MetaSnapshot | undefined): Meta {
@@ -53,6 +62,7 @@ export function metaFrom(s: MetaSnapshot | undefined): Meta {
   return {
     ...emptyMeta(), ...s, prestige: new Set(s.prestige), lifetime: { ...emptyStats(), ...s.lifetime }, hardcoreBest: { ...s.hardcoreBest },
     achievements: new Set(s.achievements ?? []), buildingsSeen: new Set(s.buildingsSeen ?? []),
+    challenge: { ...(s.challenge ?? {}) }, nextChallenge: { ...(s.nextChallenge ?? {}) },
   };
 }
 
@@ -60,6 +70,7 @@ export function metaSnapshot(m: Meta): MetaSnapshot {
   return {
     ...m, prestige: [...m.prestige].sort(), lifetime: { ...m.lifetime }, hardcoreBest: { ...m.hardcoreBest },
     achievements: [...m.achievements].sort(), buildingsSeen: [...m.buildingsSeen].sort(),
+    challenge: { ...m.challenge }, nextChallenge: { ...m.nextChallenge },
   };
 }
 

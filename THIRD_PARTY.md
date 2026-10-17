@@ -22,6 +22,12 @@ These files and the built module remain under the MPL 2.0
 (https://mozilla.org/MPL/2.0/; full text in `engine/LICENSE`). The rest of
 the repository is not affected by it.
 
+## tetris-fumen
+
+https://github.com/knewjade/tetris-fumen (knewjade) — MIT License, Copyright (c) 2019
+as its LICENSE states. An npm dependency (`tetris-fumen@1.1.3`), used by
+`src/sim/fumen.ts` to decode fumen diagrams of OPENER builds.
+
 ## pcf
 
 https://github.com/MinusKelvin/pcf — MIT License, Copyright (c) 2020

@@ -1,5 +1,6 @@
 import { LEVELS, garbageSecondsAt, gravityAt } from '../data/levels';
 import { GOLDEN, type GoldenOutcome } from '../data/golden';
+import { EVENTS, type EventKind } from '../data/events';
 import { createRng, restoreRng, type Rng } from './rng';
 
 // A round is one life on the manual board. Lines earned during it go into
@@ -24,6 +25,9 @@ export interface RoundSnapshot {
   rng: number;
   goldenMs: number;
   goldenRng: number;
+  // Missing in saves from before life events.
+  eventMs?: number;
+  eventRng?: number;
 }
 
 export class Round {
@@ -43,6 +47,9 @@ export class Round {
   // Golden pieces draw from their own stream so they do not shift the
   // garbage holes a seed produces.
   private goldenRng: Rng;
+  // Life time to the next event, and the events' own stream.
+  eventMs = 0;
+  private eventRng: Rng;
 
   constructor(seed: number, snapshot?: RoundSnapshot | null) {
     if (snapshot) {
@@ -59,9 +66,12 @@ export class Round {
       this.rng = restoreRng(snapshot.rng);
       this.goldenRng = restoreRng(snapshot.goldenRng);
       this.goldenMs = snapshot.goldenMs;
+      this.eventRng = snapshot.eventRng !== undefined ? restoreRng(snapshot.eventRng) : createRng(seed ^ 0x3c6ef372);
+      this.eventMs = snapshot.eventMs ?? this.drawEventMs();
     } else {
       this.rng = createRng(seed ^ 0x9e3779b9);
       this.goldenRng = createRng(seed ^ 0x6a09e667);
+      this.eventRng = createRng(seed ^ 0x3c6ef372);
     }
   }
 
@@ -89,6 +99,7 @@ export class Round {
       startLevel: this.startLevel, rowsPerLevel: this.rowsPerLevel, rows: this.rows,
       elapsedMs: this.elapsedMs, garbageMs: this.garbageMs, rng: this.rng.state(),
       goldenMs: this.goldenMs, goldenRng: this.goldenRng.state(),
+      eventMs: this.eventMs, eventRng: this.eventRng.state(),
     };
   }
 
@@ -104,6 +115,30 @@ export class Round {
     this.elapsedMs = 0;
     this.garbageMs = 0;
     this.goldenMs = this.drawGoldenMs(goldenScale);
+    this.eventMs = this.drawEventMs();
+  }
+
+  private drawEventMs(): number {
+    return (EVENTS.minSeconds + this.eventRng.next() * (EVENTS.maxSeconds - EVENTS.minSeconds)) * 1000;
+  }
+
+  // Count down to the next event while none is on and the level allows
+  // one; returns the kind when it is due.
+  tickEvent(dtMs: number, busy: boolean): EventKind | null {
+    if (!this.live || busy || this.level < EVENTS.fromLevel) return null;
+    this.eventMs -= dtMs;
+    if (this.eventMs > 0) return null;
+    this.eventMs = this.drawEventMs();
+    const w = EVENTS.weights(this.level);
+    const kinds = Object.keys(w) as EventKind[];
+    let r = this.eventRng.next() * kinds.reduce((n, k) => n + w[k], 0);
+    for (const k of kinds) { r -= w[k]; if (r < 0) return k; }
+    return kinds[kinds.length - 1]!;
+  }
+
+  // A seed for an event's own board (the rival's), from the events' stream.
+  eventSeed(): number {
+    return Math.floor(this.eventRng.next() * 0x7fffffff);
   }
 
   // Count cleared rows. Reports a level-up and how many checkpoints were passed.

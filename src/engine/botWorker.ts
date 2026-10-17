@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import { installEngine } from '../sim/bot/ccWasm';
-import { POLICIES, playOne } from '../sim/bot/index';
+import { policyFor, playOne } from '../sim/bot/index';
 import { positionKey } from '../sim/bot/prefetch';
 import { Game, type GameSnapshot } from '../sim/game';
 import type { BotChoice } from '../sim/bot/policy';
@@ -46,7 +46,7 @@ function work(): void {
   for (const entry of copies) if (entry[1].ahead < AHEAD && (!next || entry[1].ahead < next[1].ahead)) next = entry;
   if (!next) return;
   const [id, copy] = next;
-  const policy = POLICIES[copy.skill];
+  const policy = policyFor(copy.skill);
   if (!policy || !copy.game.active) { copies.delete(id); schedule(); return; }
   const key = positionKey(copy.game);
   const choice = policy.choose(copy.game);

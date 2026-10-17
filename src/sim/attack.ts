@@ -46,18 +46,38 @@ export function earnedFor(r: LockResult, origin: Tag[], comboStep: number = ATTA
   return { amount: num(attackFor(r, comboStep).total), tags: tagsFor(r, origin) };
 }
 
-export type BotTech = 'tspin' | 'allspin' | 'combo' | 'b2b' | 'pc';
+export type BotTech = 'tspin' | 'allspin' | 'combo' | 'b2b' | 'pc' | 'downstack' | 'fourwide' | 'opener';
+
+// Which bonuses each technique is paid. OPENER plays PC, TSD, PC with the
+// chain alive, so it is paid all three; 4-WIDE is a combo bot.
+const PAID: Record<BotTech, { spin?: 'T' | 'all'; combo?: boolean; b2b?: boolean; pc?: boolean }> = {
+  tspin: { spin: 'T' },
+  allspin: { spin: 'all' },
+  combo: { combo: true },
+  b2b: { b2b: true },
+  pc: { pc: true },
+  downstack: {},
+  fourwide: { combo: true },
+  opener: { spin: 'T', b2b: true, pc: true },
+};
+
+// Lines each cleared garbage row adds for a DOWNSTACK-style bot.
+export interface GarbageBonus { clean: number; cheese: number }
 
 // What a bot is paid for a placement. Every clear pays its table value; a
 // bot earns only its own building's technique bonus (a T-SPIN bot's T-spins,
 // a COMBO bot's combos), so mixing techniques is left to synergy upgrades.
-export function botAttack(r: LockResult, tech?: BotTech): number {
-  const spinPaid = (tech === 'tspin' && r.piece === 'T') || tech === 'allspin';
-  return attackFor({
+// Garbage rows cleared pay their bonus on top, outside the table.
+export function botAttack(r: LockResult, tech?: BotTech, garbage?: GarbageBonus): number {
+  const paid = tech ? PAID[tech] : {};
+  const spinPaid = paid.spin === 'all' || (paid.spin === 'T' && r.piece === 'T');
+  const table = attackFor({
     ...r,
     spin: spinPaid ? r.spin : 'none',
-    comboIndex: tech === 'combo' ? r.comboIndex : 0,
-    b2bExtended: tech === 'b2b' ? r.b2bExtended : false,
-    perfectClear: tech === 'pc' ? r.perfectClear : false,
+    comboIndex: paid.combo ? r.comboIndex : 0,
+    b2bExtended: paid.b2b ? r.b2bExtended : false,
+    perfectClear: paid.pc ? r.perfectClear : false,
   }).total;
+  const g = garbage && r.garbageCleared ? r.garbageCleared.clean * garbage.clean + r.garbageCleared.cheese * garbage.cheese : 0;
+  return table + g;
 }

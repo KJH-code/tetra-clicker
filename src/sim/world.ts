@@ -2,7 +2,8 @@ import { Game, type GameSnapshot, type LockResult } from './game';
 import { Economy } from './economy';
 import { earnedFor, botAttack } from './attack';
 import { tag, type Tag } from './tags';
-import { POLICIES, playOne, type BotMove } from './bot/index';
+import { policyFor, playOne, type BotMove } from './bot/index';
+import { OPENERS } from '../data/openers';
 import type { BotPolicy } from './bot/policy';
 import { buildingById, BUILDINGS } from '../data/buildings';
 import { SYNERGIES } from '../data/synergies';
@@ -19,6 +20,11 @@ import { PRESTIGE, TECH_CHECKS, prestigeById, prestigeRequires } from '../data/p
 import { crownGain, metaFrom, metaSnapshot, type MetaSnapshot } from './prestige';
 import { LEVELS } from '../data/levels';
 import { ACHIEVEMENTS } from '../data/achievements';
+import { challengePoints, CHALLENGE, BUILDING_KINDS_ANY } from '../data/challenges';
+import { EVENTS, type EventKind } from '../data/events';
+import { startEvent, attackRows, cancel, randomHole, type LifeEvent } from './events';
+import { ccWasmBot, CC_DEFAULT } from './bot/ccWasm';
+import { tag as tagOf } from './tags';
 import { add, mul, num, toNumber, type Num } from './num';
 import type { Placement } from './board';
 
@@ -48,7 +54,13 @@ export interface WorldSnapshot {
   // Fractions of a Line waiting to be paid (see Payout).
   carry?: { balance: number; vault: number };
   autoBoards: AutoBoardSnapshot[];
+  // PER SECOND through this run, one sample every `sampleEvery` seconds of play.
+  samples?: number[];
+  sampleEvery?: number;
 }
+
+export const SAMPLE_SECONDS = 30;
+const MAX_SAMPLES = 240;
 
 // Events the renderer and UI react to. The sim never touches the DOM; it
 // only queues these.
@@ -73,6 +85,8 @@ export type WorldEvent =
   | { type: 'newRun'; startLines: number }
   | { type: 'hardcoreOver'; crowns: number }
   | { type: 'achievement'; id: string }
+  // A life event starting or ending; `amount` is what it paid.
+  | { type: 'lifeEvent'; kind: EventKind; phase: 'start' | 'won' | 'lost' | 'over'; amount: Num }
   | { type: 'slept'; seconds: number };
 
 export class World {
@@ -81,12 +95,18 @@ export class World {
   autoBoards: AutoBoard[] = [];
   // Where a board's decisions come from. The page swaps in one fed by a
   // worker running ahead; the decisions are the same either way.
-  policyFor: (board: AutoBoard) => BotPolicy | undefined = (board) => POLICIES[this.skillFor(board)];
+  policyFor: (board: AutoBoard) => BotPolicy | undefined = (board) => policyFor(this.skillFor(board));
 
   // The building's own skill, or the one a play synergy switched it to.
   skillFor(board: AutoBoard): string {
     const variant = SYNERGIES.find((s) => s.variant?.building === board.buildingId && this.economy.hasUpgrade(s.id));
-    return variant?.variant!.skill ?? buildingById(board.buildingId)?.skill ?? '';
+    const skill = variant?.variant!.skill ?? buildingById(board.buildingId)?.skill ?? '';
+    // OPENER plays every named build researched so far.
+    if (skill === 'opener') {
+      const builds = OPENERS.filter((_, i) => this.economy.hasPrestige(`opener_${i + 1}`)).map((o) => o.id);
+      if (builds.length) return `opener:${builds.join(',')}`;
+    }
+    return skill;
   }
   events: WorldEvent[] = [];
   private accumulatorMs = 0;
@@ -102,6 +122,12 @@ export class World {
   // Tests of exact income turn this off: each achievement's +1% would blur
   // the amounts they check.
   awardAchievements = true;
+  // The life event on now (rival, invader, helper), if any.
+  lifeEvent: LifeEvent | null = null;
+  // PER SECOND (without buffs) through the run, for the stats graph.
+  samples: number[] = [];
+  sampleEvery = SAMPLE_SECONDS;
+  private sampleMs = 0;
 
   constructor(seed: number, snapshot?: WorldSnapshot) {
     this.seed = seed;
@@ -131,6 +157,8 @@ export class World {
     this.economy.meta = metaFrom(snapshot?.meta);
     this.toBalance = new Payout(snapshot?.carry?.balance ?? 0);
     this.toVault = new Payout(snapshot?.carry?.vault ?? 0);
+    this.samples = [...(snapshot?.samples ?? [])];
+    this.sampleEvery = snapshot?.sampleEvery ?? SAMPLE_SECONDS;
     this.applyRules();
   }
 
@@ -143,8 +171,20 @@ export class World {
       comboGrace: flagCount(fx, 'rule:combo_grace', eco),
       b2bShield: flagCount(fx, 'rule:b2b_shield', eco) > 0,
       nextCount: Math.max(1, Math.round(this.fx('next_count', 5 + flagCount(fx, 'rule:next_plus', eco)))),
-      holdSlots: 1 + flagCount(fx, 'rule:hold2', eco),
+      holdSlots: Math.max(0, Math.round(this.fx('hold_slots', 1 + flagCount(fx, 'rule:hold2', eco)))),
     };
+  }
+
+  // Challenge rules can shut run upgrades, or synergies, out.
+  upgradeAllowed(id: string): boolean {
+    const fx = this.economy.effects;
+    if (flagCount(fx, 'rule:no_upgrades', this.economy) > 0) return false;
+    return !(flagCount(fx, 'rule:no_synergies', this.economy) > 0 && upgradeById(id)?.group === 'synergy');
+  }
+
+  // How many kinds of building this run may own (a challenge rule).
+  buildingKinds(): number {
+    return this.fx('building_kinds', BUILDING_KINDS_ANY);
   }
 
   comboStep(): number {
@@ -152,7 +192,7 @@ export class World {
   }
 
   buyUpgrade(id: string): boolean {
-    if (this.ascending) return false;
+    if (this.ascending || !this.upgradeAllowed(id)) return false;
     if (!upgradeById(id) || !this.economy.buyUpgrade(id)) return false;
     this.applyRules();
     this.events.push({ type: 'upgraded', upgradeId: id });
@@ -171,6 +211,8 @@ export class World {
       meta: metaSnapshot(this.economy.meta),
       carry: { balance: this.toBalance.carry, vault: this.toVault.carry },
       autoBoards: this.autoBoards.map((b) => ({ buildingId: b.buildingId, game: b.game.snapshot(), timerMs: b.timerMs })),
+      samples: [...this.samples],
+      sampleEvery: this.sampleEvery,
     };
   }
 
@@ -200,6 +242,12 @@ export class World {
     }
     recordManual(this.economy.stats, result, Number(final));
     this.economy.stats.linesEarned += toNumber(final);
+    if (this.lifeEvent && this.round.active && !result.topped && this.eventOnLock(result, toNumber(final))) {
+      // Incoming garbage pushed the stack through the ceiling.
+      this.events.push({ type: 'manualLock', result, earned: final, tags: earned.tags, at });
+      this.endRound();
+      return final;
+    }
     // Five back-to-back clears in a row: the chain counter reads 4 after the fifth.
     if (result.b2bExtended && this.manual.b2b === 4) this.economy.stats.b2b5 += 1;
     this.events.push({ type: 'manualLock', result, earned: final, tags: earned.tags, at });
@@ -246,7 +294,7 @@ export class World {
   private triggerSynergies(result: LockResult): void {
     for (const s of SYNERGIES) {
       if (!s.trigger || !this.economy.hasUpgrade(s.id)) continue;
-      const hit = s.trigger.on === 'tetris' ? result.lines === 4 : result.perfectClear;
+      const hit = s.trigger.on === 'tetris' ? result.lines === 4 : s.trigger.on === 'pc' ? result.perfectClear : !!result.garbageCleared;
       if (hit) this.grantBuff(s.trigger.buff);
     }
   }
@@ -343,6 +391,7 @@ export class World {
   // the share prestige upgrades keep, which also counts as banked risk. In a
   // hardcore run nothing is kept and the run ascends on the spot.
   private endRound(): void {
+    if (this.lifeEvent) this.endEvent('lost', num(0));
     const vault = this.round.vault;
     const level = this.round.level;
     const hardcore = this.economy.meta.hardcore;
@@ -367,8 +416,21 @@ export class World {
 
   private stepRound(dtMs: number): void {
     if (!this.round.live) return;
-    const { garbage, golden } = this.round.advance(dtMs, { ready: !this.manual.hasGolden, scale: this.goldenScale() },
-      this.fx('garbage_interval', 1), this.fx('garbage_from_level', LEVELS.garbageFromLevel));
+    const ev = this.lifeEvent;
+    // An invader brings garbage faster.
+    const speed = ev?.kind === 'invader' ? EVENTS.invader.garbageSpeed : 1;
+    const { garbage: rows, golden } = this.round.advance(dtMs, { ready: !this.manual.hasGolden, scale: this.goldenScale() },
+      this.fx('garbage_interval', 1) / speed, this.fx('garbage_from_level', LEVELS.garbageFromLevel));
+    // Attack banked against an invader blocks rows before they land.
+    let garbage = rows;
+    if (ev?.kind === 'invader' && ev.shield > 0) {
+      const blocked = Math.min(ev.shield, rows.length);
+      ev.shield -= blocked;
+      garbage = rows.slice(blocked);
+    }
+    if (this.stepEvent(dtMs)) return;
+    const due = this.round.tickEvent(dtMs, this.lifeEvent !== null);
+    if (due) this.beginEvent(due);
     const stats = this.economy.stats;
     stats.maxLifeSeconds = Math.max(stats.maxLifeSeconds, Math.floor(this.round.elapsedMs / 1000));
     if (golden) {
@@ -428,13 +490,38 @@ export class World {
       this.round.end();
       this.toVault.carry = 0;
     }
+    // Ascending alive clears a challenge run.
+    const meta = this.economy.meta;
+    const points = challengePoints(meta.challenge);
+    if (points >= CHALLENGE.minPoints) meta.challengeBest = Math.max(meta.challengeBest, points);
     return this.doAscend();
+  }
+
+  challengeUnlocked(): boolean {
+    return this.economy.meta.achievements.has('hc_level20');
+  }
+
+  // The next run's challenge pick; empty for none. Picks under the minimum
+  // are kept (the shop shows them) but NEW RUN will not start them.
+  setNextChallenge(pick: Record<string, number>): boolean {
+    if (!this.ascending || !this.challengeUnlocked()) return false;
+    this.economy.meta.nextChallenge = { ...pick };
+    return true;
+  }
+
+  canStartRun(): boolean {
+    const pick = this.economy.meta.nextChallenge;
+    const pts = challengePoints(pick);
+    return pts === 0 || (pts >= CHALLENGE.minPoints && this.challengeUnlocked());
   }
 
   // A hardcore top-out lands here directly, crowns or not.
   private doAscend(): number {
     // The run's last state counts before it is wiped.
     this.checkAchievements();
+    this.lifeEvent = null;
+    // The challenge's rules end with its run.
+    this.economy.meta.challenge = {};
     const gain = this.crownPreview();
     const meta = this.economy.meta;
     if (toNumber(this.economy.balance) === 0) meta.emptyAscensions += 1;
@@ -451,6 +538,8 @@ export class World {
     meta.ascending = true;
     this.economy.resetRun();
     this.autoBoards = [];
+    this.samples = [];
+    this.sampleEvery = SAMPLE_SECONDS;
     this.manual = new Game(this.seed + meta.ascensions * 7_777);
     this.round = new Round(this.seed + meta.ascensions);
     this.buffs = new Buffs();
@@ -488,9 +577,12 @@ export class World {
   }
 
   newRun(): boolean {
-    if (!this.ascending) return false;
-    this.economy.meta.ascending = false;
-    this.economy.meta.hardcore = this.economy.meta.nextHardcore;
+    if (!this.ascending || !this.canStartRun()) return false;
+    const meta = this.economy.meta;
+    meta.ascending = false;
+    // A challenge run is a hardcore run with its rules on top.
+    meta.challenge = challengePoints(meta.nextChallenge) > 0 ? { ...meta.nextChallenge } : {};
+    meta.hardcore = meta.nextHardcore || challengePoints(meta.challenge) > 0;
     const start = Math.floor(this.fx('start_lines', 0));
     this.economy.balance = num(start);
     this.applyRules();
@@ -505,7 +597,13 @@ export class World {
   canBuy(id: string): boolean {
     const def = buildingById(id);
     if (!def) return false;
-    return this.isUnlocked(id) && this.economy.canBuy(id);
+    return this.isUnlocked(id) && this.kindAllowed(id) && this.economy.canBuy(id);
+  }
+
+  private kindAllowed(id: string): boolean {
+    if (this.economy.owned(id) > 0) return true;
+    const kinds = BUILDINGS.filter((b) => this.economy.owned(b.id) > 0).length;
+    return kinds < this.buildingKinds();
   }
 
   isUnlocked(id: string): boolean {
@@ -517,16 +615,14 @@ export class World {
   buy(id: string): boolean {
     const def = buildingById(id);
     if (this.ascending) return false;
-    if (!def || !this.isUnlocked(id) || !this.economy.buy(id)) return false;
+    if (!def || !this.isUnlocked(id) || !this.kindAllowed(id) || !this.economy.buy(id)) return false;
     // The first copy of a building is its board; later copies only add income.
     if (!this.autoBoards.some((b) => b.buildingId === id)) {
-      this.autoBoards.push({
-        buildingId: id,
-        // Each board gets its own stream so two boards never mirror each other.
-        game: new Game(this.seed * 7919 + this.boardsCreated * 104729 + 1),
-        timerMs: 1000 / def.pps,
-        lastMove: null,
-      });
+      // Each board gets its own stream so two boards never mirror each other.
+      const seed = this.seed * 7919 + this.boardsCreated * 104729 + 1;
+      const game = new Game(seed);
+      if (def.mode) game.setMode(def.mode, seed);
+      this.autoBoards.push({ buildingId: id, game, timerMs: 1000 / def.pps, lastMove: null });
       this.boardsCreated++;
     }
     this.economy.meta.buildingsSeen.add(id);
@@ -543,7 +639,8 @@ export class World {
   }
 
   private botEarn(board: AutoBoard, move: BotMove): Num {
-    const amount = botAttack(move.result, buildingById(board.buildingId)?.tech);
+    const def = buildingById(board.buildingId);
+    const amount = botAttack(move.result, def?.tech, def?.garbageBonus);
     if (amount === 0) return num(0);
     const tags = this.botTags(board.buildingId, move.result.lines);
     const exact = evaluate(this.economy.effects, 'income', tags, this.economy, amount * this.buffs.multiplier(tags, this.economy));
@@ -627,11 +724,138 @@ export class World {
     this.buffs.tick(dtMs);
     // Bot Lines add up between the events that check; a sweep a second
     // catches thresholds they cross.
+    this.economy.stats.playSeconds += dtMs / 1000;
+    this.sampleMs += dtMs;
+    if (this.sampleMs >= this.sampleEvery * 1000) {
+      this.sampleMs = 0;
+      this.samples.push(toNumber(this.incomePerSecond()));
+      // Past the cap, every other sample goes and the gap doubles, so the
+      // whole run still fits.
+      if (this.samples.length > MAX_SAMPLES) {
+        this.samples = this.samples.filter((_, i) => i % 2 === 0);
+        this.sampleEvery *= 2;
+      }
+    }
     this.achievementMs += dtMs;
     if (this.achievementMs >= 1000) {
       this.achievementMs = 0;
       this.checkAchievements();
     }
+  }
+
+  // --- life events -------------------------------------------------------
+
+  beginEvent(kind: EventKind): void {
+    this.lifeEvent = startEvent(kind, this.round.level, this.round.eventSeed());
+    this.events.push({ type: 'lifeEvent', kind, phase: 'start', amount: num(0) });
+  }
+
+  private endEvent(phase: 'won' | 'lost' | 'over', amount: Num): void {
+    const ev = this.lifeEvent;
+    if (!ev) return;
+    this.lifeEvent = null;
+    this.events.push({ type: 'lifeEvent', kind: ev.kind, phase, amount });
+  }
+
+  // Lines into the vault at the life's level, like lucky Lines.
+  private payVault(exact: number): Num {
+    const amount = num(this.toVault.take(exact));
+    this.round.vault += toNumber(amount);
+    this.round.vaultRisk += toNumber(amount) * this.round.level;
+    this.economy.stats.linesEarned += toNumber(amount);
+    return amount;
+  }
+
+  // A manual lock during an event. True if garbage from it topped the life out.
+  private eventOnLock(result: LockResult, earned: number): boolean {
+    const ev = this.lifeEvent!;
+    if (ev.kind === 'invader') {
+      ev.earned += earned;
+      const a = attackRows(result, ev.carry);
+      ev.carry = a.carry;
+      ev.shield += a.rows;
+      return false;
+    }
+    if (ev.kind === 'helper') {
+      if (result.lines > 0 && (result.comboIndex > 0 || result.b2bExtended) && this.manual.removeGarbageRow()) {
+        ev.rows += 1;
+        this.economy.stats.helperRows += 1;
+        // Paid like a single by hand, at the level.
+        const single = evaluate(this.economy.effects, 'income', [tagOf.board('manual'), tagOf.clear(1)], this.economy, ATTACK.normal[1]);
+        this.payVault(single * this.round.level * this.buffs.multiplier([tagOf.board('manual')], this.economy));
+      }
+      return false;
+    }
+    // Rival: attack cancels what is coming first, the rest goes across; a
+    // piece that clears nothing takes the rows still waiting.
+    const a = attackRows(result, ev.myCarry);
+    ev.myCarry = a.carry;
+    const c = cancel(ev.toMe, a.rows);
+    ev.toMe = c.incoming;
+    ev.toRival += c.over;
+    if (result.lines === 0 && ev.toMe > 0) {
+      const n = Math.min(ev.toMe, EVENTS.rival.maxRowsPerLock);
+      ev.toMe -= n;
+      for (let i = 0; i < n; i++) if (this.manual.addGarbage(randomHole(ev.holes))) return true;
+    }
+    return false;
+  }
+
+  // Time passing during an event. True if the life ended.
+  private stepEvent(dtMs: number): boolean {
+    const ev = this.lifeEvent;
+    if (!ev) return false;
+    if (ev.kind === 'invader' || ev.kind === 'helper') {
+      ev.msLeft -= dtMs;
+      if (ev.msLeft > 0) return false;
+      if (ev.kind === 'invader') {
+        this.economy.stats.invadersSurvived += 1;
+        this.endEvent('won', this.payVault(ev.earned * EVENTS.invader.payout));
+      } else {
+        this.endEvent('over', num(0));
+      }
+      return false;
+    }
+    // The rival plays its own pieces at its own pace.
+    ev.timerMs -= dtMs;
+    while (ev.timerMs <= 0 && this.lifeEvent === ev) {
+      ev.timerMs += 1000 / EVENTS.rival.pps(ev.level);
+      const move = playOne(ev.game, this.rivalPolicy(ev.level));
+      if (!move) break;
+      const r = move.result;
+      if (r.topped) {
+        this.economy.stats.rivalWins += 1;
+        const reward = toNumber(this.incomePerSecond()) * EVENTS.rival.rewardSecondsPerLevel * ev.level;
+        this.endEvent('won', this.payVault(reward));
+        return false;
+      }
+      const a = attackRows(r, ev.rivalCarry);
+      ev.rivalCarry = a.carry;
+      const c = cancel(ev.toRival, a.rows);
+      ev.toRival = c.incoming;
+      ev.toMe += c.over;
+      if (r.lines === 0 && ev.toRival > 0) {
+        const n = Math.min(ev.toRival, EVENTS.rival.maxRowsPerLock);
+        ev.toRival -= n;
+        for (let i = 0; i < n; i++) {
+          if (ev.game.addGarbage(randomHole(ev.holes))) {
+            this.economy.stats.rivalWins += 1;
+            const reward = toNumber(this.incomePerSecond()) * EVENTS.rival.rewardSecondsPerLevel * ev.level;
+            this.endEvent('won', this.payVault(reward));
+            return false;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  private rivalPolicies = new Map<number, BotPolicy>();
+  private rivalPolicy(level: number): BotPolicy {
+    const nodes = EVENTS.rival.nodes(level);
+    let p = this.rivalPolicies.get(nodes);
+    if (!p) { p = ccWasmBot({ weights: CC_DEFAULT, nodes }); this.rivalPolicies.set(nodes, p); }
+    return p;
   }
 
   // Mark every achievement whose conditions now hold. Met ones stay met.

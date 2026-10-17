@@ -36,3 +36,5 @@ export function garbageSecondsAt(level: number, fromLevel: number = LEVELS.garba
 
 // Grid id for garbage cells; piece colours use 1..7.
 export const GARBAGE_ID = 8;
+// Cheese: a garbage row whose hole moved. Drawn the same, paid more by bots.
+export const CHEESE_ID = 9;

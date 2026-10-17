@@ -229,6 +229,14 @@ canvas { display: block; image-rendering: pixelated; }
 .pcard.owned .price { color: var(--ok); }
 .pcard.locked { opacity: 0.25; }
 .btn.primary { color: #d9b8ff; border-color: #b26bff; }
+.mode-btn.ch.on { color: #ffb800; border-color: #ffb800; }
+.challenge { margin-top: 12px; border: 1px solid #ffb80060; border-radius: 10px; padding: 10px; }
+.challenge .title { color: #ffb800; font-size: 12px; letter-spacing: 0.08em; margin-bottom: 8px; }
+.challenge .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.challenge .rule { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.challenge .rule .name { width: 130px; font-size: 11px; color: var(--dim); letter-spacing: 0.08em; }
+.challenge .btn.step { padding: 4px 7px; letter-spacing: 0.02em; font-size: 10px; }
+.challenge .btn.step.on { color: #ffb800; border-color: #ffb800; }
 .btn.ascend-btn { color: #d9b8ff; border-color: #b26bff80; margin-bottom: 8px; }
 .btn.ascend-btn:disabled { opacity: 0.4; cursor: default; }
 .crowns { color: #d9b8ff; font-size: 12px; letter-spacing: 0.1em; margin: -4px 0 8px; }
@@ -309,6 +317,22 @@ canvas { display: block; image-rendering: pixelated; }
   .settings.ascend.wide { width: calc(100vw - 16px); }
   .ascend .branches { grid-template-columns: repeat(2, 1fr); }
   .ach-list { grid-template-columns: 1fr 1fr; }
+  .challenge .rules { grid-template-columns: 1fr; }
   .keys { grid-template-columns: 1fr; }
   .toast { font-size: 11px; letter-spacing: 0.02em; padding: 5px 10px; }
 }
+
+/* Stats tab */
+.achievements .tabs { display: flex; gap: 6px; }
+.btn.tab.on { color: #ffb800; border-color: #ffb800; }
+.stats { overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.stat-table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+.stat-table th { text-align: left; color: #ffb800; font-weight: 600; letter-spacing: 0.1em; font-size: 11px; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.stat-table th:not(:first-child), .stat-table td:not(:first-child) { text-align: right; }
+.stat-table td { padding: 3px 6px; border-bottom: 1px solid #12122a; }
+.stat-table td:first-child { color: var(--dim); }
+.chart { position: relative; }
+.chart canvas { max-width: 100%; height: auto !important; }
+.chart-title { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; margin-bottom: 4px; }
+.chart-tip { position: absolute; top: 18px; transform: translateX(-50%); background: #11112af0; border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; font-size: 11px; pointer-events: none; white-space: nowrap; color: var(--text); }
+.chart-tip[hidden] { display: none; }

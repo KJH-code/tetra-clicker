@@ -5,7 +5,8 @@ import { BUILDINGS } from '../src/data/buildings';
 
 describe('ladder numbers', () => {
   it('every building unlocks within 25% of its target time under the default player', () => {
-    const r = simulate({ buildings: LADDER, player: DEFAULT_PLAYER, target: DEFAULT_TARGET, horizonSeconds: 7 * 86_400 });
+    // OPENER's target is about 16 days out.
+    const r = simulate({ buildings: LADDER, player: DEFAULT_PLAYER, target: DEFAULT_TARGET, horizonSeconds: 20 * 86_400 });
     for (const b of LADDER) {
       const t = r.firstUnlock[b.id];
       expect(t, b.id).toBeDefined();
