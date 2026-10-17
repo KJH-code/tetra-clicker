@@ -105,10 +105,46 @@ describe('achievements', () => {
     delete snap.manual.golden.wrath;
     const m = migrate({ version: 7, savedAt: 0, settings: {}, world: snap })!;
     expect(m.version).toBe(SAVE_VERSION);
-    expect(SAVE_VERSION).toBe(8);
+    expect(SAVE_VERSION).toBeGreaterThanOrEqual(8);
     const back = new World(1, m.world);
     expect(back.economy.meta.achievements.size).toBe(0);
     expect(back.economy.meta.hardcoreAscensions).toBe(0);
     expect(back.manual.golden.wrath).toBe(false);
+  });
+});
+
+describe('buildings seen and lifetime Lines (save v9)', () => {
+  it('buying marks a building seen for good', () => {
+    const w = rich();
+    w.buy('single');
+    w.economy.stats.riskLines = 1e9;
+    w.ascend();
+    expect([...w.economy.meta.buildingsSeen]).toEqual(['single']);
+    const back = new World(1, JSON.parse(JSON.stringify(w.snapshot())));
+    expect(back.economy.meta.buildingsSeen.has('single')).toBe(true);
+  });
+
+  it('a v8 save counts buildings from FIRST achievements and ownership, and estimates Lines', () => {
+    const w = new World(1);
+    const snap = JSON.parse(JSON.stringify(w.snapshot()));
+    delete snap.meta.buildingsSeen;
+    snap.meta.achievements = ['own_double_1'];
+    snap.meta.riskBanked = 400_000;
+    snap.meta.lifetime.manualLines = 50_000;
+    snap.economy.owned = { single: 2 };
+    snap.economy.upgrades = ['manual_200'];
+    snap.economy.balance = '1000';
+    snap.economy.stats.manualLines = 300;
+    snap.economy.stats.linesEarned = 500;
+    const m = migrate({ version: 8, savedAt: 0, settings: {}, world: JSON.parse(JSON.stringify(snap)) })!;
+    const back = new World(1, m.world);
+    expect([...back.economy.meta.buildingsSeen].sort()).toEqual(['double', 'single']);
+    // 1000 balance + 110 + 127 for two singles + the upgrade + 300 by hand + max(50K, 400K / 4).
+    const career = back.economy.career('linesEarned');
+    expect(career).toBeGreaterThanOrEqual(1000 + 110 + 127 + 300 + 100_000);
+    // Never lowered when the counted total is already larger.
+    snap.economy.stats.linesEarned = 1e9;
+    const m2 = migrate({ version: 8, savedAt: 0, settings: {}, world: JSON.parse(JSON.stringify(snap)) })!;
+    expect(new World(1, m2.world).economy.career('linesEarned')).toBe(1e9);
   });
 });

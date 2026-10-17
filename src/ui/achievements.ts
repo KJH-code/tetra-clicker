@@ -24,10 +24,13 @@ export class AchievementsPanel {
       const li = document.createElement('li');
       li.className = done ? 'done' : '';
       li.dataset['achievement'] = a.id;
+      // Hidden ones, and those of buildings never bought, stay unnamed.
+      const unseen = !!a.building && !this.world.economy.meta.buildingsSeen.has(a.building);
+      const shown = done || (!a.hidden && !unseen);
       const name = document.createElement('b');
-      name.textContent = done || !a.hidden ? a.name : '???';
+      name.textContent = shown ? a.name : '???';
       const desc = document.createElement('span');
-      desc.textContent = done || !a.hidden ? a.desc : 'Hidden';
+      desc.textContent = shown ? a.desc : a.hidden ? 'Hidden' : 'A building not yet bought';
       li.append(name, desc);
       list.append(li);
     }

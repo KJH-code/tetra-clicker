@@ -529,6 +529,7 @@ export class World {
       });
       this.boardsCreated++;
     }
+    this.economy.meta.buildingsSeen.add(id);
     this.events.push({ type: 'bought', buildingId: id, owned: this.economy.owned(id) });
     this.checkAchievements();
     return true;

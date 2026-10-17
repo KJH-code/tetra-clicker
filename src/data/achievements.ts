@@ -11,6 +11,8 @@ export interface AchievementDef {
   when: Condition[];
   // Shown as ??? until met.
   hidden?: boolean;
+  // Named only once this building has been bought in some run.
+  building?: string;
 }
 
 const OWNED_STEPS = [1, 10, 50, 100];
@@ -24,6 +26,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: n === 1 ? `FIRST ${b.name}` : `${n} ${b.name}`,
     desc: `Own ${n} ${b.name} in one run`,
     when: [{ type: 'owned', id: b.id, gte: n }],
+    building: b.id,
   }))),
   ...LINES_STEPS.map(([n, label]): AchievementDef => ({
     id: `lines_${label.toLowerCase()}`, name: `${label} LINES`, desc: `Earn ${label} Lines over all runs`, when: [career('linesEarned', n)],

@@ -20,6 +20,9 @@ export interface Meta {
   // Ascensions made with an empty bank (a hidden achievement).
   emptyAscensions: number;
   achievements: Set<string>;
+  // Buildings bought at least once in any run: the achievement list names
+  // only these, so it does not give the ladder away.
+  buildingsSeen: Set<string>;
 }
 
 export interface MetaSnapshot {
@@ -36,26 +39,27 @@ export interface MetaSnapshot {
   hardcoreAscensions: number;
   emptyAscensions: number;
   achievements: string[];
+  buildingsSeen: string[];
 }
 
 export const emptyMeta = (): Meta => ({
   crowns: 0, crownsEarned: 0, riskBanked: 0, ascensions: 0, prestige: new Set(), lifetime: emptyStats(), ascending: false,
   hardcore: false, nextHardcore: false, hardcoreBest: { level: 0, rows: 0 },
-  hardcoreAscensions: 0, emptyAscensions: 0, achievements: new Set(),
+  hardcoreAscensions: 0, emptyAscensions: 0, achievements: new Set(), buildingsSeen: new Set(),
 });
 
 export function metaFrom(s: MetaSnapshot | undefined): Meta {
   if (!s) return emptyMeta();
   return {
     ...emptyMeta(), ...s, prestige: new Set(s.prestige), lifetime: { ...emptyStats(), ...s.lifetime }, hardcoreBest: { ...s.hardcoreBest },
-    achievements: new Set(s.achievements ?? []),
+    achievements: new Set(s.achievements ?? []), buildingsSeen: new Set(s.buildingsSeen ?? []),
   };
 }
 
 export function metaSnapshot(m: Meta): MetaSnapshot {
   return {
     ...m, prestige: [...m.prestige].sort(), lifetime: { ...m.lifetime }, hardcoreBest: { ...m.hardcoreBest },
-    achievements: [...m.achievements].sort(),
+    achievements: [...m.achievements].sort(), buildingsSeen: [...m.buildingsSeen].sort(),
   };
 }
 

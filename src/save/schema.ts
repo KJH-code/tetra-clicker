@@ -1,7 +1,9 @@
 import type { WorldSnapshot } from '../sim/world';
+import { BUILDINGS } from '../data/buildings';
+import { UPGRADES } from '../data/upgrades';
 import type { HandlingSettings } from '../data/handling';
 
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 export interface SaveData {
   version: number;
@@ -107,6 +109,35 @@ const MIGRATIONS: Migration[] = [
     }
     const golden = (world['manual'] as Record<string, unknown> | undefined)?.['golden'] as Record<string, unknown> | undefined;
     if (golden) golden['wrath'] ??= false;
+    return raw;
+  },
+  // 8 → 9: buildings bought ever are tracked, and Lines earned before
+  // version 8 are estimated. A building counts as bought if its FIRST
+  // achievement is met or it is owned now. The estimate is a floor: this
+  // run's balance, plus what its buildings and upgrades cost (at list price,
+  // and nothing discounts prices yet), plus Lines made by hand, plus for
+  // finished runs the larger of their hand Lines and banked risk over the
+  // level-4 average the prices were fitted to.
+  (raw) => {
+    const world = raw['world'] as Record<string, unknown>;
+    const meta = world['meta'] as Record<string, unknown> | undefined;
+    const economy = world['economy'] as Record<string, unknown>;
+    const owned = (economy['owned'] ?? {}) as Record<string, number>;
+    if (!meta) return raw;
+    const achievements = (meta['achievements'] ?? []) as string[];
+    const seen = new Set((meta['buildingsSeen'] ?? []) as string[]);
+    for (const b of BUILDINGS) if (achievements.includes(`own_${b.id}_1`) || (owned[b.id] ?? 0) > 0) seen.add(b.id);
+    meta['buildingsSeen'] = [...seen].sort();
+    let spent = 0;
+    for (const b of BUILDINGS) for (let k = 0; k < (owned[b.id] ?? 0); k++) spent += Math.ceil(b.basePrice * b.priceGrowth ** k - 1e-9);
+    for (const id of (economy['upgrades'] ?? []) as string[]) spent += UPGRADES.find((u) => u.id === id)?.price ?? 0;
+    const stats = (economy['stats'] ?? {}) as Record<string, number>;
+    const lifetime = (meta['lifetime'] ?? {}) as Record<string, number>;
+    const past = Math.max(lifetime['manualLines'] ?? 0, (Number(meta['riskBanked']) || 0) / 4);
+    const estimate = Number(economy['balance'] ?? 0) + spent + (stats['manualLines'] ?? 0) + past;
+    const counted = (lifetime['linesEarned'] ?? 0) + (stats['linesEarned'] ?? 0);
+    if (estimate > counted) lifetime['linesEarned'] = (lifetime['linesEarned'] ?? 0) + Math.floor(estimate - counted);
+    meta['lifetime'] = lifetime;
     return raw;
   },
 ];
