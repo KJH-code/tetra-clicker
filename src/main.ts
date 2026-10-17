@@ -44,6 +44,7 @@ const prefetch = new BotPrefetch(world);
 if (import.meta.env.DEV) Object.assign(window, { prefetch, world });
 
 // --- manual board ---------------------------------------------------------
+const manualPane = document.getElementById('manual-pane')!;
 const manualCanvas = document.getElementById('manual-board') as HTMLCanvasElement;
 const manual = new BoardRenderer(manualCanvas, { cell: 28, leftCells: 5, rightCells: 5 });
 const manualFx = new Fx();
@@ -178,6 +179,12 @@ function handleEvent(e: WorldEvent): void {
     case 'garbage':
       manualFx.shakeBoard(1);
       break;
+    case 'hardcoreOver':
+      ascendPanel.hardcoreOver(e.crowns);
+      autoRoot.replaceChildren();
+      autoViews.length = 0;
+      shop.refresh(true);
+      break;
     case 'roundEnd': {
       manualFx.shakeBoard(6);
       if (Number(e.forfeited) > 0) {
@@ -285,7 +292,8 @@ function render(): void {
     golden: { active: g.golden.active, holds: g.golden.holds, next: g.golden.queue },
   };
   const buffs = world.buffs.active.map((b) => ({ label: BUFFS[b.id]?.label ?? b.id, msLeft: b.msLeft }));
-  manual.render(view, manualFx, (ctx) => drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel()));
+  manual.render(view, manualFx, (ctx) => drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore));
+  manualPane.classList.toggle('hardcore', world.economy.meta.hardcore);
   ensureAutoViews();
   world.autoBoards.forEach((board, i) => {
     const v = autoViews[i]!;

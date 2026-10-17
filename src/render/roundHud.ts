@@ -9,7 +9,7 @@ import { GOLD } from './theme';
 // checkpoint. A centred banner covers the states where the board is not
 // live (waiting, paused).
 export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, round: Round, wrath: number,
-  buffs: { label: string; msLeft: number }[] = [], nextStartLevel = 1): void {
+  buffs: { label: string; msLeft: number }[] = [], nextStartLevel = 1, hardcore = false): void {
   const c = r.layout.cell;
   const colW = r.layout.leftCells * c;
   const x0 = 6;
@@ -23,6 +23,11 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
     ctx.fillText(text, x0, y);
     y += c * 0.55;
   };
+  if (hardcore) {
+    ctx.fillStyle = '#ff3b3b';
+    ctx.font = `800 ${Math.round(c * 0.42)}px system-ui, sans-serif`;
+    ctx.fillText('HARDCORE', x0, y - c * 0.8);
+  }
   label('VAULT');
   ctx.fillStyle = '#e8e8ff';
   ctx.font = `700 ${Math.round(c * 0.7)}px system-ui, sans-serif`;

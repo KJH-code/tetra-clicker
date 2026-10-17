@@ -69,6 +69,7 @@ export type WorldEvent =
   | { type: 'goldenLost' }
   | { type: 'ascended'; crowns: number }
   | { type: 'newRun'; startLines: number }
+  | { type: 'hardcoreOver'; crowns: number }
   | { type: 'slept'; seconds: number };
 
 export class World {
@@ -133,7 +134,7 @@ export class World {
     this.manual.rules = {
       comboGrace: flagCount(fx, 'rule:combo_grace', eco),
       b2bShield: flagCount(fx, 'rule:b2b_shield', eco) > 0,
-      nextCount: 5 + flagCount(fx, 'rule:next_plus', eco),
+      nextCount: Math.max(1, Math.round(this.fx('next_count', 5 + flagCount(fx, 'rule:next_plus', eco)))),
       holdSlots: 1 + flagCount(fx, 'rule:hold2', eco),
     };
   }
@@ -207,6 +208,7 @@ export class World {
       const { levelUp, checkpoints } = this.round.addRows(result.lines);
       const stats = this.economy.stats;
       stats.maxLevel = Math.max(stats.maxLevel, this.round.level);
+      stats.maxLifeRows = Math.max(stats.maxLifeRows, this.round.rows);
       if (levelUp) this.events.push({ type: 'levelUp', level: this.round.level });
       if (checkpoints > 0) this.checkpoint(checkpoints);
     }
@@ -296,11 +298,13 @@ export class World {
   }
 
   // A top-out is the only way a life ends: the unbanked vault is lost, save
-  // the share prestige upgrades keep, which also counts as banked risk.
+  // the share prestige upgrades keep, which also counts as banked risk. In a
+  // hardcore run nothing is kept and the run ascends on the spot.
   private endRound(): void {
     const vault = this.round.vault;
     const level = this.round.level;
-    const retain = Math.min(1, Math.max(0, this.fx('retain', LEVELS.retain)));
+    const hardcore = this.economy.meta.hardcore;
+    const retain = hardcore ? 0 : Math.min(1, Math.max(0, this.fx('retain', LEVELS.retain)));
     // The vault holds whole Lines; the kept share rounds down.
     const kept = Math.floor(vault * retain + 1e-9);
     this.economy.balance = add(this.economy.balance, num(kept));
@@ -313,12 +317,18 @@ export class World {
     // A golden piece belongs to its round.
     this.manual.clearGolden();
     this.events.push({ type: 'roundEnd', deposited: num(kept), forfeited: num(vault - kept), level });
+    if (hardcore) {
+      const crowns = this.doAscend();
+      this.events.push({ type: 'hardcoreOver', crowns });
+    }
   }
 
   private stepRound(dtMs: number): void {
     if (!this.round.live) return;
     const { garbage, golden } = this.round.advance(dtMs, { ready: !this.manual.hasGolden, scale: this.goldenScale() },
-      this.fx('garbage_interval', 1));
+      this.fx('garbage_interval', 1), this.fx('garbage_from_level', LEVELS.garbageFromLevel));
+    const stats = this.economy.stats;
+    stats.maxLifeSeconds = Math.max(stats.maxLifeSeconds, Math.floor(this.round.elapsedMs / 1000));
     if (golden && this.manual.markGolden(this.manual.rules.nextCount - 1)) this.events.push({ type: 'goldenSpawn' });
     for (const hole of garbage) {
       if (this.manual.addGarbage(hole)) { this.endRound(); return; }
@@ -344,7 +354,7 @@ export class World {
   }
 
   techChecks(): { id: string; label: string; done: boolean }[] {
-    return TECH_CHECKS.map((c) => ({ id: c.id, label: c.label, done: conditionMet(c.when, this.economy) }));
+    return TECH_CHECKS.map((c) => ({ id: c.id, label: c.label, done: c.when.every((w) => conditionMet(w, this.economy)) }));
   }
 
   techScore(): number {
@@ -356,16 +366,34 @@ export class World {
     return crownGain(this.economy.meta.riskBanked, this.economy.stats.riskLines, this.techScore());
   }
 
+  // Between lives, or mid-life in a hardcore run (its only life never ends
+  // on its own terms otherwise).
   canAscend(): boolean {
-    return !this.round.active && !this.ascending && this.crownPreview() >= 1;
+    const midLife = this.round.active && !this.economy.meta.hardcore;
+    return !midLife && !this.ascending && this.crownPreview() >= 1;
   }
 
   // Bank the crowns and wipe the run. The world then waits on the prestige
-  // shop until newRun().
+  // shop until newRun(). A hardcore life still running banks its vault first,
+  // so walking away alive keeps everything earned.
   ascend(): number {
     if (!this.canAscend()) return 0;
+    if (this.round.active) {
+      this.checkpoint(0);
+      this.round.end();
+      this.toVault.carry = 0;
+    }
+    return this.doAscend();
+  }
+
+  // A hardcore top-out lands here directly, crowns or not.
+  private doAscend(): number {
     const gain = this.crownPreview();
     const meta = this.economy.meta;
+    if (meta.hardcore) {
+      const s = this.economy.stats;
+      meta.hardcoreBest = { level: Math.max(meta.hardcoreBest.level, s.maxLevel), rows: Math.max(meta.hardcoreBest.rows, s.maxLifeRows) };
+    }
     meta.crowns += gain;
     meta.crownsEarned += gain;
     meta.riskBanked += this.economy.stats.riskLines;
@@ -401,9 +429,18 @@ export class World {
     return true;
   }
 
+  // The mode of the run NEW RUN starts; it can only be picked on the
+  // prestige shop, and stays as it was unless changed.
+  setNextHardcore(on: boolean): boolean {
+    if (!this.ascending) return false;
+    this.economy.meta.nextHardcore = on;
+    return true;
+  }
+
   newRun(): boolean {
     if (!this.ascending) return false;
     this.economy.meta.ascending = false;
+    this.economy.meta.hardcore = this.economy.meta.nextHardcore;
     const start = Math.floor(this.fx('start_lines', 0));
     this.economy.balance = num(start);
     this.applyRules();

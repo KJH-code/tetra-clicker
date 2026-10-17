@@ -229,3 +229,12 @@ canvas { display: block; image-rendering: pixelated; }
 .btn.ascend-btn { color: #d9b8ff; border-color: #b26bff80; margin-bottom: 8px; }
 .btn.ascend-btn:disabled { opacity: 0.4; cursor: default; }
 .crowns { color: #d9b8ff; font-size: 12px; letter-spacing: 0.1em; margin: -4px 0 8px; }
+
+/* Hardcore: the manual pane runs red, and the prestige shop picks the mode. */
+#manual-pane.hardcore { border-color: #ff3b3b; box-shadow: 0 0 24px #ff3b3b40 inset, 0 0 18px #ff3b3b30; }
+.ascend .over { color: #ff3b3b; font-weight: 800; letter-spacing: 0.2em; margin-bottom: 6px; }
+.ascend .row .mode { display: flex; gap: 6px; margin-right: auto; }
+.ascend .mode-btn { opacity: 0.55; }
+.ascend .mode-btn.on { opacity: 1; border-color: var(--accent); }
+.ascend .mode-btn.hc.on { border-color: #ff3b3b; color: #ff3b3b; }
+.ascend .row .dim { flex: 1; margin: 0 10px; font-size: 11px; }

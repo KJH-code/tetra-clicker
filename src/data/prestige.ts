@@ -26,20 +26,28 @@ export const PRESTIGE = {
 export interface TechCheck {
   id: string;
   label: string;
-  when: Condition;
+  when: Condition[];
 }
 
+const HC: Condition = { type: 'hardcore' };
+
 export const TECH_CHECKS: TechCheck[] = [
-  { id: 'tss', label: 'T-SPIN SINGLE', when: { type: 'stat', stat: 'tss', gte: 1 } },
-  { id: 'tsd', label: 'T-SPIN DOUBLE', when: { type: 'stat', stat: 'tsd', gte: 1 } },
-  { id: 'tst', label: 'T-SPIN TRIPLE', when: { type: 'stat', stat: 'tst', gte: 1 } },
-  { id: 'pc', label: 'PERFECT CLEAR', when: { type: 'stat', stat: 'pcs', gte: 1 } },
-  { id: 'combo5', label: '5 COMBO', when: { type: 'stat', stat: 'combo5', gte: 1 } },
-  { id: 'combo10', label: '10 COMBO', when: { type: 'stat', stat: 'combo10', gte: 1 } },
-  { id: 'b2b5', label: 'B2B ×5', when: { type: 'stat', stat: 'b2b5', gte: 1 } },
-  { id: 'tetris10', label: '10 TETRISES', when: { type: 'stat', stat: 'tetrises', gte: 10 } },
-  { id: 'level10', label: 'REACH LEVEL 10', when: { type: 'stat', stat: 'maxLevel', gte: 10 } },
-  { id: 'golden3', label: '3 GOLDEN PIECES', when: { type: 'stat', stat: 'goldens', gte: 3 } },
+  { id: 'tss', label: 'T-SPIN SINGLE', when: [{ type: 'stat', stat: 'tss', gte: 1 }] },
+  { id: 'tsd', label: 'T-SPIN DOUBLE', when: [{ type: 'stat', stat: 'tsd', gte: 1 }] },
+  { id: 'tst', label: 'T-SPIN TRIPLE', when: [{ type: 'stat', stat: 'tst', gte: 1 }] },
+  { id: 'pc', label: 'PERFECT CLEAR', when: [{ type: 'stat', stat: 'pcs', gte: 1 }] },
+  { id: 'combo5', label: '5 COMBO', when: [{ type: 'stat', stat: 'combo5', gte: 1 }] },
+  { id: 'combo10', label: '10 COMBO', when: [{ type: 'stat', stat: 'combo10', gte: 1 }] },
+  { id: 'b2b5', label: 'B2B ×5', when: [{ type: 'stat', stat: 'b2b5', gte: 1 }] },
+  { id: 'tetris10', label: '10 TETRISES', when: [{ type: 'stat', stat: 'tetrises', gte: 10 }] },
+  { id: 'level10', label: 'REACH LEVEL 10', when: [{ type: 'stat', stat: 'maxLevel', gte: 10 }] },
+  { id: 'golden3', label: '3 GOLDEN PIECES', when: [{ type: 'stat', stat: 'goldens', gte: 3 }] },
+  // Hardcore only. "Alive" is read when the run ascends: a voluntary
+  // ascension has no death behind it, a top-out has one.
+  { id: 'hc_level15', label: 'HARDCORE LEVEL 15', when: [HC, { type: 'stat', stat: 'maxLevel', gte: 15 }] },
+  { id: 'hc_checkpoints10', label: 'HARDCORE 10 CHECKPOINTS', when: [HC, { type: 'stat', stat: 'checkpoints', gte: 10 }] },
+  { id: 'hc_alive', label: 'HARDCORE ASCEND ALIVE', when: [HC, { type: 'stat', stat: 'deaths', lte: 0 }, { type: 'stat', stat: 'rounds', gte: 1 }] },
+  { id: 'hc_30min', label: 'HARDCORE 30 MINUTES', when: [HC, { type: 'stat', stat: 'maxLifeSeconds', gte: 1800 }] },
 ];
 
 // Prestige upgrades: three chains, bought only on the ascension screen.

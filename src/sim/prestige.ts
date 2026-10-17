@@ -11,6 +11,11 @@ export interface Meta {
   lifetime: Stats;
   // Between ascending and starting the next run, on the prestige shop.
   ascending: boolean;
+  // This run is hardcore; the mode picked on the prestige shop for the next.
+  hardcore: boolean;
+  nextHardcore: boolean;
+  // Best hardcore life: level reached and rows cleared.
+  hardcoreBest: { level: number; rows: number };
 }
 
 export interface MetaSnapshot {
@@ -21,19 +26,23 @@ export interface MetaSnapshot {
   prestige: string[];
   lifetime: Stats;
   ascending: boolean;
+  hardcore: boolean;
+  nextHardcore: boolean;
+  hardcoreBest: { level: number; rows: number };
 }
 
 export const emptyMeta = (): Meta => ({
   crowns: 0, crownsEarned: 0, riskBanked: 0, ascensions: 0, prestige: new Set(), lifetime: emptyStats(), ascending: false,
+  hardcore: false, nextHardcore: false, hardcoreBest: { level: 0, rows: 0 },
 });
 
 export function metaFrom(s: MetaSnapshot | undefined): Meta {
   if (!s) return emptyMeta();
-  return { ...s, prestige: new Set(s.prestige), lifetime: { ...emptyStats(), ...s.lifetime } };
+  return { ...s, prestige: new Set(s.prestige), lifetime: { ...emptyStats(), ...s.lifetime }, hardcoreBest: { ...s.hardcoreBest } };
 }
 
 export function metaSnapshot(m: Meta): MetaSnapshot {
-  return { ...m, prestige: [...m.prestige].sort(), lifetime: { ...m.lifetime } };
+  return { ...m, prestige: [...m.prestige].sort(), lifetime: { ...m.lifetime }, hardcoreBest: { ...m.hardcoreBest } };
 }
 
 // Crowns the whole of a lifetime's risk is worth, before tech.

@@ -191,7 +191,7 @@ export function simulate(params: SimParams): SimResult {
       for (const u of upgrades) {
         if (eco.hasUpgrade(u.id)) continue;
         const need = u.unlock.find((c) => c.type === 'stat');
-        if (!need || need.type !== 'stat' || eco.stats.manualLines >= need.gte) continue;
+        if (!need || need.type !== 'stat' || !('gte' in need) || eco.stats.manualLines >= need.gte) continue;
         const at = t + (need.gte - eco.stats.manualLines) / manualNow;
         if (at < next) { next = at; snapStat = need.gte; }
       }

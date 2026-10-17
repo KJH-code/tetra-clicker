@@ -260,7 +260,7 @@ describe('saves', () => {
     snap['round'] = { phase: 'running', paused: true, vault: 55, danger: 0.7, elapsedMs: 1, garbageMs: 0, settleMs: 0, rng: 1, goldenMs: 1, goldenRng: 1 };
     const keys = { left: ['ArrowLeft'], settle: ['Enter'] };
     const m = migrate({ version: 5, savedAt: 0, settings: { das: 1, arr: 1, sdf: 1, keys }, world: snap })!;
-    expect(m.version).toBe(6);
+    expect(m.version).toBe(SAVE_VERSION);
     expect(m.world.round).toBeNull();
     expect(m.world.economy.balance).toBe('155');
     expect('roundsSettled' in m.world.economy.stats).toBe(false);

@@ -2,6 +2,7 @@ import { BUILDINGS } from './buildings';
 import { UPGRADES, type UpgradeDef } from './upgrades';
 import { CROWN_EFFECT, PRESTIGE_UPGRADES } from './prestige';
 import type { Effect } from '../sim/effects';
+import { HARDCORE_EFFECTS } from './hardcore';
 
 // Every effect in the game, gathered from the data files. An upgrade's
 // effects only apply once it is bought, so the loader adds that condition
@@ -16,5 +17,5 @@ export function prestigeEffects(): Effect[] {
 }
 
 export function allEffects(): Effect[] {
-  return [...BUILDINGS.flatMap((b) => b.effects), ...upgradeEffects(UPGRADES), ...prestigeEffects(), CROWN_EFFECT];
+  return [...BUILDINGS.flatMap((b) => b.effects), ...upgradeEffects(UPGRADES), ...prestigeEffects(), CROWN_EFFECT, ...HARDCORE_EFFECTS];
 }

@@ -29,8 +29,8 @@ export function gravityAt(level: number): number {
   return i < LEVELS.gravity.length ? LEVELS.gravity[i]! : Infinity;
 }
 
-export function garbageSecondsAt(level: number): number | null {
-  if (level < LEVELS.garbageFromLevel) return null;
+export function garbageSecondsAt(level: number, fromLevel: number = LEVELS.garbageFromLevel): number | null {
+  if (level < fromLevel) return null;
   return Math.max(LEVELS.garbageMinSeconds, LEVELS.garbageSecondsAtLevel1 / level);
 }
 

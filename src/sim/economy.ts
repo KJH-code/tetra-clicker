@@ -56,6 +56,10 @@ export class Economy implements EffectContext {
     return this.meta.prestige.has(id);
   }
 
+  isHardcore(): boolean {
+    return this.meta.hardcore;
+  }
+
   // Everything a run owns goes; meta stays.
   resetRun(): void {
     this.balance = ZERO;

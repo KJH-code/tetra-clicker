@@ -97,7 +97,8 @@ many short ones. K is set so the first crown comes after about 2.5 hours.
 
 - **Tech score**: ten checks per run, 0.15 each, capped at 1.0 — T-spin
   single / double / triple, perfect clear, 5 and 10 combo, five B2B in a row,
-  10 tetrises, reaching level 10, 3 golden pieces.
+  10 tetrises, reaching level 10, 3 golden pieces — plus four in hardcore runs
+  (below).
 - **Every crown earned** adds 1% to all income, spent or not.
 - **Resets**: Lines, buildings, run upgrades (wrath too), run stats, round,
   buffs, golden piece. **Stays**: crowns, prestige upgrades, lifetime stats,
@@ -119,6 +120,27 @@ A fourth chain, SYNERGY, is research: 1, 2, 3 … 8 crowns up the ladder, each
 opening one synergy for every later run (below).
 
 Everything is data in `src/data/prestige.ts`.
+
+### Hardcore
+
+From the second run on, the prestige shop picks the next run's mode, NORMAL or
+HARDCORE (it stays as last time unless changed). A hardcore run is one life:
+
+- **Harder**: starts three levels up, garbage from level 1 (normal: 3), three
+  next pieces instead of five.
+- **Pays more**: manual income ×2 and risk weight ×3 (about ×1.44 crowns by
+  itself, more with the extra Lines). The tech cap rises by 0.5 to make room
+  for four hardcore-only checks: level 15, 10 checkpoints, 30 minutes alive,
+  and ascending alive.
+- **A top-out ascends the run on the spot**, crowns or not: the vault is lost
+  (vault-keeping upgrades do not apply) and the prestige shop opens on
+  HARDCORE OVER.
+- **ASCEND works mid-life**: the life pauses on the confirmation, and
+  ascending banks the vault first, risk weight and all.
+
+The manual pane runs red with a HARDCORE badge; the prestige shop shows the
+best hardcore life (level reached, rows cleared). The effects are data in
+`src/data/hardcore.ts`, on a `{ type: 'hardcore' }` condition.
 
 ### Synergies
 
@@ -326,10 +348,11 @@ fitted to.
 ## Save
 
 localStorage, key `tetra-clicker/save`, every 10 s plus on tab hide and
-unload. The file has a `version` (now 6); `src/save/schema.ts` upgrades
+unload. The file has a `version` (now 7); `src/save/schema.ts` upgrades
 older saves step by step, so a version 1 save loads with no upgrades and
 zeroed stats, a version 2 save loads with no round in play, a version 3
 save loads with no buffs or golden piece, a version 4 save has never
 ascended and has its Lines doubled into the whole-number unit, and a
 version 5 save has any round in progress banked in full (lives replaced
-settled rounds) and its settle key dropped.
+settled rounds) and its settle key dropped, and a version 6 save has only
+ever played normal runs, with no hardcore record.

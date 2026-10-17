@@ -29,6 +29,8 @@ export class AscendPanel {
   confirm(): void {
     if (!this.world.canAscend()) return;
     const w = this.world;
+    // A hardcore life can ascend mid-life; it waits while the player decides.
+    w.pauseRound();
     const box = panel('ASCEND');
     box.append(
       line('big', `+${w.crownPreview()} CROWN`),
@@ -42,6 +44,7 @@ export class AscendPanel {
       li.textContent = `${c.done ? '✓' : '·'} ${c.label}`;
       list.append(li);
     }
+    if (w.round.active) box.append(line('dim', `This hardcore life ends here; its vault (${w.round.vault}) is banked first.`));
     box.append(list, line('dim', 'Lines, buildings, run upgrades and wrath reset. Crowns, prestige upgrades and settings stay.'));
     const row = document.createElement('div');
     row.className = 'row';
@@ -58,10 +61,16 @@ export class AscendPanel {
     this.show(box);
   }
 
-  private showShop(): void {
+  // A hardcore top-out lands the player straight on the prestige shop.
+  hardcoreOver(crowns: number): void {
+    this.showShop(`HARDCORE OVER · +${crowns} CROWN`);
+  }
+
+  private showShop(note?: string): void {
     const meta = this.world.economy.meta;
     const box = panel('PRESTIGE');
     box.classList.add('wide');
+    if (note) box.append(line('over', note));
     box.append(line('big crown', `${meta.crowns} CROWN`), line('dim', `${meta.crownsEarned} earned · +${meta.crownsEarned}% income`));
     const cols = document.createElement('div');
     cols.className = 'branches';
@@ -87,7 +96,23 @@ export class AscendPanel {
     }
     const row = document.createElement('div');
     row.className = 'row';
-    row.append(button('NEW RUN', 'btn primary', () => {
+    // The next run's mode: a pick here, kept from the last run otherwise.
+    const mode = document.createElement('div');
+    mode.className = 'mode';
+    for (const hc of [false, true]) {
+      const b = button(hc ? 'HARDCORE' : 'NORMAL', `btn mode-btn${hc ? ' hc' : ''}`, () => {
+        this.world.setNextHardcore(hc);
+        this.showShop(note);
+      });
+      b.classList.toggle('on', meta.nextHardcore === hc);
+      b.dataset['mode'] = hc ? 'hardcore' : 'normal';
+      mode.append(b);
+    }
+    const best = meta.hardcoreBest;
+    const record = line('dim', best.level > 0
+      ? `HARDCORE BEST · LEVEL ${best.level} · ${best.rows} ROWS`
+      : 'HARDCORE: one life, a top-out ascends · garbage from level 1, start +3 levels, 3 next · manual ×2, risk ×3');
+    row.append(mode, record, button('NEW RUN', 'btn primary', () => {
       if (this.world.newRun()) {
         this.onChanged();
         this.close();

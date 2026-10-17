@@ -1,7 +1,7 @@
 import type { WorldSnapshot } from '../sim/world';
 import type { HandlingSettings } from '../data/handling';
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 export interface SaveData {
   version: number;
@@ -80,6 +80,18 @@ const MIGRATIONS: Migration[] = [
     if (lifetime) { delete lifetime['roundsSettled']; delete lifetime['hotSettles']; }
     const keys = (raw['settings'] as Record<string, unknown> | undefined)?.['keys'] as Record<string, unknown> | undefined;
     if (keys) delete keys['settle'];
+    return raw;
+  },
+  // 6 → 7: hardcore arrives. Every run so far was normal, with no hardcore
+  // record; the new life-length stats default to zero when the world loads.
+  (raw) => {
+    const world = raw['world'] as Record<string, unknown>;
+    const meta = world['meta'] as Record<string, unknown> | undefined;
+    if (meta) {
+      meta['hardcore'] ??= false;
+      meta['nextHardcore'] ??= false;
+      meta['hardcoreBest'] ??= { level: 0, rows: 0 };
+    }
     return raw;
   },
 ];

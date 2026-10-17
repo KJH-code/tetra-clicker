@@ -139,7 +139,7 @@ export class Round {
 
   // Advance life time. Returns the garbage rows due and whether a golden
   // piece is due. `garbageScale` stretches garbage gaps (a prestige upgrade).
-  advance(dtMs: number, golden?: { ready: boolean; scale: number }, garbageScale = 1): { garbage: number[]; golden: boolean } {
+  advance(dtMs: number, golden?: { ready: boolean; scale: number }, garbageScale = 1, garbageFrom: number = LEVELS.garbageFromLevel): { garbage: number[]; golden: boolean } {
     const out = { garbage: [] as number[], golden: false };
     if (!this.live) return out;
     this.elapsedMs += dtMs;
@@ -150,7 +150,7 @@ export class Round {
         this.goldenMs = this.drawGoldenMs(golden.scale);
       }
     }
-    const seconds = garbageSecondsAt(this.level);
+    const seconds = garbageSecondsAt(this.level, garbageFrom);
     if (seconds !== null) {
       this.garbageMs += dtMs;
       const interval = seconds * 1000 * garbageScale;

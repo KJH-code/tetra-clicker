@@ -7,12 +7,15 @@ export type EffectTarget = 'income' | 'price' | (string & {});
 export type EffectOp = 'add' | 'add_pct' | 'mul' | 'mul_pct' | 'flag';
 
 // Conditions are data too: owning enough of a building, a play statistic
-// reaching a threshold, having bought an upgrade, or a prestige upgrade.
+// reaching a threshold (or staying under one), having bought an upgrade, a
+// prestige upgrade, or playing a hardcore run.
 export type Condition =
   | { type: 'owned'; id: string; gte: number }
   | { type: 'stat'; stat: string; gte: number }
+  | { type: 'stat'; stat: string; lte: number }
   | { type: 'upgrade'; id: string }
-  | { type: 'prestige'; id: string };
+  | { type: 'prestige'; id: string }
+  | { type: 'hardcore' };
 
 export interface Effect {
   target: EffectTarget;
@@ -29,14 +32,19 @@ export interface EffectContext {
   stat?(name: string): number;
   hasUpgrade?(id: string): boolean;
   hasPrestige?(id: string): boolean;
+  isHardcore?(): boolean;
 }
 
 export function conditionMet(c: Condition, ctx: EffectContext): boolean {
   switch (c.type) {
     case 'owned': return ctx.owned(c.id) >= c.gte;
-    case 'stat': return (ctx.stat?.(c.stat) ?? 0) >= c.gte;
+    case 'stat': {
+      const v = ctx.stat?.(c.stat) ?? 0;
+      return 'gte' in c ? v >= c.gte : v <= c.lte;
+    }
     case 'upgrade': return ctx.hasUpgrade?.(c.id) ?? false;
     case 'prestige': return ctx.hasPrestige?.(c.id) ?? false;
+    case 'hardcore': return ctx.isHardcore?.() ?? false;
   }
 }
 

@@ -25,11 +25,14 @@ export interface Stats {
   combo10: number;
   b2b5: number; // back-to-back chains that reached five clears
   tetrises: number;
+  // The longest life of the run, in rows cleared and in life time.
+  maxLifeRows: number;
+  maxLifeSeconds: number;
 }
 
 export const emptyStats = (): Stats => ({
   manualLines: 0, manualPieces: 0, spins: 0, combo5: 0, b2bs: 0, pcs: 0, riskLines: 0, rounds: 0, checkpoints: 0, deaths: 0, maxLevel: 0, goldens: 0,
-  tss: 0, tsd: 0, tst: 0, combo10: 0, b2b5: 0, tetrises: 0,
+  tss: 0, tsd: 0, tst: 0, combo10: 0, b2b5: 0, tetrises: 0, maxLifeRows: 0, maxLifeSeconds: 0,
 });
 
 // Add one run's counters into lifetime totals; a "max" counter keeps the larger.

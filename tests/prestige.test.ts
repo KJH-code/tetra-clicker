@@ -77,7 +77,8 @@ describe('tech checklist', () => {
     expect(w.techScore()).toBe(0);
     const s = w.economy.stats;
     s.tss = 1; s.tsd = 1; s.tst = 1; s.pcs = 1; s.combo5 = 1; s.combo10 = 1; s.b2b5 = 1; s.tetrises = 9; s.maxLevel = 10; s.goldens = 3;
-    expect(w.techChecks().filter((c) => c.done).map((c) => c.id)).toEqual(TECH_CHECKS.map((c) => c.id).filter((id) => id !== 'tetris10'));
+    // Hardcore checks need a hardcore run (tests/hardcore.test.ts).
+    expect(w.techChecks().filter((c) => c.done).map((c) => c.id)).toEqual(TECH_CHECKS.map((c) => c.id).filter((id) => id !== 'tetris10' && !id.startsWith('hc_')));
     expect(w.techScore()).toBeCloseTo(1.0, 12); // nine checks, capped
     s.tss = 0; s.tsd = 0; s.tst = 0;
     expect(w.techScore()).toBeCloseTo(6 * 0.15, 12);
