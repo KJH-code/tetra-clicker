@@ -25,8 +25,9 @@ export interface LockResult {
   // The board was reset because the next piece could not spawn.
   topped: boolean;
   clearedRows: number[]; // absolute row indices, for effects
-  // The piece was the golden one.
+  // The piece was the golden one, and a wrath piece in its place.
   golden?: boolean;
+  wrath?: boolean;
 }
 
 // Where the golden piece is: a queue index (-1 = not in the queue), the
@@ -35,6 +36,8 @@ export interface GoldenMarks {
   queue: number;
   active: boolean;
   holds: boolean[];
+  // The one golden piece is a wrath piece (missing in older saves).
+  wrath?: boolean;
 }
 
 export interface GameSnapshot {
@@ -168,10 +171,11 @@ export class Game {
   }
 
   // Gild the queue piece at `index` (the last one shown, so it scrolls into
-  // view). Only one golden piece exists at a time.
-  markGolden(index: number): boolean {
+  // view). Only one golden piece exists at a time, golden or wrath.
+  markGolden(index: number, wrath = false): boolean {
     if (this.hasGolden) return false;
     this.golden.queue = index;
+    this.golden.wrath = wrath;
     return true;
   }
 
@@ -337,6 +341,7 @@ export class Game {
   lock(): LockResult {
     const p = this.active!;
     const golden = this.golden.active;
+    const wrath = golden && !!this.golden.wrath;
     const spin = detectSpin(this.grid, p, {
       lastActionWasRotation: this.lastActionWasRotation,
       lastKickIndex: this.lastKickIndex,
@@ -389,7 +394,7 @@ export class Game {
       topped = true;
       this.resetBoard();
     }
-    return { piece: p.piece, lines, spin, perfectClear, comboIndex, b2bExtended, topped, clearedRows, golden };
+    return { piece: p.piece, lines, spin, perfectClear, comboIndex, b2bExtended, topped, clearedRows, golden, wrath };
   }
 
   // Reaching the ceiling costs the stack, the combo, the back-to-back chain

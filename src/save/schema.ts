@@ -1,7 +1,7 @@
 import type { WorldSnapshot } from '../sim/world';
 import type { HandlingSettings } from '../data/handling';
 
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 export interface SaveData {
   version: number;
@@ -92,6 +92,21 @@ const MIGRATIONS: Migration[] = [
       meta['nextHardcore'] ??= false;
       meta['hardcoreBest'] ??= { level: 0, rows: 0 };
     }
+    return raw;
+  },
+  // 7 → 8: wrath pieces and achievements arrive. Nothing is met yet; the
+  // sweep after loading awards whatever the save already qualifies for.
+  // Lines earned were never counted, so that total starts from here.
+  (raw) => {
+    const world = raw['world'] as Record<string, unknown>;
+    const meta = world['meta'] as Record<string, unknown> | undefined;
+    if (meta) {
+      meta['achievements'] ??= [];
+      meta['hardcoreAscensions'] ??= 0;
+      meta['emptyAscensions'] ??= 0;
+    }
+    const golden = (world['manual'] as Record<string, unknown> | undefined)?.['golden'] as Record<string, unknown> | undefined;
+    if (golden) golden['wrath'] ??= false;
     return raw;
   },
 ];

@@ -11,10 +11,15 @@ interface PageState {
   target: TargetParams;
   horizonDays: number;
   upgrades: boolean;
+  synergies: boolean;
+  hardcore: boolean;
+  // -1 = luck not modelled; 0..3 = golden pieces at that WRATH stage.
+  wrath: number;
 }
 
 function defaults(): PageState {
-  return { ladder: structuredClone(LADDER), player: { ...DEFAULT_PLAYER }, target: { ...DEFAULT_TARGET }, horizonDays: DEFAULT_HORIZON_SECONDS / 86_400, upgrades: true };
+  return { ladder: structuredClone(LADDER), player: { ...DEFAULT_PLAYER }, target: { ...DEFAULT_TARGET }, horizonDays: DEFAULT_HORIZON_SECONDS / 86_400, upgrades: true,
+    synergies: false, hardcore: false, wrath: -1 };
 }
 
 function load(): PageState {
@@ -25,7 +30,8 @@ function load(): PageState {
     const d = defaults();
     // Rows are matched by id so a ladder change in code survives an old save.
     const ladder = d.ladder.map((b) => ({ ...b, ...(s.ladder?.find((x) => x.id === b.id) ?? {}) }));
-    return { ladder, player: { ...d.player, ...s.player }, target: { ...d.target, ...s.target }, horizonDays: s.horizonDays ?? d.horizonDays, upgrades: s.upgrades ?? true };
+    return { ladder, player: { ...d.player, ...s.player }, target: { ...d.target, ...s.target }, horizonDays: s.horizonDays ?? d.horizonDays, upgrades: s.upgrades ?? true,
+      synergies: s.synergies ?? false, hardcore: s.hardcore ?? false, wrath: s.wrath ?? -1 };
   } catch {
     return defaults();
   }
@@ -44,7 +50,8 @@ function save(): void {
 }
 
 function run(): void {
-  const params: SimParams = { buildings: state.ladder, player: state.player, target: state.target, horizonSeconds: state.horizonDays * 86_400, upgrades: state.upgrades };
+  const params: SimParams = { buildings: state.ladder, player: state.player, target: state.target, horizonSeconds: state.horizonDays * 86_400, upgrades: state.upgrades,
+    synergies: state.synergies, hardcore: state.hardcore, ...(state.wrath >= 0 ? { wrath: state.wrath } : {}) };
   const result = simulate(params);
   chart.setState({ result, ladder: state.ladder, horizonSeconds: params.horizonSeconds });
   renderUnlocks(result.firstUnlock, result.target);
@@ -128,6 +135,17 @@ function ladderTable(): HTMLElement {
   return table;
 }
 
+function toggle(label: string, get: () => boolean, set: (v: boolean) => void): HTMLElement {
+  const wrap = document.createElement('label');
+  wrap.className = 'toggle';
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.checked = get();
+  box.addEventListener('change', () => { set(box.checked); run(); });
+  wrap.append(box, document.createTextNode(` ${label}`));
+  return wrap;
+}
+
 function buildControls(): void {
   controls.innerHTML = '';
   controls.append(h2('PLAYER'));
@@ -140,15 +158,13 @@ function buildControls(): void {
   controls.append(slider('FIRST (S)', () => state.target.firstSeconds, (v) => { state.target.firstSeconds = v; }, 10, 600, 5));
   controls.append(slider('RATIO', () => state.target.ratio, (v) => { state.target.ratio = v; }, 1.2, 5, 0.1));
   controls.append(slider('HORIZON (D)', () => state.horizonDays, (v) => { state.horizonDays = v; }, 1, 90, 1));
-  // Milestone and manual ×2 upgrades bought by the same payback rule.
-  const up = document.createElement('label');
-  up.className = 'toggle';
-  const box = document.createElement('input');
-  box.type = 'checkbox';
-  box.checked = state.upgrades;
-  box.addEventListener('change', () => { state.upgrades = box.checked; run(); });
-  up.append(box, document.createTextNode(' UPGRADES'));
-  controls.append(up);
+  // Milestone and manual ×2 upgrades bought by the same payback rule;
+  // synergies the same way, researched in advance.
+  controls.append(toggle('UPGRADES', () => state.upgrades, (v) => { state.upgrades = v; }));
+  controls.append(toggle('SYNERGIES', () => state.synergies, (v) => { state.synergies = v; }));
+  controls.append(toggle('HARDCORE', () => state.hardcore, (v) => { state.hardcore = v; }));
+  controls.append(toggle('LUCK (GOLDEN PIECES)', () => state.wrath >= 0, (v) => { state.wrath = v ? Math.max(0, state.wrath) : -1; buildControls(); }));
+  if (state.wrath >= 0) controls.append(slider('WRATH', () => state.wrath, (v) => { state.wrath = v; }, 0, 3, 1));
   controls.append(h2('LADDER'));
   controls.append(ladderTable());
   const row = document.createElement('div');
@@ -179,7 +195,8 @@ function buildControls(): void {
 // The exact shape of src/data/ladder.ts entries, plus the player model, so
 // the chosen numbers can be pasted back without translation.
 function exportJson(): string {
-  return JSON.stringify({ ladder: state.ladder, player: state.player, target: state.target, upgrades: state.upgrades }, null, 2);
+  return JSON.stringify({ ladder: state.ladder, player: state.player, target: state.target, upgrades: state.upgrades,
+    synergies: state.synergies, hardcore: state.hardcore, wrath: state.wrath }, null, 2);
 }
 
 buildControls();

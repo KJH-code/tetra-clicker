@@ -19,6 +19,7 @@ describe('gap classification', () => {
 describe('world time with a fake clock', () => {
   function worldWithBoard(): World {
     const w = new World(1);
+    w.awardAchievements = false; // exact amounts
     w.economy.balance = 1000;
     w.buy('single');
     w.economy.balance = 0;

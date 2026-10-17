@@ -3,6 +3,8 @@ import { SDF_INSTANT, SOFT_DROP_CELLS_PER_SECOND_PER_SDF, type HandlingSettings,
 
 export type Action = keyof KeyBindings;
 
+const TOUCH = 'Touch:';
+
 // What a key press means right now: play, start a round, or resume one.
 export type InputGate = 'play' | 'start' | 'resume';
 
@@ -38,7 +40,22 @@ export class InputHandler {
     if (!on) this.releaseAll();
   }
 
+  // On-screen buttons press the same actions as keys, under a code of their
+  // own, so DAS, ARR and soft drop behave exactly as on a keyboard.
+  press(action: Action): void {
+    this.keyDown(`${TOUCH}${action}`);
+  }
+
+  release(action: Action): void {
+    this.keyUp(`${TOUCH}${action}`);
+  }
+
+  private held(action: Action): boolean {
+    return this.down.has(`${TOUCH}${action}`) || this.settings.keys[action].some((k) => this.down.has(k));
+  }
+
   private actionFor(code: string): Action | null {
+    if (code.startsWith(TOUCH)) return code.slice(TOUCH.length) as Action;
     const keys = this.settings.keys;
     for (const action of Object.keys(keys) as Action[]) {
       if (keys[action].includes(code)) return action;
@@ -47,12 +64,17 @@ export class InputHandler {
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {
-    if (!this.active) return;
-    const action = this.actionFor(e.code);
-    if (!action) return;
+    if (!this.active || !this.actionFor(e.code)) return;
     e.preventDefault();
-    if (this.down.has(e.code)) return; // OS key repeat; DAS handles repeats
-    this.down.add(e.code);
+    this.keyDown(e.code);
+  };
+
+  private keyDown(code: string): void {
+    if (!this.active) return;
+    const action = this.actionFor(code);
+    if (!action) return;
+    if (this.down.has(code)) return; // OS key repeat; DAS handles repeats
+    this.down.add(code);
     // Between rounds or while paused, the first key only starts or resumes:
     // it should not also move a piece the player has not looked at yet.
     const gate = this.host.gate?.() ?? 'play';
@@ -81,22 +103,25 @@ export class InputHandler {
       case 'rotate180': game.rotate180(); break;
       case 'hold': game.swapHold(); break;
     }
-  };
+  }
 
   private onKeyUp = (e: KeyboardEvent): void => {
-    if (!this.down.delete(e.code)) return;
-    const action = this.actionFor(e.code);
+    this.keyUp(e.code);
+  };
+
+  private keyUp(code: string): void {
+    if (!this.down.delete(code)) return;
+    const action = this.actionFor(code);
     if (action === 'left' || action === 'right') {
       const dir = action === 'left' ? -1 : 1;
       if (this.horizontal && this.horizontal.dir === dir) {
         // If the other direction is still held, DAS restarts for it.
-        const other = dir === -1 ? 'right' : 'left';
-        const stillHeld = this.settings.keys[other].some((k) => this.down.has(k));
+        const stillHeld = this.held(dir === -1 ? 'right' : 'left');
         this.horizontal = stillHeld ? { dir: -dir as -1 | 1, heldMs: 0, repeatMs: 0 } : null;
         if (stillHeld) this.move(-dir as -1 | 1);
       }
     }
-  };
+  }
 
   private releaseAll(): void {
     this.down.clear();
@@ -135,7 +160,7 @@ export class InputHandler {
         }
       }
     }
-    const softHeld = this.settings.keys.softDrop.some((k) => this.down.has(k));
+    const softHeld = this.held('softDrop');
     if (softHeld) {
       if (this.settings.sdf >= SDF_INSTANT) {
         while (this.host.game.softDrop()) { /* instant */ }

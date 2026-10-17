@@ -23,6 +23,7 @@ describe('economy simulator', () => {
     const third = r.purchases.find((p) => p.id === 'single' && p.n === 3)!;
     expect(third).toBeDefined();
     const w = new World(1);
+    w.awardAchievements = false; // the simulator has none
     w.economy.balance = 1e9;
     w.buy('single'); w.buy('single');
     // The third copy costs what the game charges after two are owned.
@@ -81,5 +82,46 @@ describe('economy simulator', () => {
     const off = simulate(base({ buildings: LADDER, horizonSeconds: 7 * 86_400, upgrades: false }));
     expect(off.purchases.every((p) => p.kind !== 'upgrade')).toBe(true);
     expect(r.finalIncome).toBeGreaterThan(off.finalIncome);
+  });
+});
+
+describe('simulator options', () => {
+  const full = (over: Partial<SimParams> = {}): SimParams => ({
+    buildings: LADDER, player: { ...DEFAULT_PLAYER }, horizonSeconds: 2 * 86_400, target: { ...DEFAULT_TARGET }, ...over,
+  });
+  const at = (r: ReturnType<typeof simulate>, hours: number) => r.series.find((s) => s.t >= hours * 3600)!;
+
+  it('synergies are bought and raise income', () => {
+    const plain = simulate(full());
+    const syn = simulate(full({ synergies: true }));
+    expect(syn.purchases.some((p) => p.id.startsWith('syn_'))).toBe(true);
+    expect(plain.purchases.some((p) => p.id.startsWith('syn_'))).toBe(false);
+    expect(at(syn, 24).bots).toBeGreaterThan(at(plain, 24).bots);
+  });
+
+  it('hardcore doubles manual pay, triples risk weight, lives run three levels up', () => {
+    const plain = simulate(full());
+    const hc = simulate(full({ hardcore: true }));
+    expect(hc.riskWeight).toBe(3);
+    expect(plain.riskWeight).toBe(1);
+    // Manual at level 7 ×2 against level 4 ×1, before any upgrade.
+    expect(hc.series[0]!.manualActive / plain.series[0]!.manualActive).toBeCloseTo((7 * 2) / 4, 6);
+    expect(hc.manualLines).toBeGreaterThan(plain.manualLines);
+  });
+
+  it('luck adds income; a full wrath stage adds about 1.2× what golden pieces do', () => {
+    const none = simulate(full());
+    const golden = simulate(full({ wrath: 0 }));
+    const wrath = simulate(full({ wrath: 3 }));
+    expect(at(none, 24).luck).toBe(0);
+    expect(at(golden, 24).luck).toBeGreaterThan(0);
+    expect(golden.finalIncome).toBeGreaterThan(none.finalIncome);
+    // Per Line of bot income, so the runs' different ladders compare.
+    for (const h of [5, 24, 48]) {
+      const g = at(golden, h).luck / at(golden, h).bots;
+      const w = at(wrath, h).luck / at(wrath, h).bots;
+      expect(w / g).toBeGreaterThan(1.1);
+      expect(w / g).toBeLessThan(1.3);
+    }
   });
 });

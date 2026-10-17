@@ -1,10 +1,15 @@
 import { Economy } from './economy';
-import type { Effect } from './effects';
+import { evaluate, type Effect } from './effects';
 import { tag } from './tags';
 import { ATTACK } from '../data/attackTable';
 import type { LadderEntry } from '../data/ladder';
 import { milestonesFor, MANUAL_UPGRADES, MANUAL_SHARE_UPGRADES, type UpgradeDef } from '../data/upgrades';
 import { upgradeEffects } from '../data/index';
+import { UPGRADES } from '../data/upgrades';
+import { SYNERGIES } from '../data/synergies';
+import { HARDCORE_EFFECTS } from '../data/hardcore';
+import { WRATH } from '../data/golden';
+import { averageVault, goldenMeanSeconds, goldenValue, wrathValue } from './luck';
 
 // Economy simulator: how fast a player climbs the building ladder under a
 // given set of numbers. Bots are not run; each board earns at the same rate
@@ -39,6 +44,14 @@ export interface SimParams {
   // rule buffs are left out: a 0.5 PPS singles-and-doubles player barely
   // triggers them.
   upgrades?: boolean;
+  // Synergies researched and bought like any upgrade. Link synergies pay
+  // nothing here: the model player clears singles, never a tetris or PC.
+  synergies?: boolean;
+  // A hardcore run: its manual ×2 and risk ×3, and lives three levels higher.
+  hardcore?: boolean;
+  // Golden pieces, a WRATH stage 0..III of them coming as wrath pieces
+  // (research assumed). Left out, luck is not modelled at all.
+  wrath?: number;
 }
 
 export interface Purchase {
@@ -54,6 +67,11 @@ export interface Sample {
   t: number;
   balance: number;
   income: number; // bots + manual, Lines per second
+  bots: number;
+  // Manual Lines per second while the player is at the board (the focus
+  // pace), whatever the share of the day they play.
+  manualActive: number;
+  luck: number; // golden and wrath pieces, at the player's share of the day
 }
 
 export interface SimResult {
@@ -65,6 +83,8 @@ export interface SimResult {
   finalIncome: number;
   // Lines earned by hand over the run, what risk weight is built from.
   manualLines: number;
+  // Risk weight multiplier the run's effects give (×3 hardcore).
+  riskWeight: number;
 }
 
 // The ladder prices were fitted to this player, at an average life level of 4.
@@ -87,8 +107,8 @@ export function ladderUpgrades(ladder: BuildingParams[]): UpgradeDef[] {
 }
 
 class LadderEconomy extends Economy {
-  constructor(private readonly ladder: BuildingParams[], upgrades: UpgradeDef[]) {
-    super([...ladder.flatMap(effectsFor), ...upgradeEffects(upgrades)], upgrades);
+  constructor(private readonly ladder: BuildingParams[], upgrades: UpgradeDef[], extra: Effect[] = []) {
+    super([...ladder.flatMap(effectsFor), ...upgradeEffects(upgrades), ...extra], upgrades);
   }
   override price(id: string): number {
     const def = this.ladder.find((b) => b.id === id);
@@ -97,17 +117,28 @@ class LadderEconomy extends Economy {
   }
 }
 
-function manualRate(p: PlayerParams, t: number): number {
-  const share = t < p.focusMinutes * 60 ? 1 : p.dailyMinutes / 1440;
-  return p.pps * p.linesPerPiece * share * (p.avgLevel ?? 1);
+// Share of the time the player is at the board.
+function playShare(p: PlayerParams, t: number): number {
+  return t < p.focusMinutes * 60 ? 1 : p.dailyMinutes / 1440;
 }
+
+function manualRate(p: PlayerParams, t: number, levelBonus = 0): number {
+  return p.pps * p.linesPerPiece * playShare(p, t) * ((p.avgLevel ?? 1) + levelBonus);
+}
+
+const multiplierOf = (eco: Economy, target: string): number => evaluate(eco.effects, target, [], eco, 1);
 
 export let lastIterations = 0;
 
 export function simulate(params: SimParams): SimResult {
   const { buildings, player, horizonSeconds, target } = params;
-  const upgrades = params.upgrades === false ? [] : ladderUpgrades(buildings);
-  const eco = new LadderEconomy(buildings, upgrades);
+  const synergies = params.synergies ? UPGRADES.filter((u) => u.group === 'synergy' && u.unlock.every((c) => c.type !== 'owned' || buildings.some((b) => b.id === c.id))) : [];
+  const upgrades = [...(params.upgrades === false ? [] : ladderUpgrades(buildings)), ...synergies];
+  const eco = new LadderEconomy(buildings, upgrades, params.hardcore ? HARDCORE_EFFECTS : []);
+  for (const s of SYNERGIES) eco.meta.prestige.add(s.research);
+  eco.meta.hardcore = !!params.hardcore;
+  // Hardcore lives start three levels up; the model's average moves with them.
+  const levelBonus = params.hardcore ? 3 : 0;
   const botTags = (id: string) => [tag.board('auto'), tag.building(id), tag.clear(1)];
   const manualTags = [tag.board('manual')];
   const botIncome = (): number =>
@@ -115,10 +146,21 @@ export function simulate(params: SimParams): SimResult {
   // The model player clears singles, worth two Lines a row; each row also
   // pays the share of bot income, and the level multiplies both.
   const manualIncome = (at: number): number => {
-    const rate = manualRate(player, at);
+    const rate = manualRate(player, at, levelBonus);
     return rate * eco.incomeMultiplier(manualTags) + (rate / ATTACK.normal[1]) * eco.manualShare() * botIncome();
   };
-  const income = (at: number): number => botIncome() + manualIncome(at);
+  // Golden and wrath pieces appear only while a life runs, so at the
+  // player's share of the day; each is worth its expected value.
+  const rowsPerSecond = (player.pps * player.linesPerPiece) / ATTACK.normal[1];
+  const wrathChance = params.wrath === undefined ? 0 : WRATH.chance[Math.min(WRATH.chance.length - 1, params.wrath)] ?? 0;
+  const luckIncome = (at: number): number => {
+    if (params.wrath === undefined) return 0;
+    const manual = manualIncome(0);
+    const state = { bots: botIncome(), manual, vault: averageVault(manual, rowsPerSecond) };
+    const ev = (1 - wrathChance) * goldenValue(state) + wrathChance * wrathValue(state);
+    return (playShare(player, at) * ev) / goldenMeanSeconds;
+  };
+  const income = (at: number): number => botIncome() + manualIncome(at) + luckIncome(at);
   const unlocked = (b: BuildingParams): boolean => !b.requires || eco.owned(b.requires) > 0;
 
   // Income a purchase would add at time `at`, measured by applying it and
@@ -153,7 +195,7 @@ export function simulate(params: SimParams): SimResult {
   const sampleStep = 1.08;
 
   const record = (): void => {
-    series.push({ t, balance, income: income(t) });
+    series.push({ t, balance, income: income(t), bots: botIncome(), manualActive: manualIncome(0), luck: luckIncome(t) });
   };
   // Advance the clock at a constant rate, keeping the manual-Lines stat that
   // unlocks the manual upgrades.
@@ -237,5 +279,6 @@ export function simulate(params: SimParams): SimResult {
     finalBalance: balance,
     finalIncome: income(t),
     manualLines: eco.stats.manualLines,
+    riskWeight: multiplierOf(eco, 'risk_weight'),
   };
 }

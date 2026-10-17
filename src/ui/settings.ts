@@ -1,7 +1,8 @@
 import { ACTION_LABELS, DEFAULT_HANDLING, HANDLING_LIMITS, SDF_INSTANT, type HandlingSettings, type KeyBindings } from '../data/handling';
 
-// DAS / ARR / SDF and key rebinding, nothing else: the spec keeps the
-// options list this short on purpose.
+// DAS / ARR / SDF, key rebinding and sound. The spec keeps the options list
+// short on purpose; volume is the one addition, since synthesized cues
+// with no way to quiet them would drive players to mute the tab.
 export class SettingsPanel {
   private listening: keyof KeyBindings | null = null;
 
@@ -58,6 +59,19 @@ export class SettingsPanel {
     box.append(this.slider('DAS', 'das', 'ms'));
     box.append(this.slider('ARR', 'arr', 'ms'));
     box.append(this.slider('SDF', 'sdf', '×'));
+    box.append(h2('SOUND'));
+    const sound = this.slider('VOL', 'volume', '');
+    const mute = document.createElement('button');
+    mute.className = 'btn mute' + (this.settings.muted ? ' on' : '');
+    mute.textContent = this.settings.muted ? 'MUTED' : 'MUTE';
+    mute.addEventListener('click', () => {
+      this.settings.muted = !this.settings.muted;
+      this.onChange(this.settings);
+      this.render();
+    });
+    sound.append(mute);
+    sound.classList.add('with-btn');
+    box.append(sound);
     box.append(h2('KEYS'));
     const keys = document.createElement('div');
     keys.className = 'keys';
@@ -80,7 +94,9 @@ export class SettingsPanel {
     reset.className = 'btn';
     reset.textContent = 'DEFAULTS';
     reset.addEventListener('click', () => {
-      Object.assign(this.settings, structuredClone(DEFAULT_HANDLING));
+      // Defaults for handling and sound; the tutorial stays where it got to.
+      const tutorial = this.settings.tutorial;
+      Object.assign(this.settings, structuredClone(DEFAULT_HANDLING), { tutorial });
       this.onChange(this.settings);
       this.render();
     });
@@ -93,7 +109,7 @@ export class SettingsPanel {
     this.overlay.replaceChildren(box);
   }
 
-  private slider(label: string, key: 'das' | 'arr' | 'sdf', unit: string): HTMLElement {
+  private slider(label: string, key: 'das' | 'arr' | 'sdf' | 'volume', unit: string): HTMLElement {
     const row = document.createElement('div');
     row.className = 'slider';
     const l = document.createElement('span');

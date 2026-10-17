@@ -17,6 +17,7 @@ function run(w: World, ms: number, from = 0): number {
 // Bots running, a round going, the manual board one I away from a tetris.
 function world(seed = 1): World {
   const w = new World(seed);
+  w.awardAchievements = false; // exact amounts
   w.economy.balance = num(1e6);
   w.buy('single');
   w.economy.balance = num(0);
@@ -26,6 +27,7 @@ function world(seed = 1): World {
     queue: ['I', 'O', 'S', 'Z', 'J', 'L', 'T'], rng: 3, combo: -1, b2b: -1, active: null, graceUsed: 0, shieldSpent: false,
   } as GameSnapshot;
   const out = new World(seed, snap);
+  out.awardAchievements = false;
   out.advance(0);
   out.startRound();
   return out;

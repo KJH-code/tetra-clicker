@@ -14,10 +14,11 @@ import { upgradeById } from '../data/upgrades';
 import { Round, type RoundSnapshot } from './round';
 import { Buffs, type BuffState } from './buffs';
 import { Payout } from './payout';
-import { BUFFS, type GoldenOutcome } from '../data/golden';
+import { BUFFS, WRATH, type GoldenOutcome } from '../data/golden';
 import { PRESTIGE, TECH_CHECKS, prestigeById, prestigeRequires } from '../data/prestige';
 import { crownGain, metaFrom, metaSnapshot, type MetaSnapshot } from './prestige';
 import { LEVELS } from '../data/levels';
+import { ACHIEVEMENTS } from '../data/achievements';
 import { add, mul, num, toNumber, type Num } from './num';
 import type { Placement } from './board';
 
@@ -64,12 +65,14 @@ export type WorldEvent =
   | { type: 'garbage'; rows: number }
   | { type: 'paused' }
   | { type: 'buff'; id: string; ms: number }
-  | { type: 'goldenSpawn' }
-  | { type: 'golden'; outcome: GoldenOutcome; amount: Num }
-  | { type: 'goldenLost' }
+  | { type: 'goldenSpawn'; wrath: boolean }
+  // `amount` is what lucky paid, or what ruin took.
+  | { type: 'golden'; outcome: GoldenOutcome; amount: Num; wrath: boolean }
+  | { type: 'goldenLost'; wrath: boolean }
   | { type: 'ascended'; crowns: number }
   | { type: 'newRun'; startLines: number }
   | { type: 'hardcoreOver'; crowns: number }
+  | { type: 'achievement'; id: string }
   | { type: 'slept'; seconds: number };
 
 export class World {
@@ -94,6 +97,11 @@ export class World {
   buffs: Buffs;
   private toBalance = new Payout();
   private toVault = new Payout();
+  // Game time until the next sweep of the achievement list.
+  private achievementMs = 0;
+  // Tests of exact income turn this off: each achievement's +1% would blur
+  // the amounts they check.
+  awardAchievements = true;
 
   constructor(seed: number, snapshot?: WorldSnapshot) {
     this.seed = seed;
@@ -191,15 +199,21 @@ export class World {
       this.economy.balance = add(this.economy.balance, final);
     }
     recordManual(this.economy.stats, result, Number(final));
+    this.economy.stats.linesEarned += toNumber(final);
     // Five back-to-back clears in a row: the chain counter reads 4 after the fifth.
     if (result.b2bExtended && this.manual.b2b === 4) this.economy.stats.b2b5 += 1;
     this.events.push({ type: 'manualLock', result, earned: final, tags: earned.tags, at });
     // The golden piece pays only when it clears a line; placed flat it is gone.
     // It triggers after its own clear is paid, so a clear frenzy starts on
     // the next clear, and lucky Lines sit in the vault at the same risk.
+    if (result.lines === 4 && this.buffs.active.some((b) => b.id === 'clot')) this.economy.stats.clotTetrises += 1;
     if (result.golden) {
-      if (result.lines > 0) this.triggerGolden();
-      else this.events.push({ type: 'goldenLost' });
+      if (result.lines > 0 && result.wrath) this.triggerWrath();
+      else if (result.lines > 0) this.triggerGolden();
+      else {
+        this.economy.stats.goldensLost += 1;
+        this.events.push({ type: 'goldenLost', wrath: !!result.wrath });
+      }
     }
     this.triggerSynergies(result);
     if (result.topped && this.round.active) {
@@ -212,6 +226,7 @@ export class World {
       if (levelUp) this.events.push({ type: 'levelUp', level: this.round.level });
       if (checkpoints > 0) this.checkpoint(checkpoints);
     }
+    this.checkAchievements();
     return final;
   }
 
@@ -242,7 +257,7 @@ export class World {
     let amount = num(0);
     if (outcome.kind === 'buff') {
       this.grantBuff(outcome.buff);
-    } else {
+    } else if (outcome.kind === 'lucky') {
       const exact = toNumber(this.incomePerSecond()) * outcome.seconds;
       if (this.round.active) {
         amount = num(this.toVault.take(exact));
@@ -253,8 +268,35 @@ export class World {
         amount = num(this.toBalance.take(exact));
         this.economy.balance = add(this.economy.balance, amount);
       }
+      this.economy.stats.linesEarned += toNumber(amount);
     }
-    this.events.push({ type: 'golden', outcome, amount });
+    this.events.push({ type: 'golden', outcome, amount, wrath: false });
+  }
+
+  private triggerWrath(): void {
+    const fx = this.economy.effects;
+    const outcome = this.round.drawOutcome(WRATH.outcomes, (o) => evaluate(fx, 'wrath_weight', [`wrath:${o.id}`], this.economy, o.weight));
+    this.economy.stats.wraths += 1;
+    let amount = num(0);
+    if (outcome.kind === 'buff') {
+      this.grantBuff(outcome.buff);
+    } else if (outcome.kind === 'ruin') {
+      this.economy.stats.ruins += 1;
+      const share = Math.min(1, Math.max(0, this.fx('ruin_share', outcome.share)));
+      const vault = this.round.vault;
+      const lost = Math.floor(vault * share + 1e-9);
+      if (vault > 0) this.round.vaultRisk *= 1 - lost / vault;
+      this.round.vault = vault - lost;
+      amount = num(lost);
+    }
+    this.events.push({ type: 'golden', outcome, amount, wrath: true });
+  }
+
+  // Chance a due golden piece comes as a wrath piece: none until the WRATH
+  // prestige chain opens them, then by how many wrath upgrades this run owns.
+  wrathChance(): number {
+    if (flagCount(this.economy.effects, 'wrath_pieces', this.economy) === 0) return 0;
+    return WRATH.chance[Math.min(WRATH.chance.length - 1, this.wrath())] ?? 0;
   }
 
   goldenScale(): number {
@@ -329,7 +371,10 @@ export class World {
       this.fx('garbage_interval', 1), this.fx('garbage_from_level', LEVELS.garbageFromLevel));
     const stats = this.economy.stats;
     stats.maxLifeSeconds = Math.max(stats.maxLifeSeconds, Math.floor(this.round.elapsedMs / 1000));
-    if (golden && this.manual.markGolden(this.manual.rules.nextCount - 1)) this.events.push({ type: 'goldenSpawn' });
+    if (golden) {
+      const wrath = this.round.drawWrath(this.wrathChance());
+      if (this.manual.markGolden(this.manual.rules.nextCount - 1, wrath)) this.events.push({ type: 'goldenSpawn', wrath });
+    }
     for (const hole of garbage) {
       if (this.manual.addGarbage(hole)) { this.endRound(); return; }
     }
@@ -388,9 +433,13 @@ export class World {
 
   // A hardcore top-out lands here directly, crowns or not.
   private doAscend(): number {
+    // The run's last state counts before it is wiped.
+    this.checkAchievements();
     const gain = this.crownPreview();
     const meta = this.economy.meta;
+    if (toNumber(this.economy.balance) === 0) meta.emptyAscensions += 1;
     if (meta.hardcore) {
+      meta.hardcoreAscensions += 1;
       const s = this.economy.stats;
       meta.hardcoreBest = { level: Math.max(meta.hardcoreBest.level, s.maxLevel), rows: Math.max(meta.hardcoreBest.rows, s.maxLifeRows) };
     }
@@ -409,6 +458,7 @@ export class World {
     this.toVault.carry = 0;
     this.applyRules();
     this.events.push({ type: 'ascended', crowns: gain });
+    this.checkAchievements();
     return gain;
   }
 
@@ -480,6 +530,7 @@ export class World {
       this.boardsCreated++;
     }
     this.events.push({ type: 'bought', buildingId: id, owned: this.economy.owned(id) });
+    this.checkAchievements();
     return true;
   }
 
@@ -497,6 +548,7 @@ export class World {
     const exact = evaluate(this.economy.effects, 'income', tags, this.economy, amount * this.buffs.multiplier(tags, this.economy));
     const paid = num(this.toBalance.take(exact));
     this.economy.balance = add(this.economy.balance, paid);
+    this.economy.stats.linesEarned += toNumber(paid);
     return paid;
   }
 
@@ -572,13 +624,32 @@ export class World {
       }
     }
     this.buffs.tick(dtMs);
+    // Bot Lines add up between the events that check; a sweep a second
+    // catches thresholds they cross.
+    this.achievementMs += dtMs;
+    if (this.achievementMs >= 1000) {
+      this.achievementMs = 0;
+      this.checkAchievements();
+    }
   }
 
-  // Start a buff, scaled by upgrades that lengthen buffs.
+  // Mark every achievement whose conditions now hold. Met ones stay met.
+  checkAchievements(): void {
+    const meta = this.economy.meta;
+    if (!this.awardAchievements || meta.achievements.size === ACHIEVEMENTS.length) return;
+    for (const a of ACHIEVEMENTS) {
+      if (meta.achievements.has(a.id) || !a.when.every((c) => conditionMet(c, this.economy))) continue;
+      meta.achievements.add(a.id);
+      this.events.push({ type: 'achievement', id: a.id });
+    }
+  }
+
+  // Start a buff, scaled by upgrades that lengthen buffs (all of them, or
+  // one, filtered on `buff:<id>`).
   grantBuff(id: string): void {
     const def = BUFFS[id];
     if (!def) return;
-    const ms = evaluate(this.economy.effects, 'buff_duration', [], this.economy, def.durationMs);
+    const ms = evaluate(this.economy.effects, 'buff_duration', [`buff:${id}`], this.economy, def.durationMs);
     this.buffs.grant(id, ms);
     this.events.push({ type: 'buff', id, ms });
   }
@@ -587,6 +658,7 @@ export class World {
     const earned = num(this.toBalance.take(toNumber(mul(this.incomePerSecond(), num(seconds)))));
     if (toNumber(earned) > 0) {
       this.economy.balance = add(this.economy.balance, earned);
+      this.economy.stats.linesEarned += toNumber(earned);
     }
     this.events.push({ type: 'catchUp', seconds, earned });
   }

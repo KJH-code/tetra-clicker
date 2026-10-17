@@ -9,6 +9,7 @@ import { LADDER } from '../src/data/ladder';
 // Four rows one I short of full, with bots running so PER SECOND is non-zero.
 function world(upgrades: string[]): World {
   const w = new World(1);
+  w.awardAchievements = false; // exact amounts
   w.economy.balance = num(1e12);
   expect(w.buy('single')).toBe(true);
   const snap = w.snapshot();
@@ -18,6 +19,7 @@ function world(upgrades: string[]): World {
   } as GameSnapshot;
   snap.economy.upgrades = upgrades;
   const out = new World(1, snap);
+  out.awardAchievements = false;
   out.startRound();
   return out;
 }

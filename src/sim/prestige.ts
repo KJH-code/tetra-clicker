@@ -16,6 +16,10 @@ export interface Meta {
   nextHardcore: boolean;
   // Best hardcore life: level reached and rows cleared.
   hardcoreBest: { level: number; rows: number };
+  hardcoreAscensions: number;
+  // Ascensions made with an empty bank (a hidden achievement).
+  emptyAscensions: number;
+  achievements: Set<string>;
 }
 
 export interface MetaSnapshot {
@@ -29,20 +33,30 @@ export interface MetaSnapshot {
   hardcore: boolean;
   nextHardcore: boolean;
   hardcoreBest: { level: number; rows: number };
+  hardcoreAscensions: number;
+  emptyAscensions: number;
+  achievements: string[];
 }
 
 export const emptyMeta = (): Meta => ({
   crowns: 0, crownsEarned: 0, riskBanked: 0, ascensions: 0, prestige: new Set(), lifetime: emptyStats(), ascending: false,
   hardcore: false, nextHardcore: false, hardcoreBest: { level: 0, rows: 0 },
+  hardcoreAscensions: 0, emptyAscensions: 0, achievements: new Set(),
 });
 
 export function metaFrom(s: MetaSnapshot | undefined): Meta {
   if (!s) return emptyMeta();
-  return { ...s, prestige: new Set(s.prestige), lifetime: { ...emptyStats(), ...s.lifetime }, hardcoreBest: { ...s.hardcoreBest } };
+  return {
+    ...emptyMeta(), ...s, prestige: new Set(s.prestige), lifetime: { ...emptyStats(), ...s.lifetime }, hardcoreBest: { ...s.hardcoreBest },
+    achievements: new Set(s.achievements ?? []),
+  };
 }
 
 export function metaSnapshot(m: Meta): MetaSnapshot {
-  return { ...m, prestige: [...m.prestige].sort(), lifetime: { ...m.lifetime }, hardcoreBest: { ...m.hardcoreBest } };
+  return {
+    ...m, prestige: [...m.prestige].sort(), lifetime: { ...m.lifetime }, hardcoreBest: { ...m.hardcoreBest },
+    achievements: [...m.achievements].sort(),
+  };
 }
 
 // Crowns the whole of a lifetime's risk is worth, before tech.

@@ -119,14 +119,23 @@ export class Round {
     return s * 1000 * scale;
   }
 
-  drawOutcome(): GoldenOutcome {
-    const total = GOLDEN.outcomes.reduce((n, o) => n + o.weight, 0);
+  // `weight` lets effects reweigh the table (a prestige step halves CLOT).
+  drawOutcome(table: readonly GoldenOutcome[] = GOLDEN.outcomes, weight: (o: GoldenOutcome) => number = (o) => o.weight): GoldenOutcome {
+    const weights = table.map(weight);
+    const total = weights.reduce((n, w) => n + w, 0);
     let r = this.goldenRng.next() * total;
-    for (const o of GOLDEN.outcomes) {
-      r -= o.weight;
-      if (r < 0) return o;
+    for (let i = 0; i < table.length; i++) {
+      r -= weights[i]!;
+      if (r < 0) return table[i]!;
     }
-    return GOLDEN.outcomes[GOLDEN.outcomes.length - 1]!;
+    return table[table.length - 1]!;
+  }
+
+  // Whether a due golden piece comes as a wrath piece. No draw at all when
+  // wrath pieces are off, so a seed plays the same as before they existed.
+  drawWrath(chance: number): boolean {
+    if (chance <= 0) return false;
+    return this.goldenRng.next() < chance;
   }
 
   end(): void {

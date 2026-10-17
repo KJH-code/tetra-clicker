@@ -50,8 +50,8 @@ export const TECH_CHECKS: TechCheck[] = [
   { id: 'hc_30min', label: 'HARDCORE 30 MINUTES', when: [HC, { type: 'stat', stat: 'maxLifeSeconds', gte: 1800 }] },
 ];
 
-// Prestige upgrades: three chains, bought only on the ascension screen.
-export type Branch = 'production' | 'survival' | 'proportion' | 'synergy';
+// Prestige upgrades: chains, bought only on the ascension screen.
+export type Branch = 'production' | 'survival' | 'proportion' | 'synergy' | 'elder';
 
 export interface PrestigeDef {
   id: string;
@@ -85,6 +85,14 @@ export const PRESTIGE_UPGRADES: PrestigeDef[] = [
     { name: 'TECH CAP +0.5', effects: [{ target: 'tech_cap', op: 'add', value: 0.5 }] },
     { name: 'RISK WEIGHT ×2', effects: [{ target: 'risk_weight', op: 'mul', value: 2 }] },
     { name: 'START LEVEL +2', effects: [{ target: 'start_level', op: 'add', value: 2 }] },
+  ]),
+  // Wrath pieces (shown as WRATH; the id keeps clear of the run upgrades
+  // wrath_1..3): the first step lets them appear at all, the rest soften them.
+  ...branch('elder', [
+    { name: 'WRATH PIECES: wrath upgrades turn golden pieces into wrath pieces', effects: [{ target: 'wrath_pieces', op: 'flag', value: 1 }] },
+    { name: 'ELDER FRENZY LASTS 12 S', effects: [{ target: 'buff_duration', filter: ['buff:elder_frenzy'], op: 'mul', value: 2 }] },
+    { name: 'RUIN TAKES 10%', effects: [{ target: 'ruin_share', op: 'mul', value: 0.5 }] },
+    { name: 'CLOT HALF AS LIKELY', effects: [{ target: 'wrath_weight', filter: ['wrath:clot'], op: 'mul', value: 0.5 }] },
   ]),
   // Research: each opens one synergy for every later run (bought there with
   // Lines). Up the ladder, a crown dearer each step, so they come a few per

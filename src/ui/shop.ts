@@ -2,6 +2,7 @@ import type { World } from '../sim/world';
 import { format } from '../sim/num';
 import { BUILDINGS } from '../data/buildings';
 import { UpgradeChips } from './upgradeChips';
+import { ACHIEVEMENTS } from '../data/achievements';
 
 // Right pane: balance, income, one button per building, settings.
 export class Shop {
@@ -12,8 +13,9 @@ export class Shop {
   private chips: UpgradeChips;
   private crownEl: HTMLElement;
   private ascendBtn: HTMLButtonElement;
+  private achBtn: HTMLButtonElement;
 
-  constructor(private root: HTMLElement, private world: World, onSettings: () => void, onAscend: () => void) {
+  constructor(private root: HTMLElement, private world: World, onSettings: () => void, onAscend: () => void, onAchievements: () => void) {
     root.innerHTML = '';
     const balance = stat('LINES', 'balance');
     const income = stat('PER SECOND', 'income', true);
@@ -48,11 +50,16 @@ export class Shop {
     this.ascendBtn.className = 'btn ascend-btn';
     this.ascendBtn.addEventListener('click', onAscend);
     root.append(this.ascendBtn);
+    const row = el('div', 'btn-row', '');
+    this.achBtn = document.createElement('button');
+    this.achBtn.className = 'btn ach-btn';
+    this.achBtn.addEventListener('click', onAchievements);
     const settings = document.createElement('button');
     settings.className = 'btn';
     settings.textContent = 'SETTINGS';
     settings.addEventListener('click', onSettings);
-    root.append(settings);
+    row.append(this.achBtn, settings);
+    root.append(row);
     this.refresh(true);
   }
 
@@ -78,6 +85,7 @@ export class Shop {
     this.ascendBtn.hidden = preview < 1 && meta.ascensions === 0;
     this.ascendBtn.disabled = !this.world.canAscend();
     this.ascendBtn.textContent = preview >= 1 ? `ASCEND +${preview} CROWN` : 'ASCEND';
+    this.achBtn.textContent = `★ ${meta.achievements.size}/${ACHIEVEMENTS.length}`;
     // Unlocked buildings show in full; only the next locked one is visible,
     // dimmed and unnamed, so the ladder is hinted at one step at a time.
     let lockedShown = false;

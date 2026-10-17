@@ -25,7 +25,18 @@ serves from `/`.
 
 Guideline defaults: ← → move, ↓ soft drop, Space hard drop, ↑ / X rotate CW,
 Z / Ctrl rotate CCW, A 180, Shift / C hold. DAS / ARR / SDF and every key can
-be changed under SETTINGS.
+be changed under SETTINGS, along with the volume (sound is synthesized, no
+files; MUTE silences it).
+
+On a touch screen or a window under 900 px, buttons under the manual board
+play the same actions with the same DAS / ARR (a tap on the board starts or
+resumes a life). Under 900 px the page shows one pane at a time, picked from
+the BOARD / BOTS / SHOP bar at the bottom.
+
+A new save gets a five-step tutorial along the bottom of the manual board:
+start a life, clear a line, buy a building, reach a checkpoint, ascend. Each
+step moves on when the game sees it done (a save that already did one skips
+it); OK hides the current step, TUTORIAL OFF ends it.
 
 ## Lives
 
@@ -87,6 +98,26 @@ time without paying it. LUCKY DAY (15,554, after 7 golden pieces) halves the
 wait; GET LUCKY (155,554, after 27) doubles buff time. Numbers live in
 `src/data/golden.ts`.
 
+- **Wrath pieces.** Once the WRATH prestige chain opens them, a golden piece
+  comes as a wrath piece instead with a chance set by the run's wrath
+  upgrades: 33% at WRATH I, 66% at II, 100% at III. It is dark red with a
+  throbbing rim, follows the golden rules (clear a line or lose it), and
+  draws:
+
+| | chance | effect |
+|---|---|---|
+| ELDER FRENZY | 20% | bots ×666 for 6 s |
+| CLOT | 40% | all income ×0.5 for 66 s |
+| RUIN | 40% | loses 20% of the vault (never the bank) |
+
+On average a wrath piece pays about 1.2× a golden one once bots carry the
+income (from the first ascension on, in the simulator), all of it from ELDER
+FRENZY; four times in five it costs something. The weights were 30 / 35 / 35
+in the first draft, which came out at 1.8×; 20 / 40 / 40 brings it to
+1.18–1.23× across the simulator's 2.5 h to 7 day range. `tests/wrath.test.ts`
+holds it there, using `src/sim/luck.ts`, the expected-value model the
+simulator shares.
+
 ## Prestige
 
 Ascending trades a run for CROWNs. Crowns ever earned =
@@ -100,13 +131,14 @@ many short ones. K is set so the first crown comes after about 2.5 hours.
   10 tetrises, reaching level 10, 3 golden pieces — plus four in hardcore runs
   (below).
 - **Every crown earned** adds 1% to all income, spent or not.
+- **Every achievement** adds 1% too (below).
 - **Resets**: Lines, buildings, run upgrades (wrath too), run stats, round,
   buffs, golden piece. **Stays**: crowns, prestige upgrades, lifetime stats,
   settings.
 
 ASCEND (under the shop, locked during a round) shows the crowns on offer and
 the checklist; ascending opens the prestige shop, which a reload returns to
-until NEW RUN. Three chains, 1 / 3 / 9 / 27 crowns, each step needing the one
+until NEW RUN. Four chains, 1 / 3 / 9 / 27 crowns, each step needing the one
 before:
 
 | production | survival | proportion |
@@ -116,7 +148,11 @@ before:
 | manual ×3 | garbage gaps ×1.25 | risk weight ×2 |
 | all income ×2 | keep 50% of the vault on a top-out | start level +2 |
 
-A fourth chain, SYNERGY, is research: 1, 2, 3 … 8 crowns up the ladder, each
+The fourth, WRATH (ids `elder_1..4`, clear of the run upgrades
+`wrath_1..3`): wrath pieces appear at all → ELDER FRENZY lasts 12 s → RUIN
+takes 10% → CLOT half as likely.
+
+A fifth chain, SYNERGY, is research: 1, 2, 3 … 8 crowns up the ladder, each
 opening one synergy for every later run (below).
 
 Everything is data in `src/data/prestige.ts`.
@@ -169,6 +205,19 @@ less, which the ×1.25 more than covers. A link buff is game time like a
 golden buff, and the same clear again refills it to 30 s. Boards show SYN
 while a synergy they belong to is bought, and the multiplier while a buff
 lifts them. All of it is data in `src/data/synergies.ts`.
+
+### Achievements
+
+57, made from templates in `src/data/achievements.ts`: owning 1 / 10 / 50 /
+100 of each building in a run (36), Lines earned over all runs (1K / 100K /
+10M / 1B), technique counts (TSD 10 / 100, PC 1 / 10, a 10 combo), level
+10 / 15 / 20, ascending 1 / 5 / 25 times, two hardcore ones, and four hidden
+ones that show as ??? until met. Each is met once and kept for good, through
+ascension, and adds 1% to all income (the same shape as crowns). Their
+conditions are the effect engine's own, plus `career`, which reads a stat as
+every finished run plus this one. The world checks them after a manual lock,
+a purchase, an ascension and once a second; a toast announces each, and ★
+N/57 under the shop opens the list.
 
 ## Attack table
 
@@ -338,7 +387,11 @@ formula (`PPS × lines per piece × multiplier`) with the game's own pricing
 and bonus code, under a player model (PPS, lines per piece, an average life
 level that multiplies manual income, a focus window, then a daily allowance)
 and a greedy shortest-payback buyer that also buys
-the milestone, manual ×2 and manual share upgrades (toggle UPGRADES to compare). It plots income
+the milestone, manual ×2 and manual share upgrades (toggle UPGRADES to compare).
+SYNERGIES adds the synergy chips as if researched (link synergies pay
+nothing there: the model player clears singles); HARDCORE applies the
+hardcore effects (manual ×2, risk ×3, lives three levels up); LUCK models
+golden pieces at their expected value, at a WRATH stage 0–III. It plots income
 over time with each building's first purchase, lists unlock times against a
 target of `first × ratio^k`, and exports the numbers as JSON in the shape of
 `src/data/ladder.ts`. The ladder file mirrors the nine shop buildings for
@@ -348,11 +401,14 @@ fitted to.
 ## Save
 
 localStorage, key `tetra-clicker/save`, every 10 s plus on tab hide and
-unload. The file has a `version` (now 7); `src/save/schema.ts` upgrades
+unload. The file has a `version` (now 8); `src/save/schema.ts` upgrades
 older saves step by step, so a version 1 save loads with no upgrades and
 zeroed stats, a version 2 save loads with no round in play, a version 3
 save loads with no buffs or golden piece, a version 4 save has never
 ascended and has its Lines doubled into the whole-number unit, and a
 version 5 save has any round in progress banked in full (lives replaced
 settled rounds) and its settle key dropped, and a version 6 save has only
-ever played normal runs, with no hardcore record.
+ever played normal runs, with no hardcore record, and a version 7 save has
+met no achievements yet (the first sweep awards what it qualifies for) and
+holds no wrath piece. Lines earned were not counted before version 8, so that
+total starts at the upgrade.

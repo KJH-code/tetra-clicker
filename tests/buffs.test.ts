@@ -8,6 +8,7 @@ const STEP = 1000 / 60;
 
 function botWorld(): World {
   const w = new World(1);
+  w.awardAchievements = false; // exact amounts
   w.economy.balance = num(1e6);
   w.buy('single');
   w.economy.balance = num(0);
@@ -22,6 +23,7 @@ function readyManual(w: World): World {
     queue: ['I', 'O', 'S', 'Z', 'J', 'L', 'T'], rng: 3, combo: -1, b2b: -1, active: null, graceUsed: 0, shieldSpent: false,
   } as GameSnapshot;
   const out = new World(1, snap);
+  out.awardAchievements = false;
   out.advance(0);
   out.startRound();
   return out;

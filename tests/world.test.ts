@@ -22,6 +22,7 @@ describe('building ladder in the shop', () => {
 
   it('each tier unlocks only after the previous one is owned', () => {
     const w = new World(1);
+    w.awardAchievements = false; // exact income
     w.economy.balance = 1e9;
     expect(w.isUnlocked('single')).toBe(true);
     expect(w.isUnlocked('double')).toBe(false);

@@ -42,10 +42,18 @@ export class Economy implements EffectContext {
   // Run statistics first; the prestige counters (crownsEarned, ascensions)
   // are readable the same way so effects can stack on them.
   stat(name: string): number {
+    if (name === 'achievementCount') return this.meta.achievements.size;
     const run = (this.stats as unknown as Record<string, number>)[name];
     if (run !== undefined) return run;
     const meta = (this.meta as unknown as Record<string, unknown>)[name];
     return typeof meta === 'number' ? meta : 0;
+  }
+
+  // Lifetime plus this run; a "max" counter is the larger of the two.
+  career(name: string): number {
+    const life = (this.meta.lifetime as unknown as Record<string, number>)[name] ?? 0;
+    const run = (this.stats as unknown as Record<string, number>)[name] ?? 0;
+    return name.startsWith('max') ? Math.max(life, run) : life + run;
   }
 
   hasUpgrade(id: string): boolean {

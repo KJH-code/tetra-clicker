@@ -12,13 +12,17 @@ import { tag } from './sim/tags';
 import { BoardRenderer, type BoardView } from './render/boardRenderer';
 import { Fx } from './render/fx';
 import { animatedPlacement, isLanded, type BotAnimation } from './render/botAnim';
-import { GOLD, PIECE_COLORS } from './render/theme';
+import { GOLD, PIECE_COLORS, WRATH_RIM } from './render/theme';
 import { BUFFS } from './data/golden';
 import { drawRoundHud } from './render/roundHud';
-import { InputHandler } from './ui/input';
+import { InputHandler, type Action } from './ui/input';
 import { Shop } from './ui/shop';
 import { SettingsPanel } from './ui/settings';
+import { AchievementsPanel } from './ui/achievements';
+import { achievementById } from './data/achievements';
 import { AscendPanel } from './ui/ascend';
+import { Sound, type Cue } from './ui/sound';
+import { TutorialBubble, advance as tutorialAdvance, currentStep as tutorialStep } from './ui/tutorial';
 import { installEngine } from './sim/bot/ccWasm';
 import engineUrl from './engine/cold-clear.wasm?url';
 import { BotPrefetch } from './engine/botPrefetch';
@@ -46,7 +50,23 @@ if (import.meta.env.DEV) Object.assign(window, { prefetch, world });
 // --- manual board ---------------------------------------------------------
 const manualPane = document.getElementById('manual-pane')!;
 const manualCanvas = document.getElementById('manual-board') as HTMLCanvasElement;
-const manual = new BoardRenderer(manualCanvas, { cell: 28, leftCells: 5, rightCells: 5 });
+let manual = new BoardRenderer(manualCanvas, { cell: 28, leftCells: 5, rightCells: 5 });
+// The board takes the largest cell (up to 28) that fits its pane, leaving
+// room for the touch buttons when they show; rebuilt only when that changes.
+const MANUAL_COLS = 20; // hold 5 + well 10 + next 5
+const MANUAL_ROWS = 22;
+function fitManual(): void {
+  const touch = document.getElementById('touch')!;
+  const touchH = touch.offsetHeight > 0 ? touch.offsetHeight + 10 : 0;
+  const w = manualPane.clientWidth - 24;
+  const h = manualPane.clientHeight - 24 - touchH;
+  if (w <= 0 || h <= 0) return;
+  // On a wide screen the pane's width follows the canvas, so only height
+  // limits it there; a phone's pane is the screen's width.
+  const narrow = matchMedia('(max-width: 900px)').matches;
+  const cell = Math.max(10, Math.min(28, narrow ? Math.floor(w / MANUAL_COLS) : 28, Math.floor(h / MANUAL_ROWS)));
+  if (cell !== manual.layout.cell) manual = new BoardRenderer(manualCanvas, { cell, leftCells: 5, rightCells: 5 });
+}
 const manualFx = new Fx();
 
 // --- auto boards ----------------------------------------------------------
@@ -100,9 +120,39 @@ window.addEventListener('blur', () => world.pauseRound());
 input.attach(window);
 input.setActive(true);
 
+// Touch buttons press the input's actions directly; a tap on the board itself
+// starts or resumes a life, as any key does.
+for (const btn of document.querySelectorAll<HTMLButtonElement>('#touch button')) {
+  const action = btn.dataset['action'] as Action;
+  const up = (): void => { btn.classList.remove('pressed'); input.release(action); };
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    btn.setPointerCapture(e.pointerId);
+    btn.classList.add('pressed');
+    input.press(action);
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) btn.addEventListener(ev, up);
+}
+manualCanvas.addEventListener('pointerdown', () => {
+  if (!world.round.active) world.startRound();
+  else if (world.round.paused) world.resumeRound();
+});
+
+// Phones show one pane at a time.
+function showTab(tab: string): void {
+  document.body.dataset['tab'] = tab;
+  for (const b of document.querySelectorAll<HTMLButtonElement>('#tabs button')) b.classList.toggle('on', b.dataset['tab'] === tab);
+  fitManual();
+}
+for (const b of document.querySelectorAll<HTMLButtonElement>('#tabs button')) b.addEventListener('click', () => showTab(b.dataset['tab']!));
+showTab('board');
+window.addEventListener('resize', fitManual);
+
 const shopRoot = document.getElementById('shop-pane')!;
 const settingsOverlay = document.getElementById('settings-overlay')!;
-const settingsPanel = new SettingsPanel(settingsOverlay, settings, () => saveNow(), (open) => input.setActive(!open));
+const sound = new Sound(settings.volume, settings.muted);
+for (const ev of ['keydown', 'pointerdown'] as const) window.addEventListener(ev, () => sound.unlock(), { capture: true });
+const settingsPanel = new SettingsPanel(settingsOverlay, settings, () => { sound.set(settings.volume, settings.muted); saveNow(); }, (open) => input.setActive(!open));
 const ascendOverlay = document.getElementById('ascend-overlay')!;
 // Built before the shop so a save made on the prestige shop reopens it.
 let shop: Shop;
@@ -112,7 +162,12 @@ const ascendPanel = new AscendPanel(ascendOverlay, world, (open) => input.setAct
   shop.refresh(true);
   saveNow();
 });
-shop = new Shop(shopRoot, world, () => settingsPanel.open(), () => ascendPanel.confirm());
+// A returning save skips the steps it already shows done.
+settings.tutorial = tutorialStep(settings.tutorial, world);
+const tutorial = new TutorialBubble(manualPane, () => settings.tutorial, (step) => { settings.tutorial = step; saveNow(); });
+tutorial.refresh();
+const achievementsPanel = new AchievementsPanel(document.getElementById('achievements-overlay')!, world, (open) => input.setActive(!open));
+shop = new Shop(shopRoot, world, () => settingsPanel.open(), () => ascendPanel.confirm(), () => achievementsPanel.open());
 
 // --- save -----------------------------------------------------------------
 function snapshot(): SaveData {
@@ -127,11 +182,45 @@ function mergeSettings(s: Partial<HandlingSettings> | undefined): HandlingSettin
   // Only actions that still exist: an old save may bind keys to one that was removed.
   const keys = { ...d.keys };
   for (const a of Object.keys(keys) as (keyof typeof keys)[]) if (s.keys?.[a]) keys[a] = s.keys[a];
-  return { das: s.das ?? d.das, arr: s.arr ?? d.arr, sdf: s.sdf ?? d.sdf, keys };
+  // Saves from before sound and the tutorial take the defaults, except that
+  // a player who has saved before has seen the game: the tutorial still
+  // skips the steps their save already shows done.
+  return {
+    das: s.das ?? d.das, arr: s.arr ?? d.arr, sdf: s.sdf ?? d.sdf, keys,
+    volume: s.volume ?? d.volume, muted: s.muted ?? d.muted, tutorial: s.tutorial ?? d.tutorial,
+  };
 }
 
 // --- events → effects -----------------------------------------------------
+function cueFor(e: WorldEvent): Cue | null {
+  switch (e.type) {
+    case 'manualLock': {
+      const r = e.result;
+      if (r.lines === 0) return 'lock';
+      if (r.perfectClear) return 'pc';
+      if (r.spin === 'full') return 'tspin';
+      return (['clear1', 'clear2', 'clear3', 'clear4'] as const)[Math.min(4, r.lines) - 1]!;
+    }
+    case 'levelUp': return 'levelUp';
+    case 'checkpoint': return 'checkpoint';
+    case 'roundEnd': return 'topOut';
+    case 'golden': return e.wrath ? 'wrath' : 'golden';
+    case 'goldenSpawn': return e.wrath ? 'wrath' : null;
+    case 'achievement': return 'achievement';
+    case 'bought': return 'buy';
+    default: return null;
+  }
+}
+
 function handleEvent(e: WorldEvent): void {
+  const cue = cueFor(e);
+  if (cue) sound.play(cue);
+  const step = tutorialAdvance(settings.tutorial, e, world);
+  if (step !== settings.tutorial) {
+    settings.tutorial = step;
+    tutorial.refresh();
+    saveNow();
+  }
   switch (e.type) {
     case 'manualLock': {
       const r = e.result;
@@ -199,17 +288,25 @@ function handleEvent(e: WorldEvent): void {
     case 'buff':
       break;
     case 'goldenSpawn':
-      manualFx.float('GOLDEN', manual.cellX(5), manual.cellY(22), { color: GOLD, size: 18, dur: 1200 });
+      manualFx.float(e.wrath ? 'WRATH' : 'GOLDEN', manual.cellX(5), manual.cellY(22), { color: e.wrath ? WRATH_RIM : GOLD, size: 18, dur: 1200 });
       break;
     case 'golden': {
       const o = e.outcome;
-      const text = o.kind === 'buff' ? BUFFS[o.buff]?.label ?? o.id : `LUCKY +${format(e.amount)}`;
-      manualFx.shakeBoard(3);
-      manualFx.float(text, manual.cellX(5), manual.cellY(23), { color: GOLD, size: 24, dur: 2000 });
+      const text = o.kind === 'buff' ? BUFFS[o.buff]?.label ?? o.id
+        : o.kind === 'ruin' ? `RUIN −${format(e.amount)}` : `LUCKY +${format(e.amount)}`;
+      // A wrath result is the whole board's news: bigger, longer, harder shake.
+      manualFx.shakeBoard(e.wrath ? 7 : 3);
+      manualFx.float(text, manual.cellX(5), manual.cellY(23), e.wrath
+        ? { color: o.id === 'elder_frenzy' ? '#ff5050' : WRATH_RIM, size: 36, dur: 2800 }
+        : { color: GOLD, size: 24, dur: 2000 });
       break;
     }
+    case 'achievement':
+      toast(`★ ${achievementById(e.id)?.name ?? e.id} · +1% income`, 'achievement');
+      shop.refresh(true);
+      break;
     case 'goldenLost':
-      manualFx.float('GOLDEN LOST', manual.cellX(5), manual.cellY(23), { color: '#7a7aa0', size: 16, dur: 1200 });
+      manualFx.float(e.wrath ? 'WRATH LOST' : 'GOLDEN LOST', manual.cellX(5), manual.cellY(23), { color: '#7a7aa0', size: 16, dur: 1200 });
       break;
   }
 }
@@ -239,11 +336,17 @@ function techLabel(r: LockResult, tech: BotTech): string | null {
   }
 }
 
-function toast(text: string): void {
+function toast(text: string, kind = ''): void {
   const t = document.createElement('div');
-  t.className = 'toast';
+  t.className = kind ? `toast ${kind}` : 'toast';
+  // Several at once (a save that already met a dozen achievements) stack
+  // instead of printing over each other.
+  // The bot pane, or on a phone whichever pane is showing.
+  const panes = ['auto-pane', 'manual-pane', 'shop-pane'].map((id) => document.getElementById(id)!);
+  const pane = panes.find((p) => p.offsetParent !== null) ?? panes[0]!;
+  t.style.top = `${12 + (pane.querySelectorAll('.toast').length % 8) * 34}px`;
   t.textContent = text;
-  document.getElementById('auto-pane')!.append(t);
+  pane.append(t);
   setTimeout(() => t.remove(), 2600);
 }
 
@@ -289,7 +392,7 @@ function render(): void {
   const view: BoardView = {
     grid: g.grid, active: g.active, ghostY: g.active ? g.ghostY() : null,
     holds: g.holds, holdUsed: g.holdUsed, next: g.next(),
-    golden: { active: g.golden.active, holds: g.golden.holds, next: g.golden.queue },
+    golden: { active: g.golden.active, holds: g.golden.holds, next: g.golden.queue, wrath: !!g.golden.wrath },
   };
   const buffs = world.buffs.active.map((b) => ({ label: BUFFS[b.id]?.label ?? b.id, msLeft: b.msLeft }));
   manual.render(view, manualFx, (ctx) => drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore));

@@ -6,7 +6,14 @@ export interface HandlingSettings {
   arr: number;
   sdf: number;
   keys: KeyBindings;
+  // The page preferences that are saved with handling: sound, 0..100, and
+  // how far the tutorial got (TUTORIAL_OFF once dismissed or finished).
+  volume: number;
+  muted: boolean;
+  tutorial: number;
 }
+
+export const TUTORIAL_OFF = -1;
 
 export interface KeyBindings {
   left: string[];
@@ -24,6 +31,7 @@ export const HANDLING_LIMITS = {
   das: { min: 0, max: 500, step: 1 },
   arr: { min: 0, max: 200, step: 1 },
   sdf: { min: 1, max: SDF_INSTANT, step: 1 },
+  volume: { min: 0, max: 100, step: 1 },
 } as const;
 
 // With no gravity SDF has nothing to multiply, so it is read as cells per
@@ -45,6 +53,9 @@ export const DEFAULT_HANDLING: HandlingSettings = {
     rotate180: ['KeyA'],
     hold: ['ShiftLeft', 'KeyC'],
   },
+  volume: 50,
+  muted: false,
+  tutorial: 0,
 };
 
 export const ACTION_LABELS: Record<keyof KeyBindings, string> = {

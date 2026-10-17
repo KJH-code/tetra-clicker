@@ -14,6 +14,10 @@ export const PIECE_COLORS: Record<Piece, string> = {
 
 // Golden pieces. Brighter and warmer than the O so the two never read alike.
 export const GOLD = '#ffb800';
+// Wrath pieces: dark blood red with a bright rim, so they read as a threat
+// next to the golden glow.
+export const WRATH_FILL = '#5c0000';
+export const WRATH_RIM = '#ff2a2a';
 
 export const THEME = {
   background: '#06060d',

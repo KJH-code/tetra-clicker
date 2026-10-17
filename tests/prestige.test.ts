@@ -179,7 +179,9 @@ describe('ascension', () => {
     w.ascend();
     w.buyPrestige('survival_1'); // spend one
     w.newRun();
-    expect(w.economy.incomeMultiplier(['board:auto'])).toBeCloseTo(1.03, 12);
+    // Achievements met on the way add their own 1% each.
+    const ach = w.economy.meta.achievements.size;
+    expect(w.economy.incomeMultiplier(['board:auto'])).toBeCloseTo(1.03 * (1 + ach / 100), 12);
   });
 
   it('a second ascension pays the curve growth only', () => {

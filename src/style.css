@@ -125,13 +125,13 @@ canvas { display: block; image-rendering: pixelated; }
 }
 .btn:hover { color: var(--text); border-color: var(--accent); }
 
-#settings-overlay {
+#settings-overlay, #achievements-overlay {
   position: fixed; inset: 0;
   background: #06060dcc;
   display: flex; align-items: center; justify-content: center;
   z-index: 10;
 }
-#settings-overlay[hidden] { display: none; }
+#settings-overlay[hidden], #achievements-overlay[hidden] { display: none; }
 .settings {
   background: var(--panel);
   border: 1px solid var(--accent);
@@ -144,6 +144,9 @@ canvas { display: block; image-rendering: pixelated; }
 .settings h2 { margin: 0 0 6px; font-size: 13px; letter-spacing: 0.3em; color: var(--accent); }
 .slider { display: grid; grid-template-columns: 50px 1fr 60px; align-items: center; gap: 10px; font-size: 12px; }
 .slider input[type=range] { width: 100%; accent-color: var(--accent); }
+.slider.with-btn { grid-template-columns: 50px 1fr 40px 70px; }
+.btn.mute { padding: 4px 6px; letter-spacing: 0.05em; }
+.btn.mute.on { color: var(--warn); border-color: var(--warn); }
 .slider .val { text-align: right; font-variant-numeric: tabular-nums; color: var(--accent); }
 .keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
 .keyrow { display: flex; justify-content: space-between; align-items: center; font-size: 12px; gap: 8px; }
@@ -207,12 +210,12 @@ canvas { display: block; image-rendering: pixelated; }
 #ascend-overlay[hidden] { display: none; }
 .settings.ascend { border-color: #b26bff; box-shadow: 0 0 40px #b26bff40; }
 .settings.ascend h2 { color: #b26bff; }
-.settings.ascend.wide { width: 940px; max-height: 92vh; overflow-y: auto; }
+.settings.ascend.wide { width: 1160px; max-width: 96vw; max-height: 92vh; overflow-y: auto; }
 .ascend .big { font-size: 28px; font-weight: 700; color: #d9b8ff; text-shadow: 0 0 14px #b26bff80; }
 .ascend .dim { color: var(--dim); font-size: 12px; }
 .ascend .checks { list-style: none; margin: 4px 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; font-size: 12px; color: var(--dim); }
 .ascend .checks li.done { color: var(--ok); }
-.ascend .branches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 8px; }
+.ascend .branches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 8px; }
 .ascend .branch { display: flex; flex-direction: column; gap: 8px; }
 .ascend .branch .title { font-size: 11px; letter-spacing: 0.3em; color: var(--dim); }
 .pcard {
@@ -238,3 +241,74 @@ canvas { display: block; image-rendering: pixelated; }
 .ascend .mode-btn.on { opacity: 1; border-color: var(--accent); }
 .ascend .mode-btn.hc.on { border-color: #ff3b3b; color: #ff3b3b; }
 .ascend .row .dim { flex: 1; margin: 0 10px; font-size: 11px; }
+
+/* Achievements */
+.settings.achievements { width: 720px; max-width: 96vw; max-height: 88vh; border-color: #ffb800; box-shadow: 0 0 40px #ffb80030; }
+.settings.achievements h2 { color: #ffb800; }
+.ach-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ach-list li { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; opacity: 0.45; font-size: 11px; }
+.ach-list li b { font-size: 11px; letter-spacing: 0.08em; }
+.ach-list li span { color: var(--dim); }
+.ach-list li.done { opacity: 1; border-color: #ffb80080; }
+.ach-list li.done b { color: #ffb800; }
+.toast.achievement { border-color: #ffb800; color: #ffb800; }
+.btn-row { display: flex; gap: 8px; }
+.btn-row .btn { flex: 1; }
+
+/* Tutorial bubble, along the bottom of the manual pane. */
+.tutorial {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 4;
+  width: min(440px, calc(100% - 24px));
+  background: #11112af2; border: 1px solid var(--accent); border-radius: 10px;
+  box-shadow: 0 0 24px #00f0ff40; padding: 10px 12px; font-size: 13px; line-height: 1.4;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.tutorial[hidden] { display: none; }
+.tutorial .row { display: flex; gap: 8px; justify-content: flex-end; }
+.tutorial .btn { padding: 5px 10px; }
+
+/* Touch controls: shown on touch screens and narrow windows. Two rows under
+   the board, rotations and drop above, movement below, as thumbs sit. */
+#touch { display: none; }
+#tabs { display: none; }
+@media (pointer: coarse), (max-width: 900px) {
+  #manual-pane { flex-direction: column; justify-content: flex-start; gap: 10px; }
+  #touch {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 100%; max-width: 480px;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  #touch button {
+    height: 52px; border-radius: 10px; border: 1px solid var(--line); background: #11112a; color: var(--text);
+    font: 700 15px system-ui, sans-serif; letter-spacing: 0.05em; touch-action: none;
+  }
+  #touch button.pressed { border-color: var(--accent); box-shadow: 0 0 12px #00f0ff60; }
+  #touch button[data-action=left] { grid-column: 1 / span 2; }
+  #touch button[data-action=right] { grid-column: 4 / span 2; }
+  #touch button[data-action=hardDrop] { color: var(--accent); }
+}
+
+/* Phones: one pane at a time, picked from a tab bar. */
+@media (max-width: 900px) {
+  #app { display: block; height: calc(100% - 52px - env(safe-area-inset-bottom)); padding: 8px; }
+  #app > .pane { height: 100%; }
+  body:not([data-tab=bots]) #auto-pane,
+  body:not([data-tab=shop]) #shop-pane,
+  body[data-tab=bots] #manual-pane,
+  body[data-tab=shop] #manual-pane { display: none; }
+  #shop-pane { flex-direction: column; flex-wrap: nowrap; overflow-y: auto; padding: 12px; }
+  .buildings { flex-direction: column; flex-wrap: nowrap; overflow: visible; flex: 0 0 auto; }
+  .stat .value { font-size: 28px; }
+  #tabs {
+    display: grid; grid-template-columns: repeat(3, 1fr); position: fixed; left: 0; right: 0; bottom: 0;
+    height: calc(52px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
+    background: var(--panel); border-top: 1px solid var(--line); z-index: 6;
+  }
+  #tabs button { background: none; border: 0; color: var(--dim); font: 700 12px system-ui, sans-serif; letter-spacing: 0.25em; }
+  #tabs button.on { color: var(--accent); text-shadow: 0 0 8px var(--accent); }
+  .settings { width: calc(100vw - 24px); padding: 16px; }
+  .settings.ascend.wide { width: calc(100vw - 16px); }
+  .ascend .branches { grid-template-columns: repeat(2, 1fr); }
+  .ach-list { grid-template-columns: 1fr 1fr; }
+  .keys { grid-template-columns: 1fr; }
+  .toast { font-size: 11px; letter-spacing: 0.02em; padding: 5px 10px; }
+}

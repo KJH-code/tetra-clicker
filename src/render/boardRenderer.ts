@@ -1,6 +1,6 @@
 import { WIDTH, HEIGHT, TOP_VISIBLE_ROW, occupiedCells, type Grid, type Placement } from '../sim/board';
 import { cellsOf, pieceFromId, type Piece } from '../sim/pieces';
-import { GOLD, PIECE_COLORS, THEME } from './theme';
+import { GOLD, PIECE_COLORS, THEME, WRATH_FILL, WRATH_RIM } from './theme';
 import type { Fx } from './fx';
 
 // Two buffer rows are drawn above the visible twenty, dimmed, so a piece
@@ -22,7 +22,7 @@ export interface BoardView {
   holdUsed: boolean;
   next: Piece[];
   // Golden piece marks: in play, per hold slot, and a NEXT index (-1 = none).
-  golden?: { active: boolean; holds: boolean[]; next: number };
+  golden?: { active: boolean; holds: boolean[]; next: number; wrath?: boolean };
 }
 
 export class BoardRenderer {
@@ -95,10 +95,11 @@ export class BoardRenderer {
     }
     if (view.active) {
       const gold = view.golden?.active ?? false;
+      const wrath = gold && !!view.golden?.wrath;
       for (const [x, y] of occupiedCells(view.active)) {
         if (y < FIRST_DRAWN_ROW) continue;
-        this.drawCell(x, y, gold ? GOLD : PIECE_COLORS[view.active.piece], y < TOP_VISIBLE_ROW ? 0.6 : 1, true);
-        if (gold) this.drawGoldEdge(this.cellX(x) + 1, this.cellY(y) + 1, layout.cell - 2);
+        this.drawCell(x, y, wrath ? WRATH_FILL : gold ? GOLD : PIECE_COLORS[view.active.piece], y < TOP_VISIBLE_ROW ? 0.6 : 1, true);
+        if (gold) this.drawGoldEdge(this.cellX(x) + 1, this.cellY(y) + 1, layout.cell - 2, wrath);
       }
     }
     if (fx) fx.drawRowFlashes(ctx, this);
@@ -107,11 +108,11 @@ export class BoardRenderer {
     // Side panels.
     if (layout.leftCells > 0) {
       this.drawLabel('HOLD', 0, 0, layout.leftCells);
-      view.holds.forEach((p, i) => this.drawPreview(p, 0, 1 + i * 3, layout.leftCells, view.holdUsed ? 0.35 : 1, view.golden?.holds[i] ?? false));
+      view.holds.forEach((p, i) => this.drawPreview(p, 0, 1 + i * 3, layout.leftCells, view.holdUsed ? 0.35 : 1, view.golden?.holds[i] ?? false, !!view.golden?.wrath));
     }
     if (layout.rightCells > 0) {
       this.drawLabel('NEXT', this.originX + WIDTH * c, 0, layout.rightCells);
-      view.next.forEach((p, i) => this.drawPreview(p, this.originX + WIDTH * c, 1 + i * 3, layout.rightCells, 1, view.golden?.next === i));
+      view.next.forEach((p, i) => this.drawPreview(p, this.originX + WIDTH * c, 1 + i * 3, layout.rightCells, 1, view.golden?.next === i, !!view.golden?.wrath));
     }
     if (fx) fx.drawFloaters(ctx);
     ctx.restore();
@@ -163,17 +164,22 @@ export class BoardRenderer {
   // A preview piece centred in a side column; drawn at 80% cell size so the
   // five-deep queue fits beside the board.
   // White rim on golden cells: gold alone sits too close to the yellow O.
-  private drawGoldEdge(px: number, py: number, size: number): void {
+  // A wrath piece's rim is red and throbs.
+  private drawGoldEdge(px: number, py: number, size: number, wrath = false): void {
     const { ctx } = this;
     ctx.save();
-    ctx.strokeStyle = '#ffffff';
-    ctx.globalAlpha = 0.9;
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = wrath ? WRATH_RIM : '#ffffff';
+    ctx.globalAlpha = wrath ? 0.55 + 0.45 * Math.sin(performance.now() / 160) ** 2 : 0.9;
+    ctx.lineWidth = wrath ? 2.5 : 1.5;
+    if (wrath) {
+      ctx.shadowColor = WRATH_RIM;
+      ctx.shadowBlur = size * 0.5;
+    }
     ctx.strokeRect(px + 1.5, py + 1.5, size - 3, size - 3);
     ctx.restore();
   }
 
-  private drawPreview(piece: Piece, px: number, row: number, span: number, alpha: number, gold = false): void {
+  private drawPreview(piece: Piece, px: number, row: number, span: number, alpha: number, gold = false, wrath = false): void {
     const { ctx, layout } = this;
     const c = layout.cell * 0.8;
     const cells = cellsOf(piece, 0);
@@ -185,12 +191,12 @@ export class BoardRenderer {
     const oy = row * layout.cell + 8;
     ctx.save();
     ctx.globalAlpha = alpha;
-    const color = gold ? GOLD : PIECE_COLORS[piece];
+    const color = gold ? (wrath ? WRATH_FILL : GOLD) : PIECE_COLORS[piece];
     ctx.fillStyle = color;
-    ctx.shadowColor = color;
+    ctx.shadowColor = gold && wrath ? WRATH_RIM : color;
     ctx.shadowBlur = c * (gold ? 1.2 : 0.5);
     for (const [x, y] of cells) ctx.fillRect(ox + (x - minX) * c + 1, oy + (y - minY) * c + 1, c - 2, c - 2);
     ctx.restore();
-    if (gold) for (const [x, y] of cells) this.drawGoldEdge(ox + (x - minX) * c + 1, oy + (y - minY) * c + 1, c - 2);
+    if (gold) for (const [x, y] of cells) this.drawGoldEdge(ox + (x - minX) * c + 1, oy + (y - minY) * c + 1, c - 2, wrath);
   }
 }

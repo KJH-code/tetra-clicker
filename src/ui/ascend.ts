@@ -6,6 +6,7 @@ const BRANCHES: { id: Branch; title: string }[] = [
   { id: 'survival', title: 'SURVIVAL' },
   { id: 'proportion', title: 'PROPORTION' },
   { id: 'synergy', title: 'SYNERGY' },
+  { id: 'elder', title: 'WRATH' },
 ];
 
 // The ascension screen: a confirmation that shows what the run is worth,

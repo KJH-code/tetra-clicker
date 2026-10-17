@@ -7,6 +7,7 @@ import { BUILDINGS } from '../../src/data/buildings';
 describe('catch-up formula vs the real bot', () => {
   it('10,000 bot pieces earn within 1% of seconds × PPS × 0.8 × multiplier', () => {
     const w = new World(3);
+    w.awardAchievements = false; // the formula is checked without their +1% steps
     w.economy.balance = 1e9;
     w.buy('single');
     w.buy('single');

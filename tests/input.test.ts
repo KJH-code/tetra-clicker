@@ -98,3 +98,31 @@ describe('round gating', () => {
   });
 
 });
+
+describe('touch buttons', () => {
+  it('press and release drive the same DAS / ARR as keys', () => {
+    const { game, input } = setup(100, 20);
+    const x0 = game.active!.x;
+    input.press('left');
+    expect(game.active!.x).toBe(x0 - 1);
+    input.update(99);
+    input.update(1);
+    input.update(20);
+    expect(game.active!.x).toBe(x0 - 2);
+    input.release('left');
+    input.update(200);
+    expect(game.active!.x).toBe(x0 - 2);
+  });
+
+  it('hard drop and hold work from buttons; a held button does not repeat', () => {
+    const { game, input, drops } = setup(100, 20);
+    input.press('hold');
+    expect(game.holds).toHaveLength(1);
+    input.press('hardDrop');
+    input.press('hardDrop');
+    expect(drops()).toBe(1);
+    input.release('hardDrop');
+    input.press('hardDrop');
+    expect(drops()).toBe(2);
+  });
+});

@@ -5,6 +5,7 @@ import type { LockResult } from './game';
 // unlock needs.
 export interface Stats {
   manualLines: number; // Lines earned on the manual board
+  linesEarned: number; // every Line earned, by hand, by bots and by luck
   manualPieces: number;
   spins: number; // full T-spin clears
   combo5: number; // runs that reached a 5 combo
@@ -28,11 +29,17 @@ export interface Stats {
   // The longest life of the run, in rows cleared and in life time.
   maxLifeRows: number;
   maxLifeSeconds: number;
+  wraths: number; // wrath pieces that cleared a line
+  ruins: number;
+  // Golden or wrath pieces placed without clearing a line.
+  goldensLost: number;
+  clotTetrises: number; // tetrises cleared while a CLOT runs
 }
 
 export const emptyStats = (): Stats => ({
-  manualLines: 0, manualPieces: 0, spins: 0, combo5: 0, b2bs: 0, pcs: 0, riskLines: 0, rounds: 0, checkpoints: 0, deaths: 0, maxLevel: 0, goldens: 0,
+  manualLines: 0, linesEarned: 0, manualPieces: 0, spins: 0, combo5: 0, b2bs: 0, pcs: 0, riskLines: 0, rounds: 0, checkpoints: 0, deaths: 0, maxLevel: 0, goldens: 0,
   tss: 0, tsd: 0, tst: 0, combo10: 0, b2b5: 0, tetrises: 0, maxLifeRows: 0, maxLifeSeconds: 0,
+  wraths: 0, ruins: 0, goldensLost: 0, clotTetrises: 0,
 });
 
 // Add one run's counters into lifetime totals; a "max" counter keeps the larger.
