@@ -5,7 +5,7 @@ import { tag, type Tag } from './tags';
 import { policyFor, playOne, type BotMove } from './bot/index';
 import { OPENERS } from '../data/openers';
 import type { BotPolicy } from './bot/policy';
-import { buildingById, BUILDINGS } from '../data/buildings';
+import { buildingById, BUILDINGS, helperEvery } from '../data/buildings';
 import { SYNERGIES } from '../data/synergies';
 import { classifyGap, STEP_MS } from './clock';
 import { conditionMet, evaluate, flagCount } from './effects';
@@ -21,10 +21,11 @@ import { crownGain, metaFrom, metaSnapshot, type MetaSnapshot } from './prestige
 import { LEVELS } from '../data/levels';
 import { ACHIEVEMENTS } from '../data/achievements';
 import { challengePoints, CHALLENGE, BUILDING_KINDS_ANY } from '../data/challenges';
-import { EVENTS, type EventKind } from '../data/events';
+import { EVENTS, RIVAL_DUEL, type EventKind } from '../data/events';
 import { startEvent, attackRows, cancel, randomHole, type LifeEvent } from './events';
 import { ccWasmBot, CC_DEFAULT } from './bot/ccWasm';
 import { tag as tagOf } from './tags';
+import { createRng, type Rng } from './rng';
 import { add, mul, num, toNumber, type Num } from './num';
 import type { Placement } from './board';
 
@@ -87,6 +88,9 @@ export type WorldEvent =
   | { type: 'achievement'; id: string }
   // A life event starting or ending; `amount` is what it paid.
   | { type: 'lifeEvent'; kind: EventKind; phase: 'start' | 'won' | 'lost' | 'over'; amount: Num }
+  // The RIVAL building's board beaten: the streak it reached and the pay.
+  | { type: 'rivalWin'; streak: number; amount: Num }
+  | { type: 'helperRow'; amount: Num }
   | { type: 'slept'; seconds: number };
 
 export class World {
@@ -124,6 +128,10 @@ export class World {
   awardAchievements = true;
   // The life event on now (rival, invader, helper), if any.
   lifeEvent: LifeEvent | null = null;
+  // The RIVAL building's fight with the manual board, while a life runs.
+  duel: { toMe: number; toRival: number; myCarry: number; rivalCarry: number; holes: Rng } | null = null;
+  // HELPER: qualifying clears since the last garbage row it lifted.
+  private helperCount = 0;
   // PER SECOND (without buffs) through the run, for the stats graph.
   samples: number[] = [];
   sampleEvery = SAMPLE_SECONDS;
@@ -242,6 +250,11 @@ export class World {
     }
     recordManual(this.economy.stats, result, Number(final));
     this.economy.stats.linesEarned += toNumber(final);
+    if (this.round.active && !result.topped && (this.duelOnLock(result) || this.helperOnLock(result))) {
+      this.events.push({ type: 'manualLock', result, earned: final, tags: earned.tags, at });
+      this.endRound();
+      return final;
+    }
     if (this.lifeEvent && this.round.active && !result.topped && this.eventOnLock(result, toNumber(final))) {
       // Incoming garbage pushed the stack through the ceiling.
       this.events.push({ type: 'manualLock', result, earned: final, tags: earned.tags, at });
@@ -392,6 +405,9 @@ export class World {
   // hardcore run nothing is kept and the run ascends on the spot.
   private endRound(): void {
     if (this.lifeEvent) this.endEvent('lost', num(0));
+    this.duel = null;
+    this.economy.meta.rivalStreak = 0;
+    this.helperCount = 0;
     const vault = this.round.vault;
     const level = this.round.level;
     const hardcore = this.economy.meta.hardcore;
@@ -420,7 +436,7 @@ export class World {
     // An invader brings garbage faster.
     const speed = ev?.kind === 'invader' ? EVENTS.invader.garbageSpeed : 1;
     const { garbage: rows, golden } = this.round.advance(dtMs, { ready: !this.manual.hasGolden, scale: this.goldenScale() },
-      this.fx('garbage_interval', 1) / speed, this.fx('garbage_from_level', LEVELS.garbageFromLevel));
+      this.fx('garbage_interval', 1) / speed / this.fx('garbage_speed', 1), this.fx('garbage_from_level', LEVELS.garbageFromLevel));
     // Attack banked against an invader blocks rows before they land.
     let garbage = rows;
     if (ev?.kind === 'invader' && ev.shield > 0) {
@@ -429,7 +445,10 @@ export class World {
       garbage = rows.slice(blocked);
     }
     if (this.stepEvent(dtMs)) return;
-    const due = this.round.tickEvent(dtMs, this.lifeEvent !== null);
+    // A rival building on the board starts its fight with the life.
+    if (!this.duel && this.economy.owned('rival') > 0) this.duel = { toMe: 0, toRival: 0, myCarry: 0, rivalCarry: 0, holes: createRng(this.round.eventSeed()) };
+    const owned = new Set((['rival', 'invader', 'helper'] as const).filter((k) => this.economy.owned(k) > 0));
+    const due = this.round.tickEvent(dtMs, this.lifeEvent !== null, owned);
     if (due) this.beginEvent(due);
     const stats = this.economy.stats;
     stats.maxLifeSeconds = Math.max(stats.maxLifeSeconds, Math.floor(this.round.elapsedMs / 1000));
@@ -520,6 +539,8 @@ export class World {
     // The run's last state counts before it is wiped.
     this.checkAchievements();
     this.lifeEvent = null;
+    this.duel = null;
+    this.economy.meta.rivalStreak = 0;
     // The challenge's rules end with its run.
     this.economy.meta.challenge = {};
     const gain = this.crownPreview();
@@ -711,7 +732,7 @@ export class World {
       if (!def) continue;
       board.timerMs -= dtMs;
       while (board.timerMs <= 0) {
-        board.timerMs += 1000 / def.pps;
+        board.timerMs += 1000 / (def.pps * this.ppsFactor(board.buildingId));
         const policy = this.policyFor(board);
         if (!policy) break;
         const move = playOne(board.game, policy);
@@ -719,6 +740,7 @@ export class World {
         board.lastMove = move;
         const earned = this.botEarn(board, move);
         this.events.push({ type: 'botMove', board: i, move, earned });
+        if (board.buildingId === 'rival') this.duelOnRivalMove(board, move.result);
       }
     }
     this.buffs.tick(dtMs);
@@ -741,6 +763,79 @@ export class World {
       this.achievementMs = 0;
       this.checkAchievements();
     }
+  }
+
+  // --- buildings that reach into the manual board ------------------------
+
+  // A rival that has won streak fights plays this much faster.
+  private ppsFactor(buildingId: string): number {
+    return buildingId === 'rival' && this.duel ? 1 + RIVAL_DUEL.ppsPerWin * this.economy.meta.rivalStreak : 1;
+  }
+
+  // My lock against the rival: attack cancels what is coming, the rest goes
+  // across; a lock that clears nothing takes what is waiting. True if that
+  // garbage topped the life out.
+  private duelOnLock(result: LockResult): boolean {
+    const d = this.duel;
+    if (!d) return false;
+    const a = attackRows(result, d.myCarry);
+    d.myCarry = a.carry;
+    const c = cancel(d.toMe, a.rows);
+    d.toMe = c.incoming;
+    d.toRival += c.over;
+    if (result.lines === 0 && d.toMe > 0) {
+      const n = Math.min(d.toMe, RIVAL_DUEL.maxRowsPerLock);
+      d.toMe -= n;
+      for (let i = 0; i < n; i++) if (this.manual.addGarbage(randomHole(d.holes))) return true;
+    }
+    return false;
+  }
+
+  private duelOnRivalMove(board: AutoBoard, r: LockResult): void {
+    const d = this.duel;
+    // A paused life is not fought; the rival plays on alone.
+    if (!d || !this.round.live) return;
+    const meta = this.economy.meta;
+    let beaten = r.topped;
+    if (!beaten) {
+      const a = attackRows(r, d.rivalCarry);
+      d.rivalCarry = a.carry;
+      const sent = Math.floor(a.rows * (1 + RIVAL_DUEL.attackPerWin * meta.rivalStreak));
+      const c = cancel(d.toRival, sent);
+      d.toRival = c.incoming;
+      d.toMe += c.over;
+      if (r.lines === 0 && d.toRival > 0) {
+        const n = Math.min(d.toRival, RIVAL_DUEL.maxRowsPerLock);
+        d.toRival -= n;
+        for (let i = 0; i < n && !beaten; i++) beaten = board.game.addGarbage(randomHole(d.holes));
+      }
+    }
+    if (!beaten) return;
+    // Beaten: its board starts over, the next rival is stronger, and the
+    // win pays more the longer the streak.
+    if (!r.topped) board.game.reset();
+    d.toRival = 0;
+    meta.rivalStreak += 1;
+    meta.rivalBest = Math.max(meta.rivalBest, meta.rivalStreak);
+    this.economy.stats.rivalWins += 1;
+    const reward = toNumber(this.incomePerSecond()) * RIVAL_DUEL.rewardSecondsPerLevel * this.round.level * meta.rivalStreak;
+    this.events.push({ type: 'rivalWin', streak: meta.rivalStreak, amount: this.payVault(reward) });
+  }
+
+  // HELPER: every so many combo or back-to-back clears, one garbage row
+  // lifted and paid like a single.
+  private helperOnLock(result: LockResult): boolean {
+    const every = helperEvery(this.economy.owned('helper'));
+    if (every <= 0 || result.lines === 0 || !(result.comboIndex > 0 || result.b2bExtended)) return false;
+    this.helperCount += 1;
+    if (this.helperCount < every) return false;
+    this.helperCount = 0;
+    if (!this.manual.removeGarbageRow()) return false;
+    this.economy.stats.helperRows += 1;
+    const single = evaluate(this.economy.effects, 'income', [tagOf.board('manual'), tagOf.clear(1)], this.economy, ATTACK.normal[1]);
+    const amount = this.payVault(single * this.round.level * this.buffs.multiplier([tagOf.board('manual')], this.economy));
+    this.events.push({ type: 'helperRow', amount });
+    return false;
   }
 
   // --- life events -------------------------------------------------------

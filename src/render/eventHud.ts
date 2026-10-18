@@ -2,7 +2,8 @@ import type { BoardRenderer } from './boardRenderer';
 import type { LifeEvent } from '../sim/events';
 import { HEIGHT, WIDTH, TOP_VISIBLE_ROW, occupiedCells } from '../sim/board';
 import { pieceFromId } from '../sim/pieces';
-import { PIECE_COLORS, THEME } from './theme';
+import { PIECE_COLORS, THEME, VIEW } from './theme';
+import { t } from '../ui/i18n';
 
 const NAMES = { rival: 'RIVAL', invader: 'INVADER', helper: 'HELPER' } as const;
 const COLORS = { rival: '#ff5050', invader: '#ff8c1a', helper: '#39ff14' } as const;
@@ -19,8 +20,8 @@ export function drawEventHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ev
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillStyle = COLORS[ev.kind];
-  ctx.font = `800 ${Math.round(c * 0.5)}px system-ui, sans-serif`;
-  const time = ev.kind === 'rival' ? 'UNTIL ONE TOPS OUT' : `${Math.ceil(ev.msLeft / 1000)}s`;
+  ctx.font = `800 ${Math.round(c * 0.5 * VIEW.textScale)}px system-ui, sans-serif`;
+  const time = ev.kind === 'rival' ? t('UNTIL ONE TOPS OUT') : `${Math.ceil(ev.msLeft / 1000)}s`;
   ctx.fillText(`${NAMES[ev.kind]} · ${time}`, left + (WIDTH * c) / 2, top + c * 0.2);
   ctx.restore();
 
@@ -59,7 +60,7 @@ export function drawEventHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ev
     for (const [x, y] of occupiedCells(g.active)) if (y >= TOP_VISIBLE_ROW) ctx.fillRect(ox + x * mini, oy + (y - TOP_VISIBLE_ROW) * mini, mini - 1, mini - 1);
   }
   ctx.fillStyle = COLORS.rival;
-  ctx.font = `700 ${Math.round(c * 0.36)}px system-ui, sans-serif`;
+  ctx.font = `700 ${Math.round(c * 0.36 * VIEW.textScale)}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.fillText(`RIVAL L${ev.level}`, ox + (mini * WIDTH) / 2, oy - c * 0.5);
   if (ev.toRival > 0) gauge(ctx, ox - 4, oy + mini * rows, Math.min(rows, ev.toRival) * mini, '#ff3b3b');
@@ -73,4 +74,10 @@ function gauge(ctx: CanvasRenderingContext2D, x: number, bottom: number, h: numb
   ctx.shadowBlur = 8;
   ctx.fillRect(x, bottom - h, 3, h);
   ctx.restore();
+}
+
+// The RIVAL building's rows waiting for the manual board, up its left edge.
+export function drawDuelGauge(ctx: CanvasRenderingContext2D, r: BoardRenderer, rows: number): void {
+  if (rows <= 0) return;
+  gauge(ctx, r.cellX(0) - 5, r.cellY(HEIGHT), Math.min(20, rows) * r.layout.cell, '#ff3b3b');
 }

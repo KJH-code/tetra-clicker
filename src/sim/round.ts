@@ -124,12 +124,15 @@ export class Round {
 
   // Count down to the next event while none is on and the level allows
   // one; returns the kind when it is due.
-  tickEvent(dtMs: number, busy: boolean): EventKind | null {
+  // Kinds in `owned` have become buildings and no longer turn up as events.
+  tickEvent(dtMs: number, busy: boolean, owned: ReadonlySet<EventKind> = new Set()): EventKind | null {
     if (!this.live || busy || this.level < EVENTS.fromLevel) return null;
     this.eventMs -= dtMs;
     if (this.eventMs > 0) return null;
     this.eventMs = this.drawEventMs();
     const w = EVENTS.weights(this.level);
+    for (const k of owned) w[k] = 0;
+    if (w.rival + w.invader + w.helper <= 0) return null;
     const kinds = Object.keys(w) as EventKind[];
     let r = this.eventRng.next() * kinds.reduce((n, k) => n + w[k], 0);
     for (const k of kinds) { r -= w[k]; if (r < 0) return k; }

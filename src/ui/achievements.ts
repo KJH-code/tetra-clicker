@@ -1,6 +1,7 @@
 import type { World } from '../sim/world';
 import { ACHIEVEMENTS } from '../data/achievements';
 import { statsView } from './stats';
+import { t as tr } from './i18n';
 
 // The achievement list: met ones lit, the rest dim, hidden ones unnamed
 // until met. Read-only, so it closes on any click outside or Escape.
@@ -25,7 +26,7 @@ export class AchievementsPanel {
       const b = document.createElement('button');
       b.className = 'btn tab' + (t === tab ? ' on' : '');
       b.dataset['tab'] = t;
-      b.textContent = t === 'achievements' ? `ACHIEVEMENTS ${met.size}/${ACHIEVEMENTS.length}` : 'STATS';
+      b.textContent = t === 'achievements' ? tr('ACHIEVEMENTS {met}/{all}', { met: met.size, all: ACHIEVEMENTS.length }) : tr('STATS');
       b.addEventListener('click', () => this.open(t));
       tabs.append(b);
     }
@@ -38,7 +39,7 @@ export class AchievementsPanel {
       return;
     }
     const title = document.createElement('h2');
-    title.textContent = `+${met.size}% income`;
+    title.textContent = tr('+{n}% income', { n: met.size });
     const list = document.createElement('ul');
     list.className = 'ach-list';
     for (const a of ACHIEVEMENTS) {
@@ -50,9 +51,9 @@ export class AchievementsPanel {
       const unseen = !!a.building && !this.world.economy.meta.buildingsSeen.has(a.building);
       const shown = done || (!a.hidden && !unseen);
       const name = document.createElement('b');
-      name.textContent = shown ? a.name : '???';
+      name.textContent = shown ? tr(a.name) : '???';
       const desc = document.createElement('span');
-      desc.textContent = shown ? a.desc : a.hidden ? 'Hidden' : 'A building not yet bought';
+      desc.textContent = shown ? tr(a.desc) : a.hidden ? tr('Hidden') : tr('A building not yet bought');
       li.append(name, desc);
       list.append(li);
     }
@@ -65,7 +66,7 @@ export class AchievementsPanel {
   private closeRow(): HTMLElement {
     const close = document.createElement('button');
     close.className = 'btn';
-    close.textContent = 'CLOSE';
+    close.textContent = tr('CLOSE');
     close.addEventListener('click', () => this.close());
     const row = document.createElement('div');
     row.className = 'row';

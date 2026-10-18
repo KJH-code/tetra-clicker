@@ -3,7 +3,7 @@ import { BUILDINGS } from '../data/buildings';
 import { UPGRADES } from '../data/upgrades';
 import type { HandlingSettings } from '../data/handling';
 
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 export interface SaveData {
   version: number;
@@ -138,6 +138,14 @@ const MIGRATIONS: Migration[] = [
     const counted = (lifetime['linesEarned'] ?? 0) + (stats['linesEarned'] ?? 0);
     if (estimate > counted) lifetime['linesEarned'] = (lifetime['linesEarned'] ?? 0) + Math.floor(estimate - counted);
     meta['lifetime'] = lifetime;
+    return raw;
+  },
+  // 9 → 10: the RIVAL building's streak (none yet) and the accessibility
+  // and language settings, which take their defaults when settings merge.
+  (raw) => {
+    const world = raw['world'] as Record<string, unknown>;
+    const meta = world['meta'] as Record<string, unknown> | undefined;
+    if (meta) { meta['rivalStreak'] ??= 0; meta['rivalBest'] ??= 0; }
     return raw;
   },
 ];

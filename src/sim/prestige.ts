@@ -28,6 +28,9 @@ export interface Meta {
   challenge: Record<string, number>;
   nextChallenge: Record<string, number>;
   challengeBest: number;
+  // RIVAL building: wins in a row this life, and the best ever.
+  rivalStreak: number;
+  rivalBest: number;
 }
 
 export interface MetaSnapshot {
@@ -48,13 +51,15 @@ export interface MetaSnapshot {
   challenge: Record<string, number>;
   nextChallenge: Record<string, number>;
   challengeBest: number;
+  rivalStreak: number;
+  rivalBest: number;
 }
 
 export const emptyMeta = (): Meta => ({
   crowns: 0, crownsEarned: 0, riskBanked: 0, ascensions: 0, prestige: new Set(), lifetime: emptyStats(), ascending: false,
   hardcore: false, nextHardcore: false, hardcoreBest: { level: 0, rows: 0 },
   hardcoreAscensions: 0, emptyAscensions: 0, achievements: new Set(), buildingsSeen: new Set(),
-  challenge: {}, nextChallenge: {}, challengeBest: 0,
+  challenge: {}, nextChallenge: {}, challengeBest: 0, rivalStreak: 0, rivalBest: 0,
 });
 
 export function metaFrom(s: MetaSnapshot | undefined): Meta {

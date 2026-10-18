@@ -19,6 +19,8 @@ export const BUFFS: Record<string, BuffDef> = {
     effects: [{ target: 'income', filter: ['board:auto'], op: 'mul', value: 2 }] },
   syn_fourwide: { id: 'syn_fourwide', label: '4-WIDE BOT ×2', durationMs: 30_000,
     effects: [{ target: 'income', filter: ['building:fourwide'], op: 'mul', value: 2 }] },
+  syn_helper: { id: 'syn_helper', label: 'HELPER BOT ×2', durationMs: 30_000,
+    effects: [{ target: 'income', filter: ['building:helper'], op: 'mul', value: 2 }] },
   clear_frenzy: { id: 'clear_frenzy', label: 'CLEAR FRENZY ×777', durationMs: 13_000,
     effects: [{ target: 'income', filter: ['board:manual'], op: 'mul', value: 777 }] },
   // Wrath pieces: one huge bot burst, or a slump.

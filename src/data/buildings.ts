@@ -71,6 +71,29 @@ export const BUILDINGS: BuildingDef[] = [
   }),
   tier('fourwide', '4-WIDE', 3_800_000, 4, 2.918, 'downstack', { tech: 'fourwide', pps: 1.03, mode: { walls: 3 } }),
   tier('opener', 'OPENER', 16_000_000, 4, 2.064, 'fourwide', { tech: 'opener', pps: 1.6 }),
+  // Three that reach into your board, steps 3.6, 3.9, 4.2. Their bots are
+  // ones measured above (COMBO, DOWNSTACK, stock Cold Clear paid for B2B);
+  // what they do to the manual board is in their effects and in world.ts.
+  // HELPER lifts a garbage row every few combo or back-to-back clears of
+  // yours (fewer the more you own: HELPER_EVERY); INVADER speeds your
+  // garbage 5% a copy and pays your hands 10% a copy more; RIVAL's board
+  // trades garbage with yours for as long as a life runs.
+  tier('helper', 'HELPER', 46_000_000, 4, 1.18, 'opener', { tech: 'combo', pps: 3.05 }),
+  tier('invader', 'INVADER', 160_000_000, 4, 2.40, 'helper', {
+    tech: 'downstack', pps: 1.625, mode: { garbageEvery: 4, cheese: 0.5 }, garbageBonus: { clean: 2, cheese: 4 },
+  }),
+  tier('rival', 'RIVAL', 390_000_000, 4, 1.488, 'invader', { tech: 'b2b', pps: 2.82 }),
 ];
+
+// HELPER: your combo or back-to-back clears per garbage row lifted, by copies owned.
+export const HELPER_EVERY: [owned: number, every: number][] = [[10, 1], [3, 2], [2, 3], [1, 4]];
+export const helperEvery = (owned: number): number => HELPER_EVERY.find(([n]) => owned >= n)?.[1] ?? 0;
+
+// INVADER's reach into the manual board, per copy.
+const INVADER_EFFECTS: Effect[] = [
+  { target: 'garbage_speed', op: 'mul_pct', value: 5, stack: { type: 'owned', id: 'invader', offset: 0 } },
+  { target: 'income', filter: ['board:manual'], op: 'add_pct', value: 10, stack: { type: 'owned', id: 'invader', offset: 0 } },
+];
+BUILDINGS.find((b) => b.id === 'invader')!.effects.push(...INVADER_EFFECTS);
 
 export const buildingById = (id: string): BuildingDef | undefined => BUILDINGS.find((b) => b.id === id);

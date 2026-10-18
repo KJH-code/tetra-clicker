@@ -3,6 +3,7 @@ import { singleBot } from './singleBot';
 import { sizeBot } from './sizeBot';
 import { tspinBot, allspinBot, comboBot, b2bBot, tspinTstBot, b2bComboBot, downstackBot, fourWideBot } from './techBots';
 import { pcBot } from './pcBot';
+import { ccWasmBot, CC_DEFAULT } from './ccWasm';
 import { openerBot } from './openerBot';
 import { OPENERS } from '../../data/openers';
 import { decodeBuild } from '../fumen';
@@ -24,6 +25,10 @@ export const POLICIES: Record<string, BotPolicy> = {
   fourwide: fourWideBot(),
   opener: openerBot(),
   opener_combo: openerBot([], 'combo'),
+  // The buildings that reach into the manual board play bots measured above.
+  helper: comboBot(),
+  invader: downstackBot(),
+  rival: ccWasmBot({ weights: CC_DEFAULT, nodes: 6_000 }),
   // Switched to by play synergies.
   tspin_tst: tspinTstBot(),
   b2b_combo: b2bComboBot(),

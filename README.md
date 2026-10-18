@@ -2,8 +2,8 @@
 
 Tetris × idle clicker. Clear lines by hand to earn **Lines**, spend Lines on
 buildings, and each building is a bot that plays its own board and clears
-lines for you. Nine buildings, from a bot that only clears singles to one
-that loops perfect clears.
+lines for you. Fifteen buildings, from a bot that only clears singles to a
+rival that trades garbage with your own board.
 
 Play: https://kjh-code.github.io/tetra-clicker/
 
@@ -26,7 +26,8 @@ serves from `/`.
 Guideline defaults: ← → move, ↓ soft drop, Space hard drop, ↑ / X rotate CW,
 Z / Ctrl rotate CCW, A 180, Shift / C hold. DAS / ARR / SDF and every key can
 be changed under SETTINGS, along with the volume (sound is synthesized, no
-files; MUTE silences it).
+files; MUTE silences it), the language, accessibility and moving the save
+(below).
 
 On a touch screen or a window under 900 px, buttons under the manual board
 play the same actions with the same DAS / ARR (a tap on the board starts or
@@ -38,7 +39,27 @@ start a life, clear a line, buy a building, reach a checkpoint, ascend. Each
 step moves on when the game sees it done (a save that already did one skips
 it); OK hides the current step, TUTORIAL OFF ends it.
 
-## Lives
+## Language and accessibility
+
+Every screen text is in English or Korean (`src/ui/i18n.ts`, the Korean in
+`src/ui/ko.ts`). AUTO, the default, follows the browser's first language;
+SETTINGS → LANGUAGE picks one, and the page reloads in it. Technique and
+building names (T-SPIN, B2B, PC, SINGLE …), LINES and CROWN stay English. The
+English text is the key, so the data files stay English; generated names
+(FIRST <building>, "<building> ×2 (n owned)") go through patterns. A test
+reads every `t()` call in the source and every data name and requires a
+Korean form for each, unless it is technical terms only.
+
+SETTINGS → ACCESSIBILITY:
+
+| option | what it does |
+|---|---|
+| PIECE COLOURS | STANDARD (neon) or COLOUR-BLIND SAFE (Okabe–Ito). Seven pieces can all touch and no seven hues stay apart for every pair under every colour-vision type, so the colour-blind palette always shows patterns too |
+| PATTERNS | a mark per piece inside each cell: I bar, O dot, T chevron, S and Z opposite diagonals, J upright, L corner |
+| LESS MOTION | no row flashes, board shakes or pulsing; starts on when the system asks for reduced motion |
+| HIGH CONTRAST | brighter text and grid, an outline on every cell |
+| TEXT | 90–150% for the panels and the text drawn on the boards (which shrinks back to fit its column) |
+
 
 The manual board is played one life at a time. Between lives it shows READY
 and the first game key starts one (that key does nothing else). There is no
@@ -198,6 +219,9 @@ research.
 | PERFECT + DOWNSTACK | 14,000,000 | reward | the DOWNSTACK bot shares perfect-clear pay: ×1.25 |
 | DOWNSTACK + 4-WIDE | 38,000,000 | link | a garbage row you clear doubles the 4-WIDE bot for 30 s |
 | 4-WIDE + OPENER | 160,000,000 | play | the OPENER bot runs a short combo after each PC instead of the TSD, ×1.25 |
+| OPENER + HELPER | 460,000,000 | link | a perfect clear by hand doubles the HELPER bot for 30 s |
+| HELPER + INVADER | 1,600,000,000 | reward | the INVADER bot shares combo pay: ×1.25 |
+| INVADER + RIVAL | 3,900,000,000 | cross | each earns +1% per copy of the other |
 
 Reward and play synergies are a fixed ×1.25 on that bot's income, in play
 and in the hidden-tab formula alike; the bot is still paid only for its own
@@ -211,11 +235,12 @@ lifts them. All of it is data in `src/data/synergies.ts`.
 
 ### Achievements
 
-77, made from templates in `src/data/achievements.ts`: owning 1 / 10 / 50 /
-100 of each building in a run (48), Lines earned over all runs (1K / 100K /
+91, made from templates in `src/data/achievements.ts`: owning 1 / 10 / 50 /
+100 of each building in a run (60), Lines earned over all runs (1K / 100K /
 10M / 1B), technique counts (TSD 10 / 100, PC 1 / 10, a 10 combo), level
 10 / 15 / 20, ascending 1 / 5 / 25 times, two hardcore ones, challenge runs
-cleared at 3 / 6 / 10 / 15 points, one per life event, and five hidden ones
+cleared at 3 / 6 / 10 / 15 points, one per life event, beating the RIVAL
+building's board 3 and 10 times in one life, and five hidden ones
 (HARDCORE 20, which opens challenge runs, among them) that show as ??? until
 met. A building's own achievements are named only once it has been bought
 in some run, so the list does not give the ladder away. Each is met once and kept for good, through
@@ -223,9 +248,9 @@ ascension, and adds 1% to all income (the same shape as crowns). Their
 conditions are the effect engine's own, plus `career`, which reads a stat as
 every finished run plus this one. The world checks them after a manual lock,
 a purchase, an ascension and once a second; a toast announces each, and ★
-N/77 under the shop opens the list. Its STATS tab shows this run beside all
+N/91 under the shop opens the list. Its STATS tab shows this run beside all
 runs (Lines, lives, top-outs, checkpoints, play time, techniques by hand,
-records) and two charts: PER SECOND through the run (a point every 30 s of
+records, the best RIVAL streak) and two charts: PER SECOND through the run (a point every 30 s of
 play, the gap doubling past 240 points) and each building's PER SECOND now.
 
 ### Challenge runs
@@ -268,7 +293,9 @@ three turns up; the higher the level, the likelier the first two
 - **Helper**: for 60 s, each clear that keeps a combo or back-to-back going
   lifts the lowest garbage row out and pays it like a single.
 
-A top-out or an ascension ends an event, and a save does not keep one.
+A top-out or an ascension ends an event, and a save does not keep one. Once
+the HELPER, INVADER or RIVAL building is owned, its event no longer turns up:
+the building does the same thing for good.
 
 ## Attack table
 
@@ -351,6 +378,9 @@ average level 4.
 | DOWNSTACK | 1,400,000 | its board throws up a garbage row every 4th piece (half of them cheese); it digs | 1.125 | 2.40 | table value + 2 a garbage row, 4 a cheese row |
 | 4-WIDE | 3,800,000 | walls stand full on both sides; endless combos in the 4-wide well (up to 165) | 1.03 | 2.918 | combo |
 | OPENER | 16,000,000 | a DPC loop by search: PC, TSD, PC from the leftovers (a PC per 15 pieces, a TSD per 29) | 1.6 | 2.064 | PC, TSD and B2B |
+| HELPER | 46,000,000 | the COMBO bot; lifts garbage off your board (below) | 3.05 | 1.18 | combo |
+| INVADER | 160,000,000 | the DOWNSTACK bot; speeds up your garbage (below) | 1.625 | 2.40 | table value + garbage rows |
+| RIVAL | 390,000,000 | Cold Clear's own weights, 6,000 nodes; fights your board (below) | 2.82 | 1.488 | B2B |
 
 Each building unlocks after one copy of the previous tier. Its bot never
 tops out, and every clear that is not its own technique pays the plain table
@@ -361,7 +391,24 @@ The technique bots earn about the same per piece (a single is worth too
 little for a combo to beat a tetris), so a higher tier plays faster instead:
 PPS is set so PPS × Lines per piece climbs 1.6, 1.8, 2.0, 2.2 Lines a second,
 and PERFECT, which earns the most per piece, stays at 1 PPS; past it the
-step is 0.3: 2.7, 3.0, 3.3.
+step is 0.3: 2.7, 3.0, 3.3, 3.6, 3.9, 4.2.
+
+The last three reach into the manual board, from the moment one is bought
+(`src/data/buildings.ts`, `src/sim/world.ts`):
+
+- **HELPER**: every Nth clear by hand that keeps a combo or back-to-back
+  going lifts the lowest garbage row out of your board and pays it like a
+  single. N is 4 with one copy, 3 with two, 2 with three to nine, 1 from ten.
+- **INVADER**: each copy makes your garbage come 5% faster and adds 10% to
+  your manual income.
+- **RIVAL**: while a life runs, the RIVAL board trades garbage with yours,
+  like the rival event (table value ÷ 2 in rows, your attack cancels what is
+  coming first, a piece that clears nothing takes up to 6 rows). A top-out
+  on your side ends the life as always. When the rival tops out its board
+  resets and the next one is stronger: each win in a row makes it play 15%
+  faster and hit 10% harder, and pays PER SECOND × 60 s × level ×
+  streak into the vault. The streak resets with the life; the best is kept.
+  Between lives it plays alone.
 
 DOWNSTACK and 4-WIDE play on boards with rules of their own (`BoardMode`
 in `src/sim/game.ts`: its own garbage, walls), kept in the board's snapshot
@@ -457,14 +504,14 @@ hardcore effects (manual ×2, risk ×3, lives three levels up); LUCK models
 golden pieces at their expected value, at a WRATH stage 0–III. It plots income
 over time with each building's first purchase, lists unlock times against a
 target of `first × ratio^k`, and exports the numbers as JSON in the shape of
-`src/data/ladder.ts`. The ladder file mirrors the nine shop buildings for
+`src/data/ladder.ts`. The ladder file mirrors the fifteen shop buildings for
 tuning; its default player averages level 4, the level the prices were
 fitted to.
 
 ## Save
 
 localStorage, key `tetra-clicker/save`, every 10 s plus on tab hide and
-unload. The file has a `version` (now 9); `src/save/schema.ts` upgrades
+unload. The file has a `version` (now 10); `src/save/schema.ts` upgrades
 older saves step by step, so a version 1 save loads with no upgrades and
 zeroed stats, a version 2 save loads with no round in play, a version 3
 save loads with no buffs or golden piece, a version 4 save has never
@@ -476,4 +523,12 @@ met no achievements yet (the first sweep awards what it qualifies for) and
 holds no wrath piece, and a version 8 save has its buildings ever bought
 filled in from FIRST achievements and what it owns, and its lifetime Lines
 (not counted before version 8) raised to a floor estimated from the balance,
-what it bought, Lines by hand and banked risk.
+what it bought, Lines by hand and banked risk, and a version 9 save has no
+RIVAL streak yet; its new settings (language, accessibility) take their
+defaults.
+
+SETTINGS → SAVE moves a game between browsers. EXPORT copies the save as
+text (`TETRA1:` and base64 JSON) and downloads it as a `.txt`; IMPORT takes
+pasted text or that file, runs it through the same migrations, and only
+when it reads as a save asks to replace this game and reloads. Anything
+else is refused and the current game stays as it is.

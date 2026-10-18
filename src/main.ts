@@ -5,6 +5,7 @@ import { format } from './sim/num';
 import { LocalStorageStore } from './save/localStorageStore';
 import { SAVE_VERSION, type SaveData } from './save/schema';
 import { startAutosave } from './save/autosave';
+import { exportSave, importSave } from './save/transfer';
 import { DEFAULT_HANDLING, type HandlingSettings } from './data/handling';
 import { buildingById } from './data/buildings';
 import { SYNERGIES } from './data/synergies';
@@ -12,10 +13,10 @@ import { tag } from './sim/tags';
 import { BoardRenderer, type BoardView } from './render/boardRenderer';
 import { Fx } from './render/fx';
 import { animatedPlacement, isLanded, type BotAnimation } from './render/botAnim';
-import { GOLD, PIECE_COLORS, WRATH_RIM } from './render/theme';
+import { GOLD, PIECE_COLORS, WRATH_RIM, THEME, VIEW, setPalette } from './render/theme';
 import { BUFFS } from './data/golden';
 import { drawRoundHud } from './render/roundHud';
-import { drawEventHud } from './render/eventHud';
+import { drawEventHud, drawDuelGauge } from './render/eventHud';
 import { InputHandler, type Action } from './ui/input';
 import { Shop } from './ui/shop';
 import { SettingsPanel } from './ui/settings';
@@ -27,6 +28,7 @@ import { TutorialBubble, advance as tutorialAdvance, currentStep as tutorialStep
 import { installEngine } from './sim/bot/ccWasm';
 import engineUrl from './engine/cold-clear.wasm?url';
 import { BotPrefetch } from './engine/botPrefetch';
+import { resolveLanguage, setLanguage, t } from './ui/i18n';
 
 // The technique bots think with Cold Clear compiled to wasm. Browsers only
 // compile a module this size asynchronously, so it loads before anything plays.
@@ -41,7 +43,29 @@ async function loadEngine(): Promise<WebAssembly.Instance> {
 
 const store = new LocalStorageStore();
 const saved = store.load();
-const settings: HandlingSettings = saved ? mergeSettings(saved.settings) : structuredClone(DEFAULT_HANDLING);
+const settings: HandlingSettings = mergeSettings(saved?.settings);
+applyDisplay();
+// The language is set before any panel is built; changing it reloads.
+const lang = resolveLanguage(settings.language, navigator.languages ?? [navigator.language]);
+setLanguage(lang);
+document.documentElement.lang = lang;
+for (const b of document.querySelectorAll<HTMLButtonElement>('#tabs button, #touch button[data-action="hardDrop"]')) b.textContent = t(b.textContent ?? '');
+
+// Accessibility settings into the renderers and the page: palette and
+// patterns (the colour-blind palette always shows patterns), motion,
+// contrast and text size.
+function applyDisplay(): void {
+  setPalette(settings.palette);
+  VIEW.patterns = settings.patterns || settings.palette === 'cvd';
+  VIEW.reduceMotion = settings.reduceMotion;
+  VIEW.highContrast = settings.highContrast;
+  VIEW.textScale = settings.uiScale / 100;
+  THEME.grid = settings.highContrast ? '#33335c' : '#15152a';
+  const root = document.documentElement;
+  root.classList.toggle('high-contrast', settings.highContrast);
+  root.classList.toggle('reduce-motion', settings.reduceMotion);
+  root.style.setProperty('--ui-scale', String(settings.uiScale / 100));
+}
 const world = saved ? new World(saved.world.seed, saved.world) : new World((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
 // Bot decisions are worked out ahead in a worker so a search never stalls a frame.
 const prefetch = new BotPrefetch(world);
@@ -153,7 +177,23 @@ const shopRoot = document.getElementById('shop-pane')!;
 const settingsOverlay = document.getElementById('settings-overlay')!;
 const sound = new Sound(settings.volume, settings.muted);
 for (const ev of ['keydown', 'pointerdown'] as const) window.addEventListener(ev, () => sound.unlock(), { capture: true });
-const settingsPanel = new SettingsPanel(settingsOverlay, settings, () => { sound.set(settings.volume, settings.muted); saveNow(); }, (open) => input.setActive(!open));
+const settingsPanel = new SettingsPanel(settingsOverlay, settings, () => {
+  sound.set(settings.volume, settings.muted);
+  applyDisplay();
+  fitManual();
+  saveNow();
+  if (resolveLanguage(settings.language, navigator.languages ?? [navigator.language]) !== lang) location.reload();
+}, (open) => input.setActive(!open), {
+  exportText: () => exportSave(snapshot()),
+  importText: (text) => {
+    const data = importSave(text);
+    if (!data) return false;
+    // Written past the autosave, which stays shut until the reload.
+    store.replace(data);
+    location.reload();
+    return true;
+  },
+});
 const ascendOverlay = document.getElementById('ascend-overlay')!;
 // Built before the shop so a save made on the prestige shop reopens it.
 let shop: Shop;
@@ -179,6 +219,8 @@ startAutosave(store, snapshot);
 
 function mergeSettings(s: Partial<HandlingSettings> | undefined): HandlingSettings {
   const d = structuredClone(DEFAULT_HANDLING);
+  // Less motion starts on for a player whose system asks for it.
+  d.reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!s) return d;
   // Only actions that still exist: an old save may bind keys to one that was removed.
   const keys = { ...d.keys };
@@ -189,6 +231,9 @@ function mergeSettings(s: Partial<HandlingSettings> | undefined): HandlingSettin
   return {
     das: s.das ?? d.das, arr: s.arr ?? d.arr, sdf: s.sdf ?? d.sdf, keys,
     volume: s.volume ?? d.volume, muted: s.muted ?? d.muted, tutorial: s.tutorial ?? d.tutorial,
+    language: s.language ?? d.language, palette: s.palette ?? d.palette, patterns: s.patterns ?? d.patterns,
+    reduceMotion: s.reduceMotion ?? d.reduceMotion,
+    uiScale: s.uiScale ?? d.uiScale, highContrast: s.highContrast ?? d.highContrast,
   };
 }
 
@@ -208,6 +253,7 @@ function cueFor(e: WorldEvent): Cue | null {
     case 'golden': return e.wrath ? 'wrath' : 'golden';
     case 'goldenSpawn': return e.wrath ? 'wrath' : null;
     case 'achievement': return 'achievement';
+    case 'rivalWin': return 'checkpoint';
     case 'lifeEvent': return e.phase === 'start' ? 'wrath' : e.phase === 'won' ? 'checkpoint' : null;
     case 'bought': return 'buy';
     default: return null;
@@ -258,13 +304,13 @@ function handleEvent(e: WorldEvent): void {
     case 'slept':
       break;
     case 'roundStart':
-      manualFx.float(`GO · LEVEL ${e.level}`, manual.cellX(5), manual.cellY(29), { color: '#00f0ff', size: 26, dur: 900 });
+      manualFx.float(t('GO · LEVEL {n}', { n: e.level }), manual.cellX(5), manual.cellY(29), { color: '#00f0ff', size: 26, dur: 900 });
       break;
     case 'levelUp':
-      manualFx.float(`LEVEL ${e.level}`, manual.cellX(5), manual.cellY(24), { color: '#00f0ff', size: 22, dur: 1100 });
+      manualFx.float(t('LEVEL {n}', { n: e.level }), manual.cellX(5), manual.cellY(24), { color: '#00f0ff', size: 22, dur: 1100 });
       break;
     case 'checkpoint':
-      manualFx.float(`CHECKPOINT +${format(e.banked)}`, manual.cellX(5), manual.cellY(22), { color: '#39ff14', size: 22, dur: 1600 });
+      manualFx.float(t('CHECKPOINT +{v}', { v: format(e.banked) }), manual.cellX(5), manual.cellY(22), { color: '#39ff14', size: 22, dur: 1600 });
       shop.refresh(true);
       break;
     case 'garbage':
@@ -281,7 +327,7 @@ function handleEvent(e: WorldEvent): void {
       if (Number(e.forfeited) > 0) {
         manualFx.float(`−${format(e.forfeited)}`, manual.cellX(5), manual.cellY(25), { color: '#ff3b3b', size: 30, dur: 1600 });
       }
-      manualFx.float(`TOPPED OUT · LEVEL ${e.level}`, manual.cellX(5), manual.cellY(23), { color: '#ffffff', size: 16, dur: 1600 });
+      manualFx.float(t('TOPPED OUT · LEVEL {n}', { n: e.level }), manual.cellX(5), manual.cellY(23), { color: '#ffffff', size: 16, dur: 1600 });
       shop.refresh(true);
       break;
     }
@@ -290,11 +336,11 @@ function handleEvent(e: WorldEvent): void {
     case 'buff':
       break;
     case 'goldenSpawn':
-      manualFx.float(e.wrath ? 'WRATH' : 'GOLDEN', manual.cellX(5), manual.cellY(22), { color: e.wrath ? WRATH_RIM : GOLD, size: 18, dur: 1200 });
+      manualFx.float(e.wrath ? 'WRATH' : t('GOLDEN'), manual.cellX(5), manual.cellY(22), { color: e.wrath ? WRATH_RIM : GOLD, size: 18, dur: 1200 });
       break;
     case 'golden': {
       const o = e.outcome;
-      const text = o.kind === 'buff' ? BUFFS[o.buff]?.label ?? o.id
+      const text = o.kind === 'buff' ? t(BUFFS[o.buff]?.label ?? o.id)
         : o.kind === 'ruin' ? `RUIN −${format(e.amount)}` : `LUCKY +${format(e.amount)}`;
       // A wrath result is the whole board's news: bigger, longer, harder shake.
       manualFx.shakeBoard(e.wrath ? 7 : 3);
@@ -303,19 +349,27 @@ function handleEvent(e: WorldEvent): void {
         : { color: GOLD, size: 24, dur: 2000 });
       break;
     }
+    case 'rivalWin':
+      manualFx.float(t('RIVAL DOWN ×{n} +{v}', { n: e.streak, v: format(e.amount) }), manual.cellX(5), manual.cellY(24), { color: '#ff5050', size: 26, dur: 2200 });
+      break;
+    case 'helperRow':
+      manualFx.float(`HELPER +${format(e.amount)}`, manual.cellX(5), manual.cellY(30), { color: '#39ff14', size: 16, dur: 1000 });
+      break;
     case 'lifeEvent': {
       const names = { rival: 'RIVAL', invader: 'INVADER', helper: 'HELPER' };
-      const text = e.phase === 'start' ? `${names[e.kind]}!` : e.phase === 'won' ? `${names[e.kind]} BEATEN +${format(e.amount)}` : e.phase === 'lost' ? `${names[e.kind]} WINS` : `${names[e.kind]} LEAVES`;
+      const name = names[e.kind];
+      const text = e.phase === 'start' ? `${name}!` : e.phase === 'won' ? t('{name} BEATEN +{v}', { name, v: format(e.amount) })
+        : e.phase === 'lost' ? t('{name} WINS', { name }) : t('{name} LEAVES', { name });
       manualFx.float(text, manual.cellX(5), manual.cellY(24), { color: e.phase === 'lost' ? '#7a7aa0' : '#ff8c1a', size: e.phase === 'start' ? 30 : 24, dur: 2200 });
       if (e.phase === 'start') manualFx.shakeBoard(4);
       break;
     }
     case 'achievement':
-      toast(`★ ${achievementById(e.id)?.name ?? e.id} · +1% income`, 'achievement');
+      toast(t('★ {name} · +1% income', { name: t(achievementById(e.id)?.name ?? e.id) }), 'achievement');
       shop.refresh(true);
       break;
     case 'goldenLost':
-      manualFx.float(e.wrath ? 'WRATH LOST' : 'GOLDEN LOST', manual.cellX(5), manual.cellY(23), { color: '#7a7aa0', size: 16, dur: 1200 });
+      manualFx.float(t(e.wrath ? 'WRATH LOST' : 'GOLDEN LOST'), manual.cellX(5), manual.cellY(23), { color: '#7a7aa0', size: 16, dur: 1200 });
       break;
   }
 }
@@ -413,6 +467,7 @@ function render(): void {
   manual.render(view, manualFx, (ctx) => {
     drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore);
     drawEventHud(ctx, manual, world.lifeEvent, view.next.length);
+    drawDuelGauge(ctx, manual, world.duel?.toMe ?? 0);
   });
   manualPane.classList.toggle('hardcore', world.economy.meta.hardcore);
   ensureAutoViews();
@@ -436,7 +491,9 @@ const e2Earned = (v: AutoView): number => v.lastEarned;
 function boardLabel(id: string, name: string | undefined): string {
   const syn = SYNERGIES.some((s) => s.pair.includes(id) && world.economy.hasUpgrade(s.id)) ? ' · SYN' : '';
   const buff = world.buffs.multiplier([tag.board('auto'), tag.building(id)], world.economy);
-  return `${name ?? id}${syn}${buff > 1 ? ` ×${buff}` : ''}`;
+  // The rival names its fight: the streak while a life runs.
+  const duel = id === 'rival' && world.duel ? ` · ${t('WIN {n}', { n: world.economy.meta.rivalStreak })}` : '';
+  return `${name ?? id}${syn}${duel}${buff > 1 ? ` ×${buff}` : ''}`;
 }
 
 function label(ctx: CanvasRenderingContext2D, r: BoardRenderer, text: string): void {

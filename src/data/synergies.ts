@@ -58,6 +58,10 @@ const SPECS: Spec[] = [
     trigger: { on: 'garbage', buff: 'syn_fourwide' } },
   { kind: 'play', name: '4-WIDE + OPENER: the OPENER bot runs a combo after each PC instead of a TSD (×1.25)', effects: [income('opener', FIXED_REWARD)],
     variant: { building: 'opener', skill: 'opener_combo' } },
+  { kind: 'link', name: 'OPENER + HELPER: your perfect clear doubles the HELPER bot for 30 s', effects: [],
+    trigger: { on: 'pc', buff: 'syn_helper' } },
+  { kind: 'reward', name: 'HELPER + INVADER: the INVADER bot shares combo pay (×1.25)', effects: [income('invader', FIXED_REWARD)] },
+  { kind: 'cross', name: 'INVADER + RIVAL: +1% each per copy of the other', effects: cross('invader', 'rival') },
 ];
 
 export const SYNERGIES: SynergyDef[] = SPECS.map((s, i) => {

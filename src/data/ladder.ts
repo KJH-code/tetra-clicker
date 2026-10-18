@@ -32,4 +32,7 @@ export const LADDER: LadderEntry[] = [
   { id: 'downstack', name: 'DOWNSTACK', basePrice: 1_400_000, growth: 1.15, pps: 1.125, linesPerPiece: 2.40, bonusPct: 10, requires: 'pc' },
   { id: 'fourwide', name: '4-WIDE', basePrice: 3_800_000, growth: 1.15, pps: 1.03, linesPerPiece: 2.918, bonusPct: 10, requires: 'downstack' },
   { id: 'opener', name: 'OPENER', basePrice: 16_000_000, growth: 1.15, pps: 1.6, linesPerPiece: 2.064, bonusPct: 10, requires: 'fourwide' },
+  { id: 'helper', name: 'HELPER', basePrice: 46_000_000, growth: 1.15, pps: 3.05, linesPerPiece: 1.18, bonusPct: 10, requires: 'opener' },
+  { id: 'invader', name: 'INVADER', basePrice: 160_000_000, growth: 1.15, pps: 1.625, linesPerPiece: 2.40, bonusPct: 10, requires: 'helper' },
+  { id: 'rival', name: 'RIVAL', basePrice: 390_000_000, growth: 1.15, pps: 2.82, linesPerPiece: 1.488, bonusPct: 10, requires: 'invader' },
 ];

@@ -1,6 +1,6 @@
 import { WIDTH, HEIGHT, TOP_VISIBLE_ROW, occupiedCells, type Grid, type Placement } from '../sim/board';
 import { cellsOf, pieceFromId, type Piece } from '../sim/pieces';
-import { GOLD, PIECE_COLORS, THEME, WRATH_FILL, WRATH_RIM } from './theme';
+import { GOLD, PIECE_COLORS, THEME, VIEW, WRATH_FILL, WRATH_RIM } from './theme';
 import type { Fx } from './fx';
 
 // Two buffer rows are drawn above the visible twenty, dimmed, so a piece
@@ -86,7 +86,7 @@ export class BoardRenderer {
         const id = view.grid[y * WIDTH + x]!;
         if (id === 0) continue;
         const piece = pieceFromId(id);
-        this.drawCell(x, y, piece ? PIECE_COLORS[piece] : THEME.dim, dim ? 0.35 : 1);
+        this.drawCell(x, y, piece ? PIECE_COLORS[piece] : THEME.dim, dim ? 0.35 : 1, false, piece);
       }
     }
     // Ghost, then the active piece on top of it.
@@ -98,7 +98,7 @@ export class BoardRenderer {
       const wrath = gold && !!view.golden?.wrath;
       for (const [x, y] of occupiedCells(view.active)) {
         if (y < FIRST_DRAWN_ROW) continue;
-        this.drawCell(x, y, wrath ? WRATH_FILL : gold ? GOLD : PIECE_COLORS[view.active.piece], y < TOP_VISIBLE_ROW ? 0.6 : 1, true);
+        this.drawCell(x, y, wrath ? WRATH_FILL : gold ? GOLD : PIECE_COLORS[view.active.piece], y < TOP_VISIBLE_ROW ? 0.6 : 1, true, view.active.piece);
         if (gold) this.drawGoldEdge(this.cellX(x) + 1, this.cellY(y) + 1, layout.cell - 2, wrath);
       }
     }
@@ -118,11 +118,18 @@ export class BoardRenderer {
     ctx.restore();
   }
 
-  drawCell(x: number, y: number, color: string, alpha = 1, glow = false): void {
+  drawCell(x: number, y: number, color: string, alpha = 1, glow = false, piece: Piece | null = null): void {
     const { ctx, layout } = this;
     const c = layout.cell;
     const px = this.cellX(x);
     const py = this.cellY(y);
+    this.paintCell(px, py, c, color, alpha, glow, piece);
+  }
+
+  // One block at pixel (px, py), size c: fill, lit top edge, and the
+  // display options (a pattern per piece, a dark outline in high contrast).
+  private paintCell(px: number, py: number, c: number, color: string, alpha: number, glow: boolean, piece: Piece | null): void {
+    const { ctx } = this;
     ctx.save();
     ctx.globalAlpha = alpha;
     if (glow) {
@@ -136,6 +143,13 @@ export class BoardRenderer {
     ctx.fillStyle = '#ffffff';
     ctx.globalAlpha = alpha * 0.25;
     ctx.fillRect(px + 1, py + 1, c - 2, Math.max(1, c * 0.18));
+    if (piece && VIEW.patterns) drawPattern(ctx, piece, px + 1, py + 1, c - 2, alpha);
+    if (VIEW.highContrast) {
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = Math.max(1, c * 0.08);
+      ctx.strokeRect(px + 1.5, py + 1.5, c - 3, c - 3);
+    }
     ctx.restore();
   }
 
@@ -169,7 +183,7 @@ export class BoardRenderer {
     const { ctx } = this;
     ctx.save();
     ctx.strokeStyle = wrath ? WRATH_RIM : '#ffffff';
-    ctx.globalAlpha = wrath ? 0.55 + 0.45 * Math.sin(performance.now() / 160) ** 2 : 0.9;
+    ctx.globalAlpha = wrath && !VIEW.reduceMotion ? 0.55 + 0.45 * Math.sin(performance.now() / 160) ** 2 : 0.9;
     ctx.lineWidth = wrath ? 2.5 : 1.5;
     if (wrath) {
       ctx.shadowColor = WRATH_RIM;
@@ -197,6 +211,32 @@ export class BoardRenderer {
     ctx.shadowBlur = c * (gold ? 1.2 : 0.5);
     for (const [x, y] of cells) ctx.fillRect(ox + (x - minX) * c + 1, oy + (y - minY) * c + 1, c - 2, c - 2);
     ctx.restore();
+    if (VIEW.patterns) for (const [x, y] of cells) drawPattern(ctx, piece, ox + (x - minX) * c + 1, oy + (y - minY) * c + 1, c - 2, alpha);
     if (gold) for (const [x, y] of cells) this.drawGoldEdge(ox + (x - minX) * c + 1, oy + (y - minY) * c + 1, c - 2, wrath);
   }
+}
+
+// A mark per piece so pieces differ by more than colour: a bar for I, a dot
+// for O, a chevron for T, a slash each way for S and Z, an upright for J,
+// a corner for L. Dark ink over the block, thin enough to keep its colour.
+function drawPattern(ctx: CanvasRenderingContext2D, piece: Piece, x: number, y: number, s: number, alpha: number): void {
+  const m = s * 0.25;
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.55;
+  ctx.strokeStyle = '#000000';
+  ctx.fillStyle = '#000000';
+  ctx.lineWidth = Math.max(1, s * 0.13);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  switch (piece) {
+    case 'I': ctx.moveTo(x + m, y + s / 2); ctx.lineTo(x + s - m, y + s / 2); break;
+    case 'O': ctx.arc(x + s / 2, y + s / 2, s * 0.14, 0, Math.PI * 2); ctx.fill(); break;
+    case 'T': ctx.moveTo(x + m, y + s - m); ctx.lineTo(x + s / 2, y + m); ctx.lineTo(x + s - m, y + s - m); break;
+    case 'S': ctx.moveTo(x + m, y + s - m); ctx.lineTo(x + s - m, y + m); break;
+    case 'Z': ctx.moveTo(x + m, y + m); ctx.lineTo(x + s - m, y + s - m); break;
+    case 'J': ctx.moveTo(x + s / 2, y + m); ctx.lineTo(x + s / 2, y + s - m); break;
+    case 'L': ctx.moveTo(x + m, y + m); ctx.lineTo(x + m, y + s - m); ctx.lineTo(x + s - m, y + s - m); break;
+  }
+  ctx.stroke();
+  ctx.restore();
 }

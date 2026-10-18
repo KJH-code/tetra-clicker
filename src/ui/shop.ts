@@ -3,6 +3,7 @@ import { format } from '../sim/num';
 import { BUILDINGS } from '../data/buildings';
 import { UpgradeChips } from './upgradeChips';
 import { ACHIEVEMENTS } from '../data/achievements';
+import { t } from './i18n';
 
 // Right pane: balance, income, one button per building, settings.
 export class Shop {
@@ -18,7 +19,7 @@ export class Shop {
   constructor(private root: HTMLElement, private world: World, onSettings: () => void, onAscend: () => void, onAchievements: () => void) {
     root.innerHTML = '';
     const balance = stat('LINES', 'balance');
-    const income = stat('PER SECOND', 'income', true);
+    const income = stat(t('PER SECOND'), 'income', true);
     this.balanceEl = balance.value;
     this.incomeEl = income.value;
     this.crownEl = el('div', 'crowns', '');
@@ -36,7 +37,7 @@ export class Shop {
       const name = el('div', 'name', b.name);
       const owned = el('div', 'owned', '0');
       const price = el('div', 'price', '');
-      const hint = el('div', 'hint', `+${b.effects[0]?.value ?? 0}% / copy · ${b.pps} PPS`);
+      const hint = el('div', 'hint', t('+{pct}% / copy · {pps} PPS', { pct: b.effects[0]?.value ?? 0, pps: b.pps }));
       btn.append(name, owned, price, hint);
       btn.addEventListener('click', () => {
         if (this.world.buy(b.id)) this.refresh(true);
@@ -56,7 +57,7 @@ export class Shop {
     this.achBtn.addEventListener('click', onAchievements);
     const settings = document.createElement('button');
     settings.className = 'btn';
-    settings.textContent = 'SETTINGS';
+    settings.textContent = t('SETTINGS');
     settings.addEventListener('click', onSettings);
     row.append(this.achBtn, settings);
     root.append(row);
@@ -79,12 +80,12 @@ export class Shop {
     this.chips.refresh();
     const meta = this.world.economy.meta;
     this.crownEl.hidden = meta.crownsEarned === 0;
-    this.crownEl.textContent = `♛ ${meta.crowns} CROWN · +${meta.crownsEarned}% income`;
+    this.crownEl.textContent = t('♛ {crowns} CROWN · +{earned}% income', { crowns: meta.crowns, earned: meta.crownsEarned });
     // The button stays hidden until a run is worth something, then names the price.
     const preview = this.world.crownPreview();
     this.ascendBtn.hidden = preview < 1 && meta.ascensions === 0;
     this.ascendBtn.disabled = !this.world.canAscend();
-    this.ascendBtn.textContent = preview >= 1 ? `ASCEND +${preview} CROWN` : 'ASCEND';
+    this.ascendBtn.textContent = preview >= 1 ? t('ASCEND +{n} CROWN', { n: preview }) : t('ASCEND');
     this.achBtn.textContent = `★ ${meta.achievements.size}/${ACHIEVEMENTS.length}`;
     // Unlocked buildings show in full; only the next locked one is visible,
     // dimmed and unnamed, so the ladder is hinted at one step at a time.

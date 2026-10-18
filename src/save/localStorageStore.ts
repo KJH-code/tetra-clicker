@@ -4,7 +4,18 @@ import { migrate, type SaveData } from './schema';
 export const SAVE_KEY = 'tetra-clicker/save';
 
 export class LocalStorageStore implements SaveStore {
+  // Set once an imported save has been written: the page is about to reload,
+  // and the autosave on unload must not put the old game back.
+  private locked = false;
+
   constructor(private readonly key: string = SAVE_KEY) {}
+
+  // Write this save and accept no more until the page reloads.
+  replace(data: SaveData): void {
+    this.locked = false;
+    this.save(data);
+    this.locked = true;
+  }
 
   load(): SaveData | null {
     try {
@@ -18,6 +29,7 @@ export class LocalStorageStore implements SaveStore {
   }
 
   save(data: SaveData): void {
+    if (this.locked) return;
     try {
       localStorage.setItem(this.key, JSON.stringify(data));
     } catch {

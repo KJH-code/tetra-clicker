@@ -1,6 +1,6 @@
 import { WIDTH } from '../sim/board';
 import type { BoardRenderer } from './boardRenderer';
-import { THEME } from './theme';
+import { THEME, VIEW } from './theme';
 
 interface RowFlash { row: number; t: number; dur: number }
 interface Floater { text: string; x: number; y: number; t: number; dur: number; color: string; size: number }
@@ -13,15 +13,18 @@ export class Fx {
   private shake = { amp: 0, t: 0, dur: 0 };
 
   rowClear(rows: number[]): void {
+    // Reduced motion: no flash.
+    if (VIEW.reduceMotion) return;
     for (const row of rows) this.flashes.push({ row, t: 0, dur: 260 });
   }
 
   shakeBoard(strength: number): void {
+    if (VIEW.reduceMotion) return;
     this.shake = { amp: Math.min(10, 2 + strength * 2), t: 0, dur: 180 + strength * 40 };
   }
 
   float(text: string, x: number, y: number, opts: { color?: string; size?: number; dur?: number } = {}): void {
-    this.floaters.push({ text, x, y, t: 0, dur: opts.dur ?? 900, color: opts.color ?? THEME.text, size: opts.size ?? 16 });
+    this.floaters.push({ text, x, y, t: 0, dur: opts.dur ?? 900, color: opts.color ?? THEME.text, size: (opts.size ?? 16) * VIEW.textScale });
   }
 
   update(dt: number): void {

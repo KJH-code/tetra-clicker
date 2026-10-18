@@ -2,6 +2,7 @@ import type { World } from '../sim/world';
 import { BUILDINGS } from '../data/buildings';
 import { format, toNumber } from '../sim/num';
 import { tag } from '../sim/tags';
+import { t } from './i18n';
 
 // The STATS tab: this run beside every run, techniques, records, and two
 // charts (PER SECOND through the run, and each building's share of it now).
@@ -13,44 +14,45 @@ export function statsView(world: World): HTMLElement {
   wrap.className = 'stats';
   const time = (sec: number) => {
     const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    return h > 0 ? t('{h}h {m}m', { h, m }) : t('{m}m', { m });
   };
   const sections: [string, [string, string, string][]][] = [
-    ['RUN · ALL RUNS', [
-      ['Lines earned', format(s.linesEarned), format(career('linesEarned'))],
-      ['Lives', String(s.rounds), String(career('rounds'))],
-      ['Top-outs', String(s.deaths), String(career('deaths'))],
-      ['Checkpoints', String(s.checkpoints), String(career('checkpoints'))],
-      ['Play time', time(s.playSeconds), time(career('playSeconds'))],
-      ['Ascensions', '', String(eco.meta.ascensions)],
+    [t('RUN · ALL RUNS'), [
+      [t('Lines earned'), format(s.linesEarned), format(career('linesEarned'))],
+      [t('Lives'), String(s.rounds), String(career('rounds'))],
+      [t('Top-outs'), String(s.deaths), String(career('deaths'))],
+      [t('Checkpoints'), String(s.checkpoints), String(career('checkpoints'))],
+      [t('Play time'), time(s.playSeconds), time(career('playSeconds'))],
+      [t('Ascensions'), '', String(eco.meta.ascensions)],
     ]],
-    ['TECHNIQUES BY HAND', [
-      ['T-spin single / double / triple', `${s.tss} / ${s.tsd} / ${s.tst}`, `${career('tss')} / ${career('tsd')} / ${career('tst')}`],
-      ['Tetrises', String(s.tetrises), String(career('tetrises'))],
-      ['Perfect clears', String(s.pcs), String(career('pcs'))],
-      ['Back-to-back clears', String(s.b2bs), String(career('b2bs'))],
-      ['5 / 10 combos', `${s.combo5} / ${s.combo10}`, `${career('combo5')} / ${career('combo10')}`],
-      ['Golden / wrath pieces', `${s.goldens} / ${s.wraths}`, `${career('goldens')} / ${career('wraths')}`],
-      ['Rivals beaten', String(s.rivalWins), String(career('rivalWins'))],
+    [t('TECHNIQUES BY HAND'), [
+      [t('T-spin single / double / triple'), `${s.tss} / ${s.tsd} / ${s.tst}`, `${career('tss')} / ${career('tsd')} / ${career('tst')}`],
+      [t('Tetrises'), String(s.tetrises), String(career('tetrises'))],
+      [t('Perfect clears'), String(s.pcs), String(career('pcs'))],
+      [t('Back-to-back clears'), String(s.b2bs), String(career('b2bs'))],
+      [t('5 / 10 combos'), `${s.combo5} / ${s.combo10}`, `${career('combo5')} / ${career('combo10')}`],
+      [t('Golden / wrath pieces'), `${s.goldens} / ${s.wraths}`, `${career('goldens')} / ${career('wraths')}`],
+      [t('Rivals beaten'), String(s.rivalWins), String(career('rivalWins'))],
     ]],
-    ['RECORDS', [
-      ['Highest level', String(s.maxLevel), String(career('maxLevel'))],
-      ['Longest life', `${s.maxLifeRows} rows · ${time(s.maxLifeSeconds)}`, `${career('maxLifeRows')} rows · ${time(career('maxLifeSeconds'))}`],
-      ['Hardcore best', '', eco.meta.hardcoreBest.level ? `level ${eco.meta.hardcoreBest.level} · ${eco.meta.hardcoreBest.rows} rows` : '—'],
-      ['Challenge best', '', eco.meta.challengeBest ? `${eco.meta.challengeBest} points` : '—'],
+    [t('RECORDS'), [
+      [t('Highest level'), String(s.maxLevel), String(career('maxLevel'))],
+      [t('Longest life'), t('{rows} rows · {time}', { rows: s.maxLifeRows, time: time(s.maxLifeSeconds) }), t('{rows} rows · {time}', { rows: career('maxLifeRows'), time: time(career('maxLifeSeconds')) })],
+      [t('Hardcore best'), '', eco.meta.hardcoreBest.level ? t('level {level} · {rows} rows', { level: eco.meta.hardcoreBest.level, rows: eco.meta.hardcoreBest.rows }) : '—'],
+      [t('Challenge best'), '', eco.meta.challengeBest ? t('{n} points', { n: eco.meta.challengeBest }) : '—'],
+      [t('Best RIVAL streak'), String(eco.meta.rivalStreak), String(eco.meta.rivalBest)],
     ]],
   ];
   for (const [title, rows] of sections) {
-    const t = document.createElement('table');
-    t.className = 'stat-table';
-    const head = t.createTHead().insertRow();
-    for (const h of [title, 'RUN', 'ALL']) { const th = document.createElement('th'); th.textContent = h; head.append(th); }
-    const body = t.createTBody();
+    const table = document.createElement('table');
+    table.className = 'stat-table';
+    const head = table.createTHead().insertRow();
+    for (const h of [title, t('RUN'), t('ALL')]) { const th = document.createElement('th'); th.textContent = h; head.append(th); }
+    const body = table.createTBody();
     for (const r of rows) {
       const tr = body.insertRow();
       for (const v of r) tr.insertCell().textContent = v;
     }
-    wrap.append(t);
+    wrap.append(table);
   }
   wrap.append(incomeChart(world), shareChart(world));
   return wrap;
@@ -86,7 +88,7 @@ function setup(canvas: HTMLCanvasElement, w: number, h: number): CanvasRendering
 // One series, so no legend: the title names it. A crosshair and tooltip
 // follow the pointer.
 function incomeChart(world: World): HTMLElement {
-  const { box, canvas, tip } = chartBox('PER SECOND THROUGH THIS RUN (without buffs)');
+  const { box, canvas, tip } = chartBox(t('PER SECOND THROUGH THIS RUN (without buffs)'));
   const data = [...world.samples, toNumber(world.incomePerSecond())];
   const every = world.sampleEvery;
   const W = 640, H = 180, L = 48, R = 12, T = 10, B = 24;
@@ -108,10 +110,10 @@ function incomeChart(world: World): HTMLElement {
     ctx.textAlign = 'left';
     ctx.fillText('0', L, H - 8);
     ctx.textAlign = 'right';
-    ctx.fillText(`${Math.round(((data.length - 1) * every) / 60)} min`, W - R, H - 8);
+    ctx.fillText(t('{n} min', { n: Math.round(((data.length - 1) * every) / 60) }), W - R, H - 8);
     if (data.length < 2) {
       ctx.textAlign = 'center';
-      ctx.fillText(`a point every ${every} s of play`, W / 2, H / 2);
+      ctx.fillText(t('a point every {n} s of play', { n: every }), W / 2, H / 2);
     }
     ctx.strokeStyle = INK.line;
     ctx.lineWidth = 2;
@@ -136,7 +138,7 @@ function incomeChart(world: World): HTMLElement {
     const i = Math.max(0, Math.min(data.length - 1, Math.round(((px - L) / (W - L - R)) * (data.length - 1))));
     draw(i);
     tip.hidden = false;
-    tip.textContent = `${Math.round((i * every) / 60)} min · ${format(data[i]!)}/s`;
+    tip.textContent = t('{m} min · {v}/s', { m: Math.round((i * every) / 60), v: format(data[i]!) });
     tip.style.left = `${(x(i) / W) * r.width}px`;
   });
   canvas.addEventListener('pointerleave', () => { draw(null); tip.hidden = true; });
@@ -146,7 +148,7 @@ function incomeChart(world: World): HTMLElement {
 // Each owned building's share of PER SECOND now, one hue, largest first,
 // each bar labelled with its value.
 function shareChart(world: World): HTMLElement {
-  const { box, canvas, tip } = chartBox("EACH BUILDING'S PER SECOND NOW");
+  const { box, canvas, tip } = chartBox(t("EACH BUILDING'S PER SECOND NOW"));
   const rows = BUILDINGS.filter((b) => world.economy.owned(b.id) > 0).map((b) => ({
     name: b.name,
     v: b.pps * b.linesPerPiece * world.economy.incomeMultiplier([tag.board('auto'), tag.building(b.id), tag.clear(b.clearSize)]),
@@ -160,7 +162,7 @@ function shareChart(world: World): HTMLElement {
   if (!rows.length) {
     ctx.fillStyle = INK.dim;
     ctx.textAlign = 'center';
-    ctx.fillText('no buildings yet', W / 2, H / 2 + 4);
+    ctx.fillText(t('no buildings yet'), W / 2, H / 2 + 4);
   }
   rows.forEach((r, i) => {
     const yy = 4 + i * row;

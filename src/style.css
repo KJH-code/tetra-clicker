@@ -336,3 +336,19 @@ canvas { display: block; image-rendering: pixelated; }
 .chart-title { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; margin-bottom: 4px; }
 .chart-tip { position: absolute; top: 18px; transform: translateX(-50%); background: #11112af0; border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; font-size: 11px; pointer-events: none; white-space: nowrap; color: var(--text); }
 .chart-tip[hidden] { display: none; }
+
+/* Settings grew past one screen: it scrolls. */
+.settings:not(.ascend):not(.achievements) { max-height: 92vh; overflow-y: auto; }
+.save-row { justify-content: flex-start !important; flex-wrap: wrap; }
+.save-text { width: 100%; background: #11112a; color: var(--text); border: 1px solid var(--line); border-radius: 8px; font: 11px monospace; padding: 6px; }
+.save-note { font-size: 12px; color: var(--accent); }
+
+/* Accessibility */
+.a11y-row { justify-content: flex-start !important; flex-wrap: wrap; }
+.a11y-row .btn.on { color: var(--accent); border-color: var(--accent); }
+#shop-pane, .settings, .tutorial, .toast, #tabs, #touch { zoom: var(--ui-scale, 1); }
+:root.high-contrast { --dim: #c8c8f0; --line: #5a5a90; --text: #ffffff; }
+:root.high-contrast .pane { border-color: #6a6aa0; }
+:root.reduce-motion *, :root.reduce-motion *::before, :root.reduce-motion *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+/* Hangul spaced like the English capitals reads as loose syllables. */
+:root:lang(ko) *, :root:lang(ko) *::placeholder { letter-spacing: 0 !important; }

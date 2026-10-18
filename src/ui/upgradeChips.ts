@@ -1,6 +1,7 @@
 import type { World } from '../sim/world';
 import { format } from '../sim/num';
 import { UPGRADES, type UpgradeDef } from '../data/upgrades';
+import { t } from './i18n';
 
 // A row of small chips above the buildings: one per upgrade that is unlocked
 // and not yet bought. Text stays short on the chip; the tooltip carries the
@@ -36,7 +37,7 @@ export class UpgradeChips {
     const btn = document.createElement('button');
     btn.className = `chip ${u.group}`;
     btn.dataset['upgrade'] = u.id;
-    btn.textContent = u.label;
+    btn.textContent = t(u.label);
     btn.addEventListener('click', () => {
       if (this.world.buyUpgrade(u.id)) this.onBuy();
     });
@@ -47,8 +48,8 @@ export class UpgradeChips {
   }
 
   private show(u: UpgradeDef, anchor: HTMLElement): void {
-    const rule = u.rule ? '<span class="rule">RULE</span>' : '';
-    this.tip.innerHTML = `<div class="tip-name">${u.name}${rule}</div><div class="tip-price">${format(u.price)}</div>`;
+    const rule = u.rule ? `<span class="rule">${t('RULE')}</span>` : '';
+    this.tip.innerHTML = `<div class="tip-name">${t(u.name)}${rule}</div><div class="tip-price">${format(u.price)}</div>`;
     this.tip.hidden = false;
     const parent = this.tip.offsetParent as HTMLElement | null;
     const a = anchor.getBoundingClientRect();

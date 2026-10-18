@@ -1,5 +1,6 @@
 import type { World, WorldEvent } from '../sim/world';
 import { TUTORIAL_OFF } from '../data/handling';
+import { t } from './i18n';
 
 // Five steps for a new player, each a one-line bubble that moves on when the
 // game sees it done. The step logic is plain functions over the world so it
@@ -71,11 +72,11 @@ export class TutorialBubble {
     this.text.className = 'text';
     const ok = document.createElement('button');
     ok.className = 'btn';
-    ok.textContent = 'OK';
+    ok.textContent = t('OK');
     ok.addEventListener('click', () => { this.hiddenFor = this.get(); this.refresh(); });
     const off = document.createElement('button');
     off.className = 'btn';
-    off.textContent = 'TUTORIAL OFF';
+    off.textContent = t('TUTORIAL OFF');
     off.addEventListener('click', () => { this.set(TUTORIAL_OFF); this.refresh(); });
     const row = document.createElement('div');
     row.className = 'row';
@@ -88,6 +89,6 @@ export class TutorialBubble {
     const step = this.get();
     const def = step === TUTORIAL_OFF ? null : TUTORIAL[step];
     this.el.hidden = !def || this.hiddenFor === step;
-    if (def) this.text.textContent = `${step + 1}/${TUTORIAL.length} · ${def.text}`;
+    if (def) this.text.textContent = `${step + 1}/${TUTORIAL.length} · ${t(def.text)}`;
   }
 }

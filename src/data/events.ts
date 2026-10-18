@@ -32,5 +32,15 @@ export const EVENTS = {
   helper: { seconds: 60 },
 };
 
+// The RIVAL building: its board fights yours for as long as a life runs.
+// Each rival it puts up after a win plays faster and hits harder; a win
+// pays (streak) minutes of PER SECOND per level into the vault.
+export const RIVAL_DUEL = {
+  ppsPerWin: 0.15,
+  attackPerWin: 0.1,
+  rewardSecondsPerLevel: 60,
+  maxRowsPerLock: 6,
+};
+
 // Garbage rows a placement's attack sends.
 export const ATTACK_ROWS_PER_LINE = 0.5;

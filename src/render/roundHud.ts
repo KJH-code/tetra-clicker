@@ -2,7 +2,9 @@ import type { Round } from '../sim/round';
 import type { BoardRenderer } from './boardRenderer';
 import { format } from '../sim/num';
 import { TOP_VISIBLE_ROW, WIDTH } from '../sim/board';
-import { GOLD } from './theme';
+import { GOLD, VIEW } from './theme';
+import { LEVELS } from '../data/levels';
+import { t } from '../ui/i18n';
 
 // Life readout drawn on the manual board, in the hold column under the hold
 // slots: vault, level with a bar to the next one, rows to the next
@@ -13,39 +15,51 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
   const c = r.layout.cell;
   const colW = r.layout.leftCells * c;
   const x0 = 6;
+  // Larger text takes more room down the column, and shrinks back to fit
+  // across it: the column is only five cells wide.
+  const s = VIEW.textScale;
+  const font = (px: number, text: string, weight = ''): void => {
+    let size = Math.round(px * s);
+    ctx.font = `${weight} ${size}px system-ui, sans-serif`;
+    const w = ctx.measureText(text).width;
+    if (w > colW - x0 * 2) {
+      size = Math.floor((size * (colW - x0 * 2)) / w);
+      ctx.font = `${weight} ${size}px system-ui, sans-serif`;
+    }
+  };
   let y = r.cellY(TOP_VISIBLE_ROW + 8);
   ctx.save();
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   const label = (text: string): void => {
     ctx.fillStyle = '#7a7aa0';
-    ctx.font = `${Math.round(c * 0.38)}px system-ui, sans-serif`;
+    font(c * 0.38, text);
     ctx.fillText(text, x0, y);
-    y += c * 0.55;
+    y += c * 0.55 * s;
   };
   if (hardcore) {
     ctx.fillStyle = '#ff3b3b';
-    ctx.font = `800 ${Math.round(c * 0.42)}px system-ui, sans-serif`;
-    ctx.fillText('HARDCORE', x0, y - c * 0.8);
+    font(c * 0.42, t('HARDCORE'), '800');
+    ctx.fillText(t('HARDCORE'), x0, y - c * 0.8 * s);
   }
-  label('VAULT');
+  label(t('VAULT'));
   ctx.fillStyle = '#e8e8ff';
-  ctx.font = `700 ${Math.round(c * 0.7)}px system-ui, sans-serif`;
+  font(c * 0.7, format(round.vault), '700');
   ctx.fillText(format(round.vault), x0, y);
-  y += c * 1.0;
-  label(round.active ? `CHECKPOINT IN ${round.rowsToCheckpoint}` : 'CHECKPOINT EVERY 40');
-  y += c * 0.15;
-  label(wrath > 0 ? `LEVEL · WRATH ${'I'.repeat(wrath)}` : 'LEVEL');
+  y += c * 1.0 * s;
+  label(round.active ? t('CHECKPOINT IN {n}', { n: round.rowsToCheckpoint }) : t('CHECKPOINT EVERY {n}', { n: LEVELS.checkpointRows }));
+  y += c * 0.15 * s;
+  label(wrath > 0 ? t('LEVEL · WRATH {w}', { w: 'I'.repeat(wrath) }) : t('LEVEL'));
   // Level and the bar to the next one; the colour warms as levels climb.
   const level = round.active ? round.level : nextStartLevel;
   const color = level < 5 ? '#00f0ff' : level < 10 ? '#ff2ed2' : '#ff3b3b';
   ctx.fillStyle = color;
   ctx.shadowColor = color;
   ctx.shadowBlur = 10;
-  ctx.font = `700 ${Math.round(c * 0.7)}px system-ui, sans-serif`;
+  font(c * 0.7, `${level}  ×${level}`, '700');
   ctx.fillText(`${level}  ×${level}`, x0, y);
   ctx.shadowBlur = 0;
-  y += c * 0.85;
+  y += c * 0.85 * s;
   const w = colW - x0 * 2;
   const h = c * 0.3;
   const k = round.active ? (round.rows % round.rowsPerLevel) / round.rowsPerLevel : 0;
@@ -60,14 +74,14 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
     ctx.fillStyle = GOLD;
     ctx.shadowColor = GOLD;
     ctx.shadowBlur = 8;
-    ctx.font = `700 ${Math.round(c * 0.36)}px system-ui, sans-serif`;
-    ctx.fillText(b.label, x0, y);
+    font(c * 0.36, t(b.label), '700');
+    ctx.fillText(t(b.label), x0, y);
     ctx.shadowBlur = 0;
-    y += c * 0.5;
+    y += c * 0.5 * s;
     ctx.fillStyle = '#e8e8ff';
-    ctx.font = `${Math.round(c * 0.36)}px system-ui, sans-serif`;
+    font(c * 0.36, `${Math.ceil(b.msLeft / 1000)}s`);
     ctx.fillText(`${Math.ceil(b.msLeft / 1000)}s`, x0, y);
-    y += c * 0.65;
+    y += c * 0.65 * s;
   }
 
   const banner = bannerText(round);
@@ -81,12 +95,12 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
     ctx.fillStyle = banner.color;
     ctx.shadowColor = banner.color;
     ctx.shadowBlur = 14;
-    ctx.font = `700 ${Math.round(c * 0.9)}px system-ui, sans-serif`;
+    ctx.font = `700 ${Math.round(c * 0.9 * VIEW.textScale)}px system-ui, sans-serif`;
     ctx.fillText(banner.big, cx, cy - c * 0.25);
     ctx.shadowBlur = 0;
     if (banner.small) {
       ctx.fillStyle = '#7a7aa0';
-      ctx.font = `${Math.round(c * 0.4)}px system-ui, sans-serif`;
+      ctx.font = `${Math.round(c * 0.4 * VIEW.textScale)}px system-ui, sans-serif`;
       ctx.fillText(banner.small, cx, cy + c * 0.7);
     }
   }
@@ -94,7 +108,7 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
 }
 
 function bannerText(round: Round): { big: string; small?: string; color: string } | null {
-  if (!round.active) return { big: 'READY', small: 'ANY KEY', color: '#00f0ff' };
-  if (round.paused) return { big: 'PAUSED', small: 'ANY KEY', color: '#ffe600' };
+  if (!round.active) return { big: t('READY'), small: t('ANY KEY'), color: '#00f0ff' };
+  if (round.paused) return { big: t('PAUSED'), small: t('ANY KEY'), color: '#ffe600' };
   return null;
 }
