@@ -16,9 +16,12 @@ export const EVENTS = {
   },
   // A bot on a board of its own beside yours, trading garbage until one of
   // you tops out. Stronger at higher levels; beating it pays this many
-  // seconds of PER SECOND per level into the vault.
+  // seconds of PER SECOND per level into the vault. `pace` is the
+  // rival_pace effect: 0.5 in normal runs, where a 2-PPS rival outran
+  // the 0.7-PPS player the game is pitched at (cap 1), and 1 in hardcore.
   rival: {
-    pps: (level: number): number => Math.min(2, 0.5 + 0.06 * level),
+    pace: 0.5,
+    pps: (level: number, pace = 1): number => Math.min(2 * pace, 0.5 + 0.06 * level * pace),
     nodes: (level: number): number => Math.min(4_000, 200 + 150 * level),
     rewardSecondsPerLevel: 120,
     // Rows a board takes at once when it places a piece that clears nothing.

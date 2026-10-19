@@ -213,7 +213,7 @@ export class Round {
     return out;
   }
 
-  gravity(): number {
-    return gravityAt(this.level);
+  gravity(pace = 1): number {
+    return gravityAt(this.level, pace);
   }
 }

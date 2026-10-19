@@ -15,6 +15,8 @@ export interface RivalEvent {
   kind: 'rival';
   game: Game;
   level: number;
+  // Pieces per second, fixed for the fight at the level it began.
+  pps: number;
   timerMs: number;
   // Garbage rows waiting for each side, and the part of a row not sent yet.
   toMe: number;
@@ -40,10 +42,12 @@ export interface HelperEvent {
   rows: number;
 }
 
-export function startEvent(kind: EventKind, level: number, seed: number): LifeEvent {
+export function startEvent(kind: EventKind, level: number, seed: number, rivalPace = 1): LifeEvent {
   switch (kind) {
-    case 'rival':
-      return { kind, game: new Game(seed), level, timerMs: 1000 / EVENTS.rival.pps(level), toMe: 0, toRival: 0, myCarry: 0, rivalCarry: 0, holes: createRng(seed ^ 0x2545f491) };
+    case 'rival': {
+      const pps = EVENTS.rival.pps(level, rivalPace);
+      return { kind, game: new Game(seed), level, pps, timerMs: 1000 / pps, toMe: 0, toRival: 0, myCarry: 0, rivalCarry: 0, holes: createRng(seed ^ 0x2545f491) };
+    }
     case 'invader':
       return { kind, msLeft: EVENTS.invader.seconds * 1000, earned: 0, shield: 0, carry: 0 };
     case 'helper':

@@ -54,6 +54,17 @@ for Hangul, both bundled ([THIRD_PARTY.md](THIRD_PARTY.md)); the boards wait
 for them before the first frame. Hover and press effects are short and stop
 under LESS MOTION.
 
+Clears on the manual board hit as hard as the technique (`hitStrength` in
+`src/render/hit.ts`, 0–8: a single barely, a tetris 4, a T-spin double 3,
+B2B and a 4+ combo +1 each, a perfect clear 8). From a double up the cleared
+rows burst into shards of the piece's colour; from a triple the board holds
+still for a beat (hit-stop, up to 110 ms) before it shakes, and a technique's
+name lands big in the middle of the well. Under every clear sits a low
+thump with a crunch of noise for the bigger ones, and each combo step plays a
+semitone higher. Queued garbage a clear cancels pops a red −n by the gauge
+with a crack; garbage that rises jolts the stack up with a red flash and a
+dull shove. All of it is render-side: the sim does not wait for a hit-stop.
+
 ## Language and accessibility
 
 Every screen text is in English or Korean (`src/ui/i18n.ts`, the Korean in
@@ -71,7 +82,8 @@ SETTINGS → ACCESSIBILITY:
 |---|---|
 | PIECE COLOURS | STANDARD (neon) or COLOUR-BLIND SAFE (Okabe–Ito). Seven pieces can all touch and no seven hues stay apart for every pair under every colour-vision type, so the colour-blind palette always shows patterns too |
 | PATTERNS | a mark per piece inside each cell: I bar, O dot, T chevron, S and Z opposite diagonals, J upright, L corner |
-| LESS MOTION | no row flashes, board shakes or pulsing; starts on when the system asks for reduced motion |
+| HIT EFFECTS | hit-stop, shards, big technique names and the garbage jolt (on by default; off leaves the old small text and shake) |
+| LESS MOTION | no row flashes, board shakes, hit-stop, shards or pulsing; starts on when the system asks for reduced motion |
 | HIGH CONTRAST | brighter text and grid, an outline on every cell |
 | TEXT | 90–150% for the panels and the text drawn on the boards (which shrinks back to fit its column) |
 
@@ -83,9 +95,16 @@ skill.
 
 - **Level**: marathon style, +1 every 10 rows cleared. Manual Lines are
   multiplied by the level.
-- **Gravity** is always on and follows the level: 0.5 cells/s at level 1,
-  1.5 at 5, 4 at 10, 10 at 15, and at level 20 pieces land at once (20G).
-  A resting piece locks after 500 ms; moves and turns reset that up to 15 times.
+- **Gravity** is always on and follows the level. Normal runs climb the
+  table at half pace (`gravityPace` 0.5, interpolated between entries):
+  0.5 cells/s at level 1, 1.5 at 9, 4 at 19, 10 at 29, and at level 39
+  pieces land at once (20G). Hardcore climbs at full pace: 1.5 at 5, 4 at
+  10, 10 at 15, 20G at 20. The aim: a 0.7-PPS beginner tops out around
+  level 20, a middling player at 30–40, and a TGM player keeps going.
+- **Lock delay**: a resting piece locks after 500 ms; moves and turns reset
+  that up to 15 times. Past the first 20G level gravity has nowhere to go,
+  so the lock delay shrinks instead: −15 ms a level to 200 ms, and one reset
+  fewer every two levels down to 8 (`lockAt` in `src/data/levels.ts`).
 - **Garbage comes from spending, not from the clock** (`src/data/garbage.ts`).
   Buying a building or an upgrade sends rows: its price over a minute of
   what the game earns (PER SECOND plus the hand's recent rate), rounded down,
@@ -217,7 +236,8 @@ Everything is data in `src/data/prestige.ts`.
 From the second run on, the prestige shop picks the next run's mode, NORMAL or
 HARDCORE (it stays as last time unless changed). A hardcore run is one life:
 
-- **Harder**: starts three levels up, three next pieces instead of five, and
+- **Harder**: starts three levels up, gravity and rivals at full pace (20G at
+  level 20, rivals up to 2 PPS), three next pieces instead of five, and
   a slow trickle of timed cheese on top of purchase garbage (from level 1,
   a row every `3 × max(1.5, 24 / level)` seconds). Only techniques earn in
   full: a plain single, double or triple pays half.
@@ -320,8 +340,10 @@ three turns up; the higher the level, the likelier the first two
 - **Rival**: a Cold Clear bot on a board of its own, drawn small under NEXT,
   trading garbage with you until one of you tops out. Your attack cancels the
   rows coming at you first and sends the rest across; a piece that clears
-  nothing takes what is waiting (up to 6 rows). Stronger with the level
-  (0.5 + 0.06 × level PPS, up to 2); beating it pays 120 s of PER SECOND per
+  nothing takes what is waiting (up to 6 rows). Stronger with the level:
+  0.5 + 0.06 × level × pace PPS, up to 2 × pace, where pace (the
+  `rival_pace` effect) is 0.5 in normal runs (a 1-PPS cap, so it does not
+  outrun the player the game is pitched at) and 1 in hardcore; beating it pays 120 s of PER SECOND per
   level into the vault.
 - **Invader**: 45 s of timed cheese, a row every 3 seconds whatever the
   level (the one time a normal life sees timed garbage). Your attack is banked

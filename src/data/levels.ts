@@ -17,16 +17,46 @@ export const LEVELS = {
   garbageFromLevel: 3,
   garbageSecondsAtLevel1: 24,
   garbageMinSeconds: 1.5,
+  // Levels climb the gravity table at this pace: half in normal runs, so
+  // 20G comes at level 39, not 20 (hardcore doubles it back). A 0.7-PPS
+  // beginner then tops out around 20, a middling player at 30–40.
+  gravityPace: 0.5,
   // Resting piece: lock after this long; moves and turns reset it, up to the limit.
   lockDelayMs: 500,
   lockResetLimit: 15,
+  // Once gravity is 20G it has nowhere to go, so the lock delay shrinks
+  // instead: this much a level past the first 20G level, to the floor, and
+  // the reset budget one less every few levels, so even a grandmaster ends.
+  lockDelayStepMs: 15,
+  lockDelayMinMs: 200,
+  lockResetMin: 8,
+  lockResetEveryLevels: 2,
   // Share of the unbanked vault kept on a top-out (prestige raises it).
   retain: 0,
 } as const;
 
-export function gravityAt(level: number): number {
-  const i = Math.max(1, Math.floor(level)) - 1;
-  return i < LEVELS.gravity.length ? LEVELS.gravity[i]! : Infinity;
+// Between two table entries the cells per second are interpolated, so a
+// half pace still speeds up every level.
+export function gravityAt(level: number, pace = 1): number {
+  const at = (Math.max(1, Math.floor(level)) - 1) * pace;
+  const i = Math.floor(at);
+  if (i >= LEVELS.gravity.length) return Infinity;
+  const lo = LEVELS.gravity[i]!;
+  const hi = LEVELS.gravity[i + 1];
+  return hi === undefined ? lo : lo + (hi - lo) * (at - i);
+}
+
+// The first level whose gravity is 20G at this pace.
+export function firstInfiniteLevel(pace = 1): number {
+  return 1 + Math.ceil(LEVELS.gravity.length / pace);
+}
+
+export function lockAt(level: number, pace = 1): { delayMs: number; resets: number } {
+  const past = Math.max(0, Math.floor(level) - firstInfiniteLevel(pace));
+  return {
+    delayMs: Math.max(LEVELS.lockDelayMinMs, LEVELS.lockDelayMs - LEVELS.lockDelayStepMs * past),
+    resets: Math.max(LEVELS.lockResetMin, LEVELS.lockResetLimit - Math.floor(past / LEVELS.lockResetEveryLevels)),
+  };
 }
 
 export function garbageSecondsAt(level: number, fromLevel: number = LEVELS.garbageFromLevel): number | null {

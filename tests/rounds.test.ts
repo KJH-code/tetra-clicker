@@ -155,10 +155,10 @@ describe('gravity and garbage', () => {
     expect(w.manual.active!.y).toBe(y + 2);
   });
 
-  it('at 20G a piece lands at once', () => {
+  it('at 20G a piece lands at once (level 39 in a normal run)', () => {
     const w = readyWorld();
     w.startRound();
-    w.round.rows = 190; // level 20
+    w.round.rows = 380; // level 39
     const ghost = w.manual.ghostY();
     run(w, 50, 1);
     expect(w.manual.active!.y).toBe(ghost);

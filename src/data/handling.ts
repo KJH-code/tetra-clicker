@@ -16,6 +16,7 @@ export interface HandlingSettings {
   palette: 'standard' | 'cvd';
   patterns: boolean;
   reduceMotion: boolean;
+  hitEffects: boolean;
   // Percent, 90..150.
   uiScale: number;
   highContrast: boolean;
@@ -70,6 +71,7 @@ export const DEFAULT_HANDLING: HandlingSettings = {
   patterns: false,
   // The page turns this on for a player whose system asks for less motion.
   reduceMotion: false,
+  hitEffects: true,
   uiScale: 100,
   highContrast: false,
 };

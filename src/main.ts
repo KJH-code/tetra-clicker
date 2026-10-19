@@ -20,6 +20,7 @@ import { tag } from './sim/tags';
 import { BoardRenderer, type BoardView } from './render/boardRenderer';
 import { WIDTH } from './sim/board';
 import { Fx } from './render/fx';
+import { hitStrength } from './render/hit';
 import { animatedPlacement, isLanded, type BotAnimation } from './render/botAnim';
 import { GOLD, PIECE_COLORS, WRATH_RIM, THEME, VIEW, setPalette, buildingColor, font } from './render/theme';
 import { BUFFS } from './data/golden';
@@ -73,6 +74,7 @@ function applyDisplay(): void {
   setPalette(settings.palette);
   VIEW.patterns = settings.patterns || settings.palette === 'cvd';
   VIEW.reduceMotion = settings.reduceMotion;
+  VIEW.hitEffects = settings.hitEffects;
   VIEW.highContrast = settings.highContrast;
   VIEW.textScale = settings.uiScale / 100;
   THEME.grid = settings.highContrast ? '#343b52' : '#161a25';
@@ -247,7 +249,7 @@ function mergeSettings(s: Partial<HandlingSettings> | undefined): HandlingSettin
     das: s.das ?? d.das, arr: s.arr ?? d.arr, sdf: s.sdf ?? d.sdf, keys,
     volume: s.volume ?? d.volume, muted: s.muted ?? d.muted, tutorial: s.tutorial ?? d.tutorial,
     language: s.language ?? d.language, palette: s.palette ?? d.palette, patterns: s.patterns ?? d.patterns,
-    reduceMotion: s.reduceMotion ?? d.reduceMotion,
+    reduceMotion: s.reduceMotion ?? d.reduceMotion, hitEffects: s.hitEffects ?? d.hitEffects,
     uiScale: s.uiScale ?? d.uiScale, highContrast: s.highContrast ?? d.highContrast,
   };
 }
@@ -271,13 +273,18 @@ function cueFor(e: WorldEvent): Cue | null {
     case 'rivalWin': return 'checkpoint';
     case 'lifeEvent': return e.phase === 'start' ? 'wrath' : e.phase === 'won' ? 'checkpoint' : null;
     case 'bought': return 'buy';
+    case 'garbage': return 'rise';
+    case 'garbageCancel': return 'cancel';
     default: return null;
   }
 }
 
 function handleEvent(e: WorldEvent): void {
   const cue = cueFor(e);
-  if (cue) sound.play(cue);
+  if (cue && e.type === 'manualLock' && e.result.lines > 0) {
+    // Each step of a combo a semitone higher, an octave at most.
+    sound.play(cue, { strength: hitStrength(e.result), pitch: Math.min(12, Math.max(0, e.result.comboIndex)) });
+  } else if (cue) sound.play(cue);
   const step = tutorialAdvance(settings.tutorial, e, world);
   if (step !== settings.tutorial) {
     settings.tutorial = step;
@@ -288,13 +295,19 @@ function handleEvent(e: WorldEvent): void {
     case 'manualLock': {
       const r = e.result;
       if (r.lines > 0) {
+        const strength = hitStrength(r);
+        const color = r.golden ? GOLD : PIECE_COLORS[r.piece];
         manualFx.rowClear(r.clearedRows);
-        manualFx.shakeBoard(r.lines + (r.spin !== 'none' ? 1 : 0) + (r.perfectClear ? 3 : 0));
+        manualFx.hit(strength);
+        manualFx.shatter(manual, r.clearedRows, color, strength);
         const cx = manual.cellX(5);
         const cy = manual.cellY(r.clearedRows[0] ?? e.at.y);
-        manualFx.float(`+${format(e.earned)}`, cx, cy, { color: r.golden ? GOLD : PIECE_COLORS[r.piece], size: 22 + r.lines * 3 });
+        manualFx.float(`+${format(e.earned)}`, cx, cy, { color, size: 22 + r.lines * 3 });
         const label = clearLabel(r);
-        if (label) manualFx.float(label, cx, cy - 26, { color: '#ffffff', size: 13, dur: 1100 });
+        // A technique's name lands big in the middle of the well; a plain clear's stays small by the amount.
+        if (label && strength >= 2) {
+          manualFx.popup(label, cx, manual.cellY(26), { color: r.perfectClear ? GOLD : r.spin === 'full' ? PIECE_COLORS.T : '#ffffff', size: 18 + strength * 2.5, dur: 1000 + strength * 80, maxWidth: manual.layout.cell * 9.6 });
+        } else if (label) manualFx.float(label, cx, cy - 26, { color: '#ffffff', size: 13, dur: 1100 });
       }
       break;
     }
@@ -329,7 +342,10 @@ function handleEvent(e: WorldEvent): void {
       shop.refresh(true);
       break;
     case 'garbage':
-      manualFx.shakeBoard(1);
+      manualFx.rise(manual, e.rows);
+      break;
+    case 'garbageCancel':
+      manualFx.popup(`−${e.rows}`, manual.cellX(1), manual.cellY(36), { color: '#ff4d5e', size: 16 + Math.min(4, e.rows) * 2, dur: 800 });
       break;
     case 'hardcoreOver':
       ascendPanel.hardcoreOver(e.crowns);
@@ -548,3 +564,6 @@ requestAnimationFrame(frame);
 // Hidden tabs stop animation frames entirely; a coarse interval keeps the
 // clock advancing so the catch-up formula runs while the tab is away.
 window.setInterval(() => { if (document.hidden) tick(); }, 1000);
+// Dev server only: lets a browser script stage a clear or a garbage rise
+// for screenshots without playing one out.
+if (import.meta.env.DEV) Object.assign(window, { tetra: { world, handleEvent } });

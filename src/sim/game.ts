@@ -118,6 +118,9 @@ export class Game {
   private fallMs = 0;
   private lockMs = 0;
   private lockResets = 0;
+  // Past 20G the round shortens these as the level climbs.
+  lockDelayMs: number = LEVELS.lockDelayMs;
+  lockResetLimit: number = LEVELS.lockResetLimit;
   // -1 = no run in progress; otherwise the index the next clear will use.
   combo = -1;
   // -1 = no chain; 0 = one qualifying clear made, the next one extends it.
@@ -316,7 +319,7 @@ export class Game {
   // A move or turn while resting buys more lock delay, up to the reset limit,
   // so a piece cannot be stalled forever.
   private touched(): void {
-    if (this.lockMs > 0 && this.lockResets < LEVELS.lockResetLimit) {
+    if (this.lockMs > 0 && this.lockResets < this.lockResetLimit) {
       this.lockMs = 0;
       this.lockResets += 1;
     }
@@ -350,7 +353,7 @@ export class Game {
     }
     if (dropDistance(this.grid, piece) === 0) {
       this.lockMs += dtMs;
-      if (this.lockMs >= LEVELS.lockDelayMs) return this.lock();
+      if (this.lockMs >= this.lockDelayMs) return this.lock();
     } else {
       this.lockMs = 0;
     }

@@ -19,6 +19,10 @@ export const HARDCORE_EFFECTS: Effect[] = [
   { target: 'garbage_interval', op: 'mul', value: 3, when: [HC] },
   // Only techniques earn in full; a plain clear pays half.
   { target: 'income', filter: ['board:manual', 'tech:none'], op: 'mul', value: 0.5, when: [HC] },
+  // Gravity climbs at the full pace (20G at level 20) and rivals keep their
+  // full speed; normal runs take both at half.
+  { target: 'gravity_pace', op: 'mul', value: 2, when: [HC] },
+  { target: 'rival_pace', op: 'mul', value: 2, when: [HC] },
   // Three next pieces instead of five.
   { target: 'next_count', op: 'add', value: -2, when: [HC] },
   // Room for the four hardcore checks.

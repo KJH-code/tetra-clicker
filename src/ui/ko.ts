@@ -115,6 +115,7 @@ export const KO: Record<string, string> = {
   'STANDARD': '표준',
   'PATTERNS': '무늬',
   'LESS MOTION': '움직임 줄이기',
+  'HIT EFFECTS': '타격 연출',
   'HIGH CONTRAST': '고대비',
   'TEXT': '글자',
   'SAVE': '세이브',

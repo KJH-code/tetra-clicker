@@ -42,6 +42,8 @@ export function setPalette(name: PaletteName): void {
 export const VIEW = {
   patterns: false,
   reduceMotion: false,
+  // Hit-stop, shards, technique popups and the garbage jolt.
+  hitEffects: true,
   highContrast: false,
   // Multiplies text drawn on the boards.
   textScale: 1,

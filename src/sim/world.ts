@@ -18,7 +18,7 @@ import { Payout } from './payout';
 import { BUFFS, WRATH, type GoldenOutcome } from '../data/golden';
 import { PRESTIGE, TECH_CHECKS, prestigeById, prestigeRequires } from '../data/prestige';
 import { crownGain, metaFrom, metaSnapshot, type MetaSnapshot } from './prestige';
-import { LEVELS } from '../data/levels';
+import { LEVELS, lockAt } from '../data/levels';
 import { GARBAGE } from '../data/garbage';
 import { ACHIEVEMENTS } from '../data/achievements';
 import { challengePoints, CHALLENGE, BUILDING_KINDS_ANY } from '../data/challenges';
@@ -79,6 +79,8 @@ export type WorldEvent =
   | { type: 'checkpoint'; banked: Num }
   | { type: 'roundEnd'; deposited: Num; forfeited: Num; level: number }
   | { type: 'garbage'; rows: number }
+  // Queued purchase garbage a clear's attack wiped out.
+  | { type: 'garbageCancel'; rows: number }
   // A purchase sent rows to the queue.
   | { type: 'garbageQueued'; rows: number }
   // Garbage rows cleared with a technique paid this much.
@@ -347,7 +349,9 @@ export class World {
     if (this.garbageQueue <= 0) return false;
     const a = attackRows(result, this.garbageCarry);
     this.garbageCarry = a.carry;
+    const before = this.garbageQueue;
     this.garbageQueue = cancel(this.garbageQueue, a.rows).incoming;
+    if (this.garbageQueue < before) this.events.push({ type: 'garbageCancel', rows: before - this.garbageQueue });
     if (result.lines > 0 || this.garbageQueue <= 0) return false;
     const n = Math.min(this.garbageQueue, GARBAGE.maxRowsPerLock);
     this.garbageQueue -= n;
@@ -557,7 +561,11 @@ export class World {
     }
     if (garbage.length) this.events.push({ type: 'garbage', rows: garbage.length });
     this.countBoardGarbage();
-    const locked = this.manual.tick(dtMs, this.round.gravity() * this.fx('gravity', 1));
+    const pace = this.fx('gravity_pace', LEVELS.gravityPace);
+    const lock = lockAt(this.round.level, pace);
+    this.manual.lockDelayMs = lock.delayMs;
+    this.manual.lockResetLimit = lock.resets;
+    const locked = this.manual.tick(dtMs, this.round.gravity(pace) * this.fx('gravity', 1));
     if (locked) this.manualLock(locked);
   }
 
@@ -944,7 +952,7 @@ export class World {
   // --- life events -------------------------------------------------------
 
   beginEvent(kind: EventKind): void {
-    this.lifeEvent = startEvent(kind, this.round.level, this.round.eventSeed());
+    this.lifeEvent = startEvent(kind, this.round.level, this.round.eventSeed(), this.fx('rival_pace', EVENTS.rival.pace));
     this.events.push({ type: 'lifeEvent', kind, phase: 'start', amount: num(0) });
   }
 
@@ -1017,7 +1025,7 @@ export class World {
     // The rival plays its own pieces at its own pace.
     ev.timerMs -= dtMs;
     while (ev.timerMs <= 0 && this.lifeEvent === ev) {
-      ev.timerMs += 1000 / EVENTS.rival.pps(ev.level);
+      ev.timerMs += 1000 / ev.pps;
       const move = playOne(ev.game, this.rivalPolicy(ev.level));
       if (!move) break;
       const r = move.result;

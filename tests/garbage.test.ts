@@ -50,10 +50,12 @@ describe('purchase garbage', () => {
     const w = life();
     w.garbageQueue = 9;
     const tetris = lock({ lines: 4, clearedRows: [] });
+    w.drainEvents();
     w.manualLock(tetris);
     const cancelled = attackRows(tetris, 0).rows;
     expect(cancelled).toBeGreaterThan(0);
     expect(w.garbageQueue).toBe(9 - cancelled);
+    expect(w.drainEvents().find((e) => e.type === 'garbageCancel')).toEqual({ type: 'garbageCancel', rows: cancelled });
     const q = w.garbageQueue;
     w.manualLock(lock({ lines: 0 }));
     expect(w.garbageQueue).toBe(q - Math.min(4, q));
