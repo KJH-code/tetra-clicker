@@ -120,13 +120,17 @@ export class AscendPanel {
       const b = button(t('CHALLENGE'), 'btn mode-btn ch', () => {
         if (!challenge) this.world.setNextChallenge({ no_hold: 1, next: 1 });
         this.showShop(note);
+        // The rules sit under fourteen synergies: bring them into view.
+        if (!challenge) this.overlay.querySelector('.challenge')?.scrollIntoView({ block: 'nearest' });
       });
       b.classList.toggle('on', challenge);
       b.dataset['mode'] = 'challenge';
       mode.append(b);
     }
     const best = meta.hardcoreBest;
-    const record = line('dim', best.level > 0
+    const record = line('dim', challenge
+      ? t('CHALLENGE: a hardcore run with the rules above · clear it by ascending alive')
+      : best.level > 0
       ? t('HARDCORE BEST · LEVEL {level} · {rows} ROWS', { level: best.level, rows: best.rows })
       : t('HARDCORE: one life, a top-out ascends · garbage from level 1, start +3 levels, 3 next · manual ×2, risk ×3'));
     const start = button(t('NEW RUN'), 'btn primary', () => {

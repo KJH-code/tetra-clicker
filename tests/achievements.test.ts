@@ -15,9 +15,9 @@ function rich(seed = 1): World {
 const has = (w: World, id: string) => w.economy.meta.achievements.has(id);
 
 describe('achievements', () => {
-  it('91 of them, unique ids, four per building', () => {
-    expect(ACHIEVEMENTS).toHaveLength(91);
-    expect(new Set(ACHIEVEMENTS.map((a) => a.id)).size).toBe(91);
+  it('92 of them, unique ids, four per building', () => {
+    expect(ACHIEVEMENTS).toHaveLength(92);
+    expect(new Set(ACHIEVEMENTS.map((a) => a.id)).size).toBe(92);
     for (const b of BUILDINGS) expect(ACHIEVEMENTS.filter((a) => a.id.startsWith(`own_${b.id}_`))).toHaveLength(4);
     expect(ACHIEVEMENTS.filter((a) => a.hidden)).toHaveLength(5);
   });

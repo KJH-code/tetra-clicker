@@ -17,7 +17,7 @@ import { Buffs, type BuffState } from './buffs';
 import { Payout } from './payout';
 import { BUFFS, WRATH, type GoldenOutcome } from '../data/golden';
 import { PRESTIGE, TECH_CHECKS, prestigeById, prestigeRequires } from '../data/prestige';
-import { crownGain, metaFrom, metaSnapshot, type MetaSnapshot } from './prestige';
+import { crownGain, crownFraction, metaFrom, metaSnapshot, type MetaSnapshot } from './prestige';
 import { LEVELS, lockAt } from '../data/levels';
 import { GARBAGE } from '../data/garbage';
 import { ACHIEVEMENTS } from '../data/achievements';
@@ -27,6 +27,7 @@ import { startEvent, attackRows, cancel, randomHole, type LifeEvent } from './ev
 import { ccWasmBot, CC_DEFAULT } from './bot/ccWasm';
 import { tag as tagOf } from './tags';
 import { createRng, type Rng } from './rng';
+import { MISSIONS, MISSIONS_PER_LIFE, missionById, type MissionDef } from '../data/missions';
 import { add, mul, num, toNumber, type Num } from './num';
 import type { Placement } from './board';
 
@@ -61,7 +62,11 @@ export interface WorldSnapshot {
   sampleEvery?: number;
   // Purchase garbage still to rise, and what sizes the next purchase's rows.
   garbage?: { queue: number; carry: number; manualRate: number; holes: number };
+  missions?: MissionState[];
 }
+
+// A life mission: where its count stood when the life began, and whether it paid.
+export interface MissionState { id: string; base: number; done: boolean }
 
 export const SAMPLE_SECONDS = 30;
 const MAX_SAMPLES = 240;
@@ -81,6 +86,7 @@ export type WorldEvent =
   | { type: 'garbage'; rows: number }
   // Queued purchase garbage a clear's attack wiped out.
   | { type: 'garbageCancel'; rows: number }
+  | { type: 'missionDone'; id: string; amount: Num }
   // A purchase sent rows to the queue.
   | { type: 'garbageQueued'; rows: number }
   // Garbage rows cleared with a technique paid this much.
@@ -148,6 +154,8 @@ export class World {
   private garbageCarry = 0;
   private manualRate = 0;
   private garbageHoles: Rng;
+  // This life's missions (none between lives).
+  missions: MissionState[] = [];
   // PER SECOND (without buffs) through the run, for the stats graph.
   samples: number[] = [];
   sampleEvery = SAMPLE_SECONDS;
@@ -187,6 +195,7 @@ export class World {
     this.garbageCarry = snapshot?.garbage?.carry ?? 0;
     this.manualRate = snapshot?.garbage?.manualRate ?? 0;
     this.garbageHoles = createRng(snapshot?.garbage?.holes ?? (seed * 2654435761 + 97) >>> 0);
+    this.missions = (snapshot?.missions ?? []).filter((m) => missionById(m.id)).map((m) => ({ ...m }));
     this.applyRules();
     this.countBoardGarbage();
     this.syncLive();
@@ -247,6 +256,7 @@ export class World {
       samples: [...this.samples],
       sampleEvery: this.sampleEvery,
       garbage: { queue: this.garbageQueue, carry: this.garbageCarry, manualRate: this.manualRate, holes: this.garbageHoles.state() },
+      missions: this.missions.map((m) => ({ ...m })),
     };
   }
 
@@ -317,8 +327,49 @@ export class World {
       if (checkpoints > 0) this.checkpoint(checkpoints);
     }
     this.countBoardGarbage();
+    this.checkMissions();
     this.checkAchievements();
     return final;
+  }
+
+  // --- life missions -----------------------------------------------------
+
+  // Three different missions for the life just started, from a stream of
+  // their own keyed on the life's number so they never shift the garbage,
+  // golden or event draws.
+  private drawMissions(): void {
+    const rng = createRng((this.seed ^ Math.imul(this.economy.stats.rounds + this.economy.meta.lifetime.rounds, 0x9e3779b1)) >>> 0);
+    const pool = [...MISSIONS];
+    this.missions = [];
+    while (this.missions.length < MISSIONS_PER_LIFE && pool.length > 0) {
+      const def = pool.splice(rng.nextInt(pool.length), 1)[0]!;
+      this.missions.push({ id: def.id, base: this.missionCount(def), done: false });
+    }
+  }
+
+  private missionCount(def: MissionDef): number {
+    if (def.kind === 'levels') return this.round.level;
+    if (def.kind === 'seconds') return Math.floor(this.round.elapsedMs / 1000);
+    return this.economy.stats[def.stat!];
+  }
+
+  // Progress toward a mission this life, capped at its goal.
+  missionProgress(m: MissionState): number {
+    const def = missionById(m.id)!;
+    return m.done ? def.goal : Math.min(def.goal, Math.max(0, this.missionCount(def) - m.base));
+  }
+
+  private checkMissions(): void {
+    if (!this.round.active) return;
+    for (const m of this.missions) {
+      if (m.done) continue;
+      const def = missionById(m.id)!;
+      if (this.missionProgress(m) < def.goal) continue;
+      m.done = true;
+      this.economy.stats.missionsDone += 1;
+      const perSecond = toNumber(this.incomePerSecond()) + this.manualRate;
+      this.events.push({ type: 'missionDone', id: m.id, amount: this.payVault(perSecond * def.minutes * 60) });
+    }
   }
 
   // --- purchase garbage --------------------------------------------------
@@ -474,6 +525,7 @@ export class World {
     this.economy.stats.rounds += 1;
     this.economy.stats.maxLevel = Math.max(this.economy.stats.maxLevel, this.round.level);
     this.events.push({ type: 'roundStart', level: this.round.level });
+    this.drawMissions();
     this.syncLive();
     return true;
   }
@@ -508,6 +560,7 @@ export class World {
     if (vault > 0) this.economy.stats.riskLines += this.round.vaultRisk * (kept / vault) * this.riskWeight();
     this.economy.stats.deaths += 1;
     this.round.end();
+    this.missions = [];
     this.syncLive();
     // Under a Line of carry belongs to the finished round.
     this.toVault.carry = 0;
@@ -561,12 +614,18 @@ export class World {
     }
     if (garbage.length) this.events.push({ type: 'garbage', rows: garbage.length });
     this.countBoardGarbage();
-    const pace = this.fx('gravity_pace', LEVELS.gravityPace);
+    const pace = this.gravityPace();
     const lock = lockAt(this.round.level, pace);
     this.manual.lockDelayMs = lock.delayMs;
     this.manual.lockResetLimit = lock.resets;
     const locked = this.manual.tick(dtMs, this.round.gravity(pace) * this.fx('gravity', 1));
     if (locked) this.manualLock(locked);
+    else this.checkMissions();
+  }
+
+  // How fast levels climb the gravity table (half in normal runs).
+  gravityPace(): number {
+    return this.fx('gravity_pace', LEVELS.gravityPace);
   }
 
   // A data-driven number: `base` with every effect on `target` applied.
@@ -591,6 +650,10 @@ export class World {
   techScore(): number {
     const done = this.techChecks().filter((c) => c.done).length;
     return Math.min(this.fx('tech_cap', PRESTIGE.techCapBase), done * PRESTIGE.techPerCheck);
+  }
+
+  crownFraction(): number {
+    return crownFraction(this.economy.meta.riskBanked, this.economy.stats.riskLines, this.techScore());
   }
 
   crownPreview(): number {

@@ -78,3 +78,19 @@ export const font = (weight: number, px: number): string => `${weight} ${Math.ro
 // live, so the colour-blind palette carries over).
 const BUILDING_HUES: Piece[] = ['S', 'I', 'O', 'L', 'T', 'J', 'Z'];
 export const buildingColor = (index: number): string => PIECE_COLORS[BUILDING_HUES[index % BUILDING_HUES.length]!];
+
+// The manual well changes colour every ten levels, so climbing shows on the
+// board itself: cyan, violet, orange, red, then white once pieces land at
+// once (20G), whatever the level.
+const LEVEL_BANDS = [
+  { frame: '#00c8d8', grid: '#10202a', background: '#080d12' },
+  { frame: '#a050ff', grid: '#1a1530', background: '#0b0912' },
+  { frame: '#ff8c1a', grid: '#2a1c10', background: '#110c08' },
+  { frame: '#ff3b3b', grid: '#2c1216', background: '#120808' },
+];
+const BAND_20G = { frame: '#f2f4fa', grid: '#24262e', background: '#0d0e12' };
+
+export function levelTheme(level: number, twentyG: boolean): { frame: string; grid: string; background: string } {
+  if (twentyG) return BAND_20G;
+  return LEVEL_BANDS[Math.min(LEVEL_BANDS.length - 1, Math.floor(Math.max(0, level - 1) / 10))]!;
+}

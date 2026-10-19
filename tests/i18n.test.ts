@@ -12,6 +12,7 @@ import { ACTION_LABELS } from '../src/data/handling';
 import { TUTORIAL } from '../src/ui/tutorial';
 import { BRANCHES } from '../src/ui/ascend';
 import { durationParts } from '../src/ui/goal';
+import { MISSIONS } from '../src/data/missions';
 
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((f) => {
@@ -59,6 +60,7 @@ function dataStrings(): string[] {
     ...Object.values(ACTION_LABELS),
     ...TUTORIAL.map((s) => s.text),
     ...BRANCHES.map((b) => b.title),
+    ...MISSIONS.map((m) => m.label),
     ...[5, 120, 4_000, 200_000].map((s) => durationParts(s).key),
   ];
 }

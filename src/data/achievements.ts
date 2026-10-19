@@ -55,6 +55,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'invader', name: 'HELD THE LINE', desc: 'Survive an invader', when: [career('invadersSurvived', 1)] },
   { id: 'rival_3', name: 'THREE IN A ROW', desc: 'Beat the RIVAL building\'s board 3 times in one life', when: [{ type: 'stat', stat: 'rivalBest', gte: 3 }] },
   { id: 'rival_10', name: 'TEN IN A ROW', desc: 'Beat the RIVAL building\'s board 10 times in one life', when: [{ type: 'stat', stat: 'rivalBest', gte: 10 }] },
+  { id: 'missions_10', name: 'ON A MISSION', desc: 'Complete 10 life missions', when: [career('missionsDone', 10)] },
   { id: 'helper', name: 'A HAND UP', desc: 'Have a helper lift a garbage row', when: [career('helperRows', 1)] },
   { id: 'golden_lost', name: 'BUTTERFINGERS', desc: 'Place a golden or wrath piece without clearing a line', hidden: true, when: [career('goldensLost', 1)] },
   { id: 'ruined', name: 'RUINED', desc: 'Lose Lines to a wrath piece', hidden: true, when: [career('ruins', 1)] },

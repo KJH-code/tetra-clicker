@@ -1,4 +1,5 @@
 import { BUFFS, GOLDEN, WRATH, type GoldenOutcome } from '../data/golden';
+import { MISSIONS, MISSIONS_PER_LIFE, type MissionDef } from '../data/missions';
 import { LEVELS } from '../data/levels';
 import { EVENTS } from '../data/events';
 import { hasAll } from './tags';
@@ -79,4 +80,20 @@ export const goldenMeanSeconds = (GOLDEN.minSeconds + GOLDEN.maxSeconds) / 2;
 export function averageVault(manualPerSecond: number, rowsPerSecond: number): number {
   if (rowsPerSecond <= 0) return 0;
   return (manualPerSecond * LEVELS.checkpointRows) / rowsPerSecond / 2;
+}
+
+// Minutes of income the missions of one life pay a player clearing
+// `rowsPerSecond` rows at `pps`, if the life lasts `lifeSeconds`: the
+// missions they can meet in that time (a singles player meets no technique
+// mission), times the chance each is among the three drawn.
+export function missionMinutesPerLife(pps: number, rowsPerSecond: number, lifeSeconds: number): number {
+  const secondsFor = (m: MissionDef): number => {
+    if (m.kind === 'seconds') return m.goal;
+    if (m.kind === 'levels') return rowsPerSecond > 0 ? (m.goal * LEVELS.rowsPerLevel) / rowsPerSecond : Infinity;
+    if (m.stat === 'manualPieces') return pps > 0 ? m.goal / pps : Infinity;
+    if (m.stat === 'checkpoints') return rowsPerSecond > 0 ? (m.goal * LEVELS.checkpointRows) / rowsPerSecond : Infinity;
+    return Infinity;
+  };
+  const met = MISSIONS.filter((m) => secondsFor(m) <= lifeSeconds);
+  return (MISSIONS_PER_LIFE / MISSIONS.length) * met.reduce((sum, m) => sum + m.minutes, 0);
 }

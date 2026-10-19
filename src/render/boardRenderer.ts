@@ -29,6 +29,9 @@ export class BoardRenderer {
   readonly ctx: CanvasRenderingContext2D;
   readonly width: number;
   readonly height: number;
+  accent: string | undefined;
+  wellBackground: string | undefined;
+  wellGrid: string | undefined;
   private readonly originX: number;
 
   constructor(readonly canvas: HTMLCanvasElement, readonly layout: BoardLayout) {
@@ -58,9 +61,9 @@ export class BoardRenderer {
       ctx.translate(s.x, s.y);
     }
     // Playfield background and grid.
-    ctx.fillStyle = THEME.background;
+    ctx.fillStyle = this.wellBackground ?? THEME.background;
     ctx.fillRect(this.originX, 0, WIDTH * c, this.height);
-    ctx.strokeStyle = THEME.grid;
+    ctx.strokeStyle = this.wellGrid ?? THEME.grid;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = 0; x <= WIDTH; x++) {
@@ -73,8 +76,9 @@ export class BoardRenderer {
     }
     ctx.stroke();
     // The well's walls and floor, solid; the ceiling only a faint line,
-    // since pieces start above it.
-    ctx.strokeStyle = THEME.frame;
+    // since pieces start above it. `accent` recolours them (level theme,
+    // building stars).
+    ctx.strokeStyle = this.accent ?? THEME.frame;
     ctx.beginPath();
     ctx.moveTo(this.originX, this.cellY(TOP_VISIBLE_ROW) + 0.5);
     ctx.lineTo(this.originX + WIDTH * c, this.cellY(TOP_VISIBLE_ROW) + 0.5);

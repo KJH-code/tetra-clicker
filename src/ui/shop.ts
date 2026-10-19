@@ -5,7 +5,8 @@ import { UpgradeChips } from './upgradeChips';
 import { ACHIEVEMENTS } from '../data/achievements';
 import { t } from './i18n';
 import { buildingColor } from '../render/theme';
-import { durationParts, nextGoal } from './goal';
+import { durationParts, nextGoal, nearAchievements } from './goal';
+import { buildingTier, TIER_STEPS } from '../data/tiers';
 import { GARBAGE } from '../data/garbage';
 
 // Right pane: balance and income, upgrade chips, one card per building, the
@@ -13,7 +14,7 @@ import { GARBAGE } from '../data/garbage';
 export class Shop {
   private balanceEl: HTMLElement;
   private incomeEl: HTMLElement;
-  private buttons = new Map<string, { btn: HTMLButtonElement; owned: HTMLElement; price: HTMLElement }>();
+  private buttons = new Map<string, { btn: HTMLButtonElement; owned: HTMLElement; price: HTMLElement; hint: HTMLElement; bar: HTMLElement; stars: HTMLElement }>();
   private lastBalance = NaN;
   private chips: UpgradeChips;
   private crownEl: HTMLElement;
@@ -21,6 +22,8 @@ export class Shop {
   private achBtn: HTMLButtonElement;
   private goal: { name: HTMLElement; time: HTMLElement; bar: HTMLElement };
   private band: HTMLElement;
+  private crownBar: { row: HTMLElement; fill: HTMLElement; text: HTMLElement };
+  private near: HTMLElement;
 
   constructor(private root: HTMLElement, private world: World, onSettings: () => void, onAscend: () => void, onAchievements: () => void) {
     root.innerHTML = '';
@@ -45,20 +48,27 @@ export class Shop {
       btn.className = 'building';
       btn.dataset['building'] = b.id;
       btn.style.setProperty('--b', buildingColor(i));
-      const name = el('div', 'name', b.name);
+      const name = el('div', 'name', '');
+      const label = el('span', 'label', b.name);
+      // ★ per tier of copies owned (10, 25, 50, 100): only for show.
+      const stars = el('span', 'stars', '');
+      name.append(label, stars);
       const owned = el('div', 'owned', '0');
       const price = el('div', 'price', '');
       // One line; the whole of it on hover when a narrow pane cuts it short.
       const text = t('+{pct}% / copy · {pps} PPS', { pct: b.effects[0]?.value ?? 0, pps: b.pps });
       const hint = el('div', 'hint', text);
       hint.title = text;
-      btn.append(name, owned, hint, price);
+      // A locked card fills toward its price, so the next step reads as a goal.
+      const bar = el('div', 'unlock-bar', '');
+      bar.append(document.createElement('i'));
+      btn.append(name, owned, hint, price, bar);
       btn.addEventListener('click', () => {
         if (this.world.buy(b.id)) this.refresh(true);
       });
       btn.dataset['label'] = b.name;
       list.append(btn);
-      this.buttons.set(b.id, { btn, owned, price });
+      this.buttons.set(b.id, { btn, owned, price, hint, bar, stars });
     });
 
     const goal = el('div', 'goal', '');
@@ -67,7 +77,16 @@ export class Shop {
     const bar = el('div', 'goal-bar', '');
     const fill = document.createElement('i');
     bar.append(fill);
-    goal.append(el('div', 't-label', t('NEXT GOAL')), goalName, goalTime, bar);
+    // The next crown and the achievements nearest to done ride under it.
+    const crownRow = el('div', 'goal-sub crown-row', '');
+    const crownText = el('span', '', '');
+    const crownTrack = el('div', 'goal-bar crown', '');
+    const crownFill = document.createElement('i');
+    crownTrack.append(crownFill);
+    crownRow.append(el('span', 't-label', t('NEXT CROWN')), crownText, crownTrack);
+    this.crownBar = { row: crownRow, fill: crownFill, text: crownText };
+    this.near = el('div', 'near', '');
+    goal.append(el('div', 't-label', t('NEXT GOAL')), goalName, goalTime, bar, crownRow, this.near);
     root.append(goal);
     this.goal = { name: goalName, time: goalTime, bar: fill };
 
@@ -125,8 +144,16 @@ export class Shop {
       if (!unlocked && visible) lockedShown = true;
       ui.btn.hidden = !visible;
       ui.btn.classList.toggle('locked', !unlocked);
-      const name = ui.btn.querySelector('.name')!;
-      name.textContent = unlocked ? b.name : '???';
+      const tier = buildingTier(this.world.economy.owned(b.id));
+      ui.stars.textContent = tier > 0 ? ` ${'★'.repeat(tier)}` : '';
+      ui.btn.dataset['tier'] = String(tier);
+      const next = TIER_STEPS[tier];
+      ui.stars.title = next ? t('{n} copies for the next star', { n: next }) : '';
+      // A locked card names what it is and what opens it.
+      const req = b.unlock?.[0];
+      const reqName = req && req.type === 'owned' ? (BUILDINGS.find((x) => x.id === req.id)?.name ?? req.id) : '';
+      ui.hint.textContent = unlocked ? ui.hint.title : t('Buy a {name} to unlock', { name: reqName });
+      ui.bar.hidden = unlocked;
       const price = this.world.economy.price(b.id);
       const can = this.world.canBuy(b.id);
       ui.owned.textContent = String(this.world.economy.owned(b.id));
@@ -143,6 +170,7 @@ export class Shop {
       }
       ui.price.append(format(price));
       ui.price.classList.toggle('cant', !can);
+      if (!unlocked) (ui.bar.firstChild as HTMLElement).style.width = `${Math.min(100, Math.round((balance / Number(price)) * 100))}%`;
       ui.btn.disabled = !can;
       // What buying it now would send to the manual board.
       const rows = unlocked ? this.world.garbageFor(Number(price)) : 0;
@@ -155,6 +183,26 @@ export class Shop {
       }
     }
     this.refreshGoal(balance);
+    this.refreshNear();
+  }
+
+  private refreshNear(): void {
+    const meta = this.world.economy.meta;
+    const frac = this.world.crownFraction();
+    this.crownBar.fill.style.width = `${Math.round(frac * 100)}%`;
+    this.crownBar.text.textContent = `${Math.floor(frac * 100)}%`;
+    this.crownBar.row.hidden = this.world.economy.stats.riskLines <= 0 && meta.ascensions === 0;
+    const defs = ACHIEVEMENTS.filter((a) => !a.building || meta.buildingsSeen.has(a.building));
+    const near = nearAchievements(defs, meta.achievements, this.world.economy, 2);
+    this.near.replaceChildren(...near.map((a) => {
+      const row = el('div', 'goal-sub', '');
+      const track = el('div', 'goal-bar', '');
+      const fill = document.createElement('i');
+      fill.style.width = `${Math.round(a.progress * 100)}%`;
+      track.append(fill);
+      row.append(el('span', 'near-name', `★ ${t(a.name)}`), el('span', 'near-n', `${format(a.value)}/${format(a.goal)}`), track);
+      return row;
+    }));
   }
 
   private refreshGoal(balance: number): void {

@@ -7,7 +7,10 @@ import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import { World, type WorldEvent } from './sim/world';
 import type { LockResult } from './sim/game';
 import type { BotTech } from './sim/attack';
-import { format } from './sim/num';
+import { format, toNumber } from './sim/num';
+import { Backdrop } from './render/backdrop';
+import { Coins, unitStep } from './render/coins';
+import { buildingTier } from './data/tiers';
 import { LocalStorageStore } from './save/localStorageStore';
 import { SAVE_VERSION, type SaveData } from './save/schema';
 import { startAutosave } from './save/autosave';
@@ -22,9 +25,10 @@ import { WIDTH } from './sim/board';
 import { Fx } from './render/fx';
 import { hitStrength } from './render/hit';
 import { animatedPlacement, isLanded, type BotAnimation } from './render/botAnim';
-import { GOLD, PIECE_COLORS, WRATH_RIM, THEME, VIEW, setPalette, buildingColor, font } from './render/theme';
+import { GOLD, PIECE_COLORS, WRATH_RIM, THEME, VIEW, setPalette, buildingColor, font, levelTheme } from './render/theme';
 import { BUFFS } from './data/golden';
-import { drawRoundHud } from './render/roundHud';
+import { drawRoundHud, drawLifePanel } from './render/roundHud';
+import { missionById } from './data/missions';
 import { drawEventHud, drawDuelGauge } from './render/eventHud';
 import { InputHandler, type Action } from './ui/input';
 import { Shop } from './ui/shop';
@@ -110,6 +114,15 @@ function fitManual(): void {
   if (cell !== manual.layout.cell) manual = new BoardRenderer(manualCanvas, { cell, leftCells: 5, rightCells: 5 });
 }
 const manualFx = new Fx();
+const backdrop = new Backdrop(document.getElementById('backdrop') as HTMLCanvasElement);
+const coins = new Coins(document.getElementById('coins') as HTMLCanvasElement, () => {
+  const el = document.getElementById('balance');
+  if (!el) return;
+  el.classList.remove('bump');
+  void el.offsetWidth;
+  el.classList.add('bump');
+});
+const milestoneEl = document.getElementById('milestone')!;
 
 // --- auto boards ----------------------------------------------------------
 interface AutoView { renderer: BoardRenderer; fx: Fx; anim: BotAnimation | null; lastEarned: number }
@@ -250,6 +263,8 @@ function mergeSettings(s: Partial<HandlingSettings> | undefined): HandlingSettin
     volume: s.volume ?? d.volume, muted: s.muted ?? d.muted, tutorial: s.tutorial ?? d.tutorial,
     language: s.language ?? d.language, palette: s.palette ?? d.palette, patterns: s.patterns ?? d.patterns,
     reduceMotion: s.reduceMotion ?? d.reduceMotion, hitEffects: s.hitEffects ?? d.hitEffects,
+    // A save from before milestones starts at its balance's unit (set once the world loads), not at 1K again.
+    milestone: s.milestone ?? -1,
     uiScale: s.uiScale ?? d.uiScale, highContrast: s.highContrast ?? d.highContrast,
   };
 }
@@ -275,6 +290,7 @@ function cueFor(e: WorldEvent): Cue | null {
     case 'bought': return 'buy';
     case 'garbage': return 'rise';
     case 'garbageCancel': return 'cancel';
+    case 'missionDone': return 'checkpoint';
     default: return null;
   }
 }
@@ -294,6 +310,9 @@ function handleEvent(e: WorldEvent): void {
   switch (e.type) {
     case 'manualLock': {
       const r = e.result;
+      const now = world.round.elapsedMs;
+      lockTimes = lockTimes.filter((at) => at > now - PPS_WINDOW_S * 1000 && at <= now);
+      lockTimes.push(now);
       if (r.lines > 0) {
         const strength = hitStrength(r);
         const color = r.golden ? GOLD : PIECE_COLORS[r.piece];
@@ -322,16 +341,27 @@ function handleEvent(e: WorldEvent): void {
       if (Number(e.earned) > 0) toast(`+${format(e.earned)} · ${Math.round(e.seconds)}s`);
       break;
     }
-    case 'bought':
+    case 'bought': {
       ensureAutoViews();
       shop.refresh(true);
+      // Crossing 10, 25, 50 or 100 copies earns a star.
+      const tier = buildingTier(e.owned);
+      if (tier > buildingTier(e.owned - 1)) {
+        toast(t('{name} ★{n}', { name: buildingById(e.buildingId)?.name ?? e.buildingId, n: tier }), 'achievement');
+        const card = document.querySelector(`[data-building="${e.buildingId}"]`);
+        card?.classList.remove('tier-up');
+        void (card as HTMLElement | null)?.offsetWidth;
+        card?.classList.add('tier-up');
+      }
       break;
+    }
     case 'upgraded':
       shop.refresh(true);
       break;
     case 'slept':
       break;
     case 'roundStart':
+      lockTimes = [];
       manualFx.float(t('GO · LEVEL {n}', { n: e.level }), manual.cellX(5), manual.cellY(29), { color: '#00f0ff', size: 26, dur: 900 });
       break;
     case 'levelUp':
@@ -344,6 +374,17 @@ function handleEvent(e: WorldEvent): void {
     case 'garbage':
       manualFx.rise(manual, e.rows);
       break;
+    case 'missionDone': {
+      // Several met by one piece stack up the well instead of overprinting.
+      const now = performance.now();
+      missionStack = now - missionStackAt < 1500 ? missionStack + 1 : 0;
+      missionStackAt = now;
+      const y = 30 - missionStack * 2.6;
+      const def = missionById(e.id);
+      manualFx.popup(t('MISSION · {name}', { name: t(def?.label ?? e.id) }), manual.cellX(5), manual.cellY(y), { color: '#39ff14', size: 18, dur: 1600, maxWidth: manual.layout.cell * 9.6 });
+      manualFx.float(`+${format(e.amount)}`, manual.cellX(5), manual.cellY(y + 1.2), { color: '#39ff14', size: 16, dur: 1600 });
+      break;
+    }
     case 'garbageCancel':
       manualFx.popup(`−${e.rows}`, manual.cellX(1), manual.cellY(36), { color: '#ff4d5e', size: 16 + Math.min(4, e.rows) * 2, dur: 800 });
       break;
@@ -468,6 +509,10 @@ function tick(): void {
   input.update(dt);
   for (const e of world.drainEvents()) handleEvent(e);
   manualFx.update(dt);
+  backdrop.setIncome(toNumber(world.incomePerSecond()));
+  backdrop.update(dt);
+  coins.update(dt);
+  checkMilestone();
   for (const v of autoViews) {
     v.fx.update(dt);
     if (v.anim) {
@@ -477,11 +522,15 @@ function tick(): void {
         if (r.lines > 0) {
           v.fx.rowClear(r.clearedRows);
           v.fx.shakeBoard(1);
+          const balanceEl = document.getElementById('balance');
+          if (balanceEl) coins.spawn(v.renderer.canvas.getBoundingClientRect(), balanceEl.getBoundingClientRect(), PIECE_COLORS[r.piece]);
           v.fx.float(`+${format(e2Earned(v))}`, v.renderer.cellX(5), v.renderer.cellY(r.clearedRows[0] ?? 30), { color: PIECE_COLORS[r.piece], size: 14, dur: 700 });
           // Technique bots announce their technique, as the manual board does.
           const tech = buildingById(world.autoBoards[autoViews.indexOf(v)]?.buildingId ?? '')?.tech;
           const label = tech ? techLabel(r, tech) : null;
           if (label) {
+            // A bot's technique bursts too, at half the hand's strength.
+            v.fx.shatter(v.renderer, r.clearedRows, PIECE_COLORS[r.piece], Math.ceil(hitStrength(r) / 2));
             v.fx.float(label, v.renderer.cellX(5), v.renderer.cellY((r.clearedRows[0] ?? 30) - 2), { color: '#ffffff', size: Math.max(8, Math.round(v.renderer.layout.cell * 0.8)), dur: 900,
               maxWidth: WIDTH * v.renderer.layout.cell - 4 });
           }
@@ -494,6 +543,29 @@ function tick(): void {
   shop.refresh();
 }
 
+// Life time (ms) of the manual board's recent locks, for the PPS readout.
+const PPS_WINDOW_S = 10;
+let lockTimes: number[] = [];
+
+let missionStack = 0;
+let missionStackAt = 0;
+
+// A balance past a new thousands-step (1K, 1M, 1B, …) for the first time: a banner.
+function checkMilestone(): void {
+  const step = unitStep(toNumber(world.economy.balance));
+  if (settings.milestone < 0) { settings.milestone = step; return; }
+  if (step <= settings.milestone) return;
+  settings.milestone = step;
+  milestoneEl.textContent = `${format(1000 ** step).replace(/\.0+(?=\D|$)/, '')} LINES`;
+  milestoneEl.hidden = false;
+  milestoneEl.style.animation = 'none';
+  void milestoneEl.offsetWidth;
+  milestoneEl.style.animation = '';
+  window.setTimeout(() => { milestoneEl.hidden = true; }, 2400);
+  sound.play('achievement');
+  saveNow();
+}
+
 function render(): void {
   const g = world.manual;
   const view: BoardView = {
@@ -502,17 +574,39 @@ function render(): void {
     golden: { active: g.golden.active, holds: g.golden.holds, next: g.golden.queue, wrath: !!g.golden.wrath },
   };
   const buffs = world.buffs.active.map((b) => ({ label: BUFFS[b.id]?.label ?? b.id, msLeft: b.msLeft }));
+  // The well's colour follows the level band, white at 20G.
+  const level = world.round.active ? world.round.level : world.nextStartLevel();
+  const theme = levelTheme(level, world.round.active && !Number.isFinite(world.round.gravity(world.gravityPace())));
+  manual.accent = theme.frame;
+  manual.wellBackground = theme.background;
+  manual.wellGrid = settings.highContrast ? undefined : theme.grid;
   manual.render(view, manualFx, (ctx) => {
     drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore, world.economy.boardGarbage * GARBAGE.penaltyPctPerRow);
     drawEventHud(ctx, manual, world.lifeEvent, view.next.length);
     // Rows waiting for the board: the rival's and what purchases sent.
     drawDuelGauge(ctx, manual, (world.duel?.toMe ?? 0) + world.garbageQueue);
+    if (world.round.active) {
+      const seconds = world.round.elapsedMs / 1000;
+      const window = Math.min(PPS_WINDOW_S, seconds);
+      const recent = lockTimes.filter((at) => at > world.round.elapsedMs - PPS_WINDOW_S * 1000).length;
+      drawLifePanel(ctx, manual, {
+        missions: world.missions.map((m) => {
+          const def = missionById(m.id)!;
+          return { label: def.label, progress: world.missionProgress(m), goal: def.goal, done: m.done };
+        }),
+        pps: window > 0.5 ? recent / window : 0, seconds,
+        combo: Math.max(0, g.combo), b2b: Math.max(0, g.b2b),
+      });
+    }
   });
   manualPane.classList.toggle('hardcore', world.economy.meta.hardcore);
   ensureAutoViews();
   world.autoBoards.forEach((board, i) => {
     const v = autoViews[i]!;
     const def = buildingById(board.buildingId);
+    // Starred buildings frame their boards in their own colour.
+    const tier = buildingTier(world.economy.owned(board.buildingId));
+    v.renderer.accent = tier > 0 ? buildingColor(BUILDINGS.findIndex((b) => b.id === board.buildingId)) : undefined;
     const hold = { holds: board.game.holds, holdUsed: false, next: [] as never[] };
     if (v.anim) {
       const p = animatedPlacement(v.anim);
@@ -532,7 +626,8 @@ function boardLabel(id: string, name: string | undefined): string {
   const buff = world.buffs.multiplier([tag.board('auto'), tag.building(id)], world.economy);
   // The rival names its fight: the streak while a life runs.
   const duel = id === 'rival' && world.duel ? ` · ${t('WIN {n}', { n: world.economy.meta.rivalStreak })}` : '';
-  return `${name ?? id}${syn}${duel}${buff > 1 ? ` ×${buff}` : ''}`;
+  const tier = buildingTier(world.economy.owned(id));
+  return `${name ?? id}${tier > 0 ? ` ${'★'.repeat(tier)}` : ''}${syn}${duel}${buff > 1 ? ` ×${buff}` : ''}`;
 }
 
 // The board's name over the buffer rows, after a bar in the building's

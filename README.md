@@ -65,6 +65,28 @@ semitone higher. Queued garbage a clear cancels pops a red −n by the gauge
 with a crack; garbage that rises jolts the stack up with a red flash and a
 dull shove. All of it is render-side: the sim does not wait for a hit-stop.
 
+Around the boards:
+
+- **Backdrop**: faint tetrominoes drift down behind the (slightly
+  see-through) panes; more and faster the richer the run (log10 of PER
+  SECOND), up to 40 (`src/render/backdrop.ts`). LESS MOTION stops them.
+- **Level theme**: the manual well's frame, grid and floor change colour
+  every ten levels (cyan, violet, orange, red) and turn white at 20G.
+- **Life readout**: under the hold column, PPS over the last 10 s, life
+  time, the combo and B2B chain, and the life's three missions (below).
+- **Bot boards** burst into shards (half the hand's strength) when they
+  land their technique, and each bot clear sends sparks flying to LINES
+  (twenty a second at most, `src/render/coins.ts`).
+- **Milestones**: the first time the balance passes 1K, 1M, 1B, … a banner
+  crosses the top of the screen.
+- **Stars**: 10 / 25 / 50 / 100 copies of a building earn it ★ to ★★★★ on
+  its card and bot board, with a toast and a flash on the card
+  (`src/data/tiers.ts`). Only for show.
+- **Goals in the shop**: the next locked building shows its name, what it
+  does, what opens it and a bar toward its price; under NEXT GOAL sit a NEXT
+  CROWN bar (the share of the next crown this run has earned) and the two
+  achievements nearest to done with their counts.
+
 ## Language and accessibility
 
 Every screen text is in English or Korean (`src/ui/i18n.ts`, the Korean in
@@ -105,6 +127,13 @@ skill.
   that up to 15 times. Past the first 20G level gravity has nowhere to go,
   so the lock delay shrinks instead: −15 ms a level to 200 ms, and one reset
   fewer every two levels down to 8 (`lockAt` in `src/data/levels.ts`).
+- **Missions** (`src/data/missions.ts`): each life draws three of ten
+  (TETRIS ×3, T-SPIN ×2, T-SPIN DOUBLE, B2B ×4, 5 COMBO, LEVEL +5,
+  CHECKPOINT, GARBAGE ×4 BY TECHNIQUE, SURVIVE 3 MIN, 100 PIECES) from a
+  stream keyed on the life's number. Meeting one pays 1–3 minutes of PER
+  SECOND plus the hand's recent rate into the vault, once; a top-out ends
+  them. The simulator counts them with luck: a singles player meets only
+  the time, level, piece and checkpoint ones, in a life guessed at 5 minutes.
 - **Garbage comes from spending, not from the clock** (`src/data/garbage.ts`).
   Buying a building or an upgrade sends rows: its price over a minute of
   what the game earns (PER SECOND plus the hand's recent rate), rounded down,
@@ -291,7 +320,7 @@ lifts them. All of it is data in `src/data/synergies.ts`.
 
 ### Achievements
 
-91, made from templates in `src/data/achievements.ts`: owning 1 / 10 / 50 /
+92, made from templates in `src/data/achievements.ts`: owning 1 / 10 / 50 /
 100 of each building in a run (60), Lines earned over all runs (1K / 100K /
 10M / 1B), technique counts (TSD 10 / 100, PC 1 / 10, a 10 combo), level
 10 / 15 / 20, ascending 1 / 5 / 25 times, two hardcore ones, challenge runs

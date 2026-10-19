@@ -1,7 +1,7 @@
 import type { Round } from '../sim/round';
 import type { BoardRenderer } from './boardRenderer';
 import { format } from '../sim/num';
-import { TOP_VISIBLE_ROW, WIDTH } from '../sim/board';
+import { HEIGHT, TOP_VISIBLE_ROW, WIDTH } from '../sim/board';
 import { FONT, GOLD, THEME, VIEW, font as fontOf } from './theme';
 import { LEVELS } from '../data/levels';
 import { t } from '../ui/i18n';
@@ -118,4 +118,69 @@ function bannerText(round: Round): { big: string; small?: string; color: string 
   if (!round.active) return { big: t('READY'), small: t('ANY KEY'), color: '#00f0ff' };
   if (round.paused) return { big: t('PAUSED'), small: t('ANY KEY'), color: '#ffe600' };
   return null;
+}
+
+export interface LifeInfo {
+  missions: { label: string; progress: number; goal: number; done: boolean }[];
+  pps: number;
+  seconds: number;
+  combo: number;
+  b2b: number;
+}
+
+// The bottom of the hold column while a life runs: pace and chains, then the
+// life's three missions with a bar each, a done one ticked green.
+export function drawLifePanel(ctx: CanvasRenderingContext2D, r: BoardRenderer, info: LifeInfo): void {
+  const c = r.layout.cell;
+  const s = VIEW.textScale;
+  const x0 = 6;
+  const w = r.layout.leftCells * c - x0 * 2;
+  const fit = (px: number, text: string, weight: number): void => {
+    let size = px * s;
+    ctx.font = fontOf(weight, size);
+    const tw = ctx.measureText(text).width;
+    if (tw > w) size = (size * w) / tw;
+    ctx.font = fontOf(weight, size);
+  };
+  const rowH = c * 1.05 * s;
+  let y = r.cellY(HEIGHT) - 8 - rowH * info.missions.length;
+  ctx.save();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  for (const m of info.missions) {
+    const text = m.done ? `✓ ${t(m.label)}` : t(m.label);
+    ctx.fillStyle = m.done ? '#39ff14' : THEME.text;
+    fit(c * 0.36, text, 700);
+    ctx.fillText(text, x0, y);
+    const by = y + c * 0.5 * s;
+    const bh = c * 0.18;
+    ctx.fillStyle = THEME.boxHead;
+    ctx.fillRect(x0, by, w, bh);
+    ctx.fillStyle = m.done ? '#39ff14' : '#00f0ff';
+    ctx.fillRect(x0, by, w * Math.min(1, m.progress / m.goal), bh);
+    if (!m.done) {
+      ctx.fillStyle = THEME.dim;
+      ctx.textAlign = 'right';
+      ctx.font = fontOf(700, c * 0.3 * s);
+      ctx.fillText(`${m.progress}/${m.goal}`, x0 + w, y + c * 0.05);
+      ctx.textAlign = 'left';
+    }
+    y += rowH;
+  }
+  // Above the missions: a heading, and pace, time and chains.
+  y = r.cellY(HEIGHT) - 8 - rowH * info.missions.length - c * 0.55 * s;
+  ctx.fillStyle = THEME.dim;
+  fit(c * 0.34, t('MISSIONS'), 700);
+  ctx.fillText(t('MISSIONS'), x0, y);
+  const mm = Math.floor(info.seconds / 60);
+  const ss = String(Math.floor(info.seconds % 60)).padStart(2, '0');
+  const lines = [`${info.pps.toFixed(2)} PPS · ${mm}:${ss}`];
+  if (info.combo > 0 || info.b2b > 0) lines.push([info.combo > 0 ? `${info.combo} COMBO` : '', info.b2b > 0 ? `B2B ×${info.b2b}` : ''].filter(Boolean).join(' · '));
+  for (let i = lines.length - 1; i >= 0; i--) {
+    y -= c * 0.6 * s;
+    ctx.fillStyle = i === 0 ? THEME.text : '#ffe600';
+    fit(c * 0.36, lines[i]!, 700);
+    ctx.fillText(lines[i]!, x0, y);
+  }
+  ctx.restore();
 }

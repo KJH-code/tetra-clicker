@@ -51,6 +51,21 @@ html, body {
 .t-title { font-size: 15px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 
 /* ---- layout ----------------------------------------------------------- */
+#backdrop, #coins { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; }
+#backdrop { z-index: 0; }
+#coins { z-index: 50; }
+#app { position: relative; z-index: 1; }
+/* A new unit (1K, 1M, …) of balance: a banner across the top for a moment. */
+#milestone {
+  position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 60; pointer-events: none;
+  padding: 10px 28px; border-radius: var(--radius); font-size: 26px; font-weight: 800; letter-spacing: 0.12em;
+  color: var(--gold); background: #0b0d14e8; border: 1px solid var(--gold); box-shadow: 0 0 30px #ffd23a55;
+  animation: milestone 2.4s ease-out forwards;
+}
+#milestone[hidden] { display: none; }
+@keyframes milestone { 0% { opacity: 0; transform: translate(-50%, -12px) scale(1.2); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+.reduce-motion #milestone { animation: none; }
+
 #app {
   display: grid;
   grid-template-columns: auto 1fr 320px;
@@ -60,7 +75,8 @@ html, body {
 }
 
 .pane {
-  background: linear-gradient(180deg, #ffffff06, transparent 120px), var(--surface-1);
+  /* A little see-through, so the drifting pieces behind show faintly. */
+  background: linear-gradient(180deg, #ffffff06, transparent 120px), color-mix(in srgb, var(--surface-1) 88%, transparent);
   border: 1px solid var(--line);
   border-top: 4px solid var(--zone);
   border-radius: var(--radius);
@@ -163,6 +179,18 @@ canvas { display: block; image-rendering: pixelated; }
 .building:disabled .name, .building:disabled .owned { opacity: 0.75; }
 .building.locked { --b: var(--faint); opacity: 0.45; border-style: dashed; border-left-style: solid; }
 .building[hidden] { display: none; }
+.building .stars { color: var(--gold); font-size: 12px; letter-spacing: 0.02em; margin-left: 4px; }
+.building .unlock-bar { grid-column: 1 / -1; height: 3px; background: var(--surface-3); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+.building .unlock-bar[hidden] { display: none; }
+.building .unlock-bar i { display: block; height: 100%; background: var(--dim); }
+/* More stars, a brighter edge; the fourth glows. */
+.building[data-tier="1"] { border-left-width: 6px; }
+.building[data-tier="2"] { border-left-width: 7px; }
+.building[data-tier="3"] { border-left-width: 8px; }
+.building[data-tier="4"] { border-left-width: 8px; box-shadow: inset 4px 0 12px -6px var(--b), 0 4px 14px #00000040; }
+.building.tier-up { animation: tier-up 900ms ease-out; }
+@keyframes tier-up { 0% { filter: brightness(2.2); } 100% { filter: none; } }
+
 
 /* Next goal: what the next building costs, and how long until then. */
 .goal {
@@ -176,6 +204,15 @@ canvas { display: block; image-rendering: pixelated; }
 .goal .goal-time.ready { color: var(--gold); }
 .goal .goal-bar { grid-column: 1 / -1; height: 4px; background: var(--surface-3); border-radius: 2px; overflow: hidden; margin-top: 4px; }
 .goal .goal-bar i { display: block; height: 100%; background: var(--shop); transition: width 300ms linear; }
+.goal .goal-sub { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin-top: 8px; font-size: 11px; font-weight: 700; }
+.goal .goal-sub[hidden] { display: none; }
+.goal .goal-sub .goal-bar { margin-top: 2px; }
+.goal .crown-row span:nth-child(2) { color: #cdb2ff; font-variant-numeric: tabular-nums; }
+.goal .goal-bar.crown i { background: #a77bff; }
+.goal .near-name { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.goal .near-n { color: var(--gold); font-variant-numeric: tabular-nums; }
+.goal .near .goal-bar i { background: var(--gold); }
+
 
 .shop-foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
 .btn-row { display: flex; gap: 8px; }

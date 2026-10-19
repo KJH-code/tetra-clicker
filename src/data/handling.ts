@@ -17,6 +17,8 @@ export interface HandlingSettings {
   patterns: boolean;
   reduceMotion: boolean;
   hitEffects: boolean;
+  // Thousands-steps of balance already announced (1 = 1K, 2 = 1M, …).
+  milestone: number;
   // Percent, 90..150.
   uiScale: number;
   highContrast: boolean;
@@ -72,6 +74,7 @@ export const DEFAULT_HANDLING: HandlingSettings = {
   // The page turns this on for a player whose system asks for less motion.
   reduceMotion: false,
   hitEffects: true,
+  milestone: 0,
   uiScale: 100,
   highContrast: false,
 };

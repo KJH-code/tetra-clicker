@@ -10,7 +10,7 @@ import { SYNERGIES } from '../data/synergies';
 import { HARDCORE_EFFECTS } from '../data/hardcore';
 import { GARBAGE } from '../data/garbage';
 import { WRATH } from '../data/golden';
-import { averageVault, goldenMeanSeconds, goldenValue, wrathValue, eventValue, eventMeanSeconds } from './luck';
+import { averageVault, goldenMeanSeconds, goldenValue, wrathValue, eventValue, eventMeanSeconds, missionMinutesPerLife } from './luck';
 
 // Economy simulator: how fast a player climbs the building ladder under a
 // given set of numbers. Bots are not run; each board earns at the same rate
@@ -122,6 +122,10 @@ class LadderEconomy extends Economy {
 }
 
 // Share of the time the player is at the board.
+// How long the model player's lives last, for mission pay: a guess until
+// play-testing measures it.
+const MODEL_LIFE_SECONDS = 300;
+
 function playShare(p: PlayerParams, t: number): number {
   return t < p.focusMinutes * 60 ? 1 : p.dailyMinutes / 1440;
 }
@@ -165,7 +169,9 @@ export function simulate(params: SimParams): SimResult {
     const ev = (1 - wrathChance) * goldenValue(state) + wrathChance * wrathValue(state);
     const level = (player.avgLevel ?? 1) + levelBonus;
     const events = eventValue(state, Math.round(level), params.eventWin ?? 0.5) / eventMeanSeconds;
-    return playShare(player, at) * (ev / goldenMeanSeconds + events);
+    // Missions pay minutes of PER SECOND (bots plus the hand) per life.
+    const missions = (missionMinutesPerLife(player.pps, rowsPerSecond, MODEL_LIFE_SECONDS) * 60 * (state.bots + manual)) / MODEL_LIFE_SECONDS;
+    return playShare(player, at) * (ev / goldenMeanSeconds + events + missions);
   };
   const income = (at: number): number => botIncome() + manualIncome(at) + luckIncome(at);
   const unlocked = (b: BuildingParams): boolean => !b.requires || eco.owned(b.requires) > 0;

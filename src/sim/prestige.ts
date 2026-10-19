@@ -86,6 +86,12 @@ export function crownCurve(risk: number): number {
 
 // Crowns an ascension pays now: the curve's growth over this run, times
 // (1 + tech score), rounded down.
+// How far toward the next crown the run is, 0..1.
+export function crownFraction(riskBanked: number, runRisk: number, techScore: number): number {
+  const grown = (crownCurve(riskBanked + runRisk) - crownCurve(riskBanked)) * (1 + techScore);
+  return Math.max(0, Math.min(1, grown - Math.floor(grown + 1e-9)));
+}
+
 export function crownGain(riskBanked: number, runRisk: number, techScore: number): number {
   const grown = crownCurve(riskBanked + runRisk) - crownCurve(riskBanked);
   // A hair of tolerance so an exact cube (8 × K → 2) does not floor to 1.
