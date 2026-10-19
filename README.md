@@ -24,10 +24,12 @@ serves from `/`.
 ## Controls
 
 Guideline defaults: ← → move, ↓ soft drop, Space hard drop, ↑ / X rotate CW,
-Z / Ctrl rotate CCW, A 180, Shift / C hold. DAS / ARR / SDF and every key can
-be changed under SETTINGS, along with the volume (sound is synthesized, no
-files; MUTE silences it), the language, accessibility and moving the save
-(below).
+Z / Ctrl rotate CCW, A 180, Shift / C hold. DAS / ARR / SDF and the keys
+are under SETTINGS: an action takes any number of keys (+ adds the next key
+pressed, × on a key removes it), and a key serves one action only, so adding
+it to one takes it off another. Settings also hold the volume (sound is
+synthesized, no files; MUTE silences it), the language, accessibility and
+moving the save (below).
 
 On a touch screen or a window under 900 px, buttons under the manual board
 play the same actions with the same DAS / ARR (a tap on the board starts or
@@ -38,6 +40,19 @@ A new save gets a five-step tutorial along the bottom of the manual board:
 start a life, clear a line, buy a building, reach a checkpoint, ascend. Each
 step moves on when the game sees it done (a save that already did one skips
 it); OK hides the current step, TUTORIAL OFF ends it.
+
+## Look
+
+Dark slate panels with a colour band per area: the manual board cyan, the
+shop green, settings blue, achievements and stats gold, ascension violet,
+hardcore red. Buttons are filled in their area's colour; each building has
+a colour of its own (the piece colours down the ladder) on its shop card and
+over its bot board. The shop ends with a NEXT GOAL card: the next building
+on the ladder (or, once every kind is owned, the cheapest next copy) and how
+long PER SECOND takes to pay for it. Text is Exo 2 for Latin and Pretendard
+for Hangul, both bundled ([THIRD_PARTY.md](THIRD_PARTY.md)); the boards wait
+for them before the first frame. Hover and press effects are short and stop
+under LESS MOTION.
 
 ## Language and accessibility
 

@@ -56,11 +56,23 @@ export const WRATH_RIM = '#ff2a2a';
 
 // Mutable: high contrast brightens the grid.
 export const THEME = {
-  background: '#06060d',
-  grid: '#15152a',
-  frame: '#2a2a4a',
+  background: '#090b10',
+  grid: '#161a25',
+  frame: '#3a4157',
+  // The HOLD / NEXT boxes and their title bars.
+  box: '#12151d',
+  boxHead: '#242a3a',
   ghost: '#ffffff',
-  text: '#e8e8ff',
-  dim: '#7a7aa0',
+  text: '#f2f4fa',
+  dim: '#8d93ab',
   flash: '#ffffff',
 };
+
+// The page's fonts, for text drawn on the boards (loaded before the first frame).
+export const FONT = "'Exo 2', 'Pretendard Variable', Pretendard, system-ui, sans-serif";
+export const font = (weight: number, px: number): string => `${weight} ${Math.round(px)}px ${FONT}`;
+
+// Each building's colour, down the ladder through the piece colours (read
+// live, so the colour-blind palette carries over).
+const BUILDING_HUES: Piece[] = ['S', 'I', 'O', 'L', 'T', 'J', 'Z'];
+export const buildingColor = (index: number): string => PIECE_COLORS[BUILDING_HUES[index % BUILDING_HUES.length]!];

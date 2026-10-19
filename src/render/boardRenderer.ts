@@ -1,6 +1,6 @@
 import { WIDTH, HEIGHT, TOP_VISIBLE_ROW, occupiedCells, type Grid, type Placement } from '../sim/board';
 import { cellsOf, pieceFromId, type Piece } from '../sim/pieces';
-import { GOLD, PIECE_COLORS, THEME, VIEW, WRATH_FILL, WRATH_RIM } from './theme';
+import { GOLD, PIECE_COLORS, THEME, VIEW, WRATH_FILL, WRATH_RIM, font } from './theme';
 import type { Fx } from './fx';
 
 // Two buffer rows are drawn above the visible twenty, dimmed, so a piece
@@ -72,11 +72,19 @@ export class BoardRenderer {
       ctx.lineTo(this.originX + WIDTH * c, this.cellY(y) + 0.5);
     }
     ctx.stroke();
-    // Ceiling line marks where the visible field starts.
+    // The well's walls and floor, solid; the ceiling only a faint line,
+    // since pieces start above it.
     ctx.strokeStyle = THEME.frame;
     ctx.beginPath();
     ctx.moveTo(this.originX, this.cellY(TOP_VISIBLE_ROW) + 0.5);
     ctx.lineTo(this.originX + WIDTH * c, this.cellY(TOP_VISIBLE_ROW) + 0.5);
+    ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(this.originX + 1, this.cellY(TOP_VISIBLE_ROW));
+    ctx.lineTo(this.originX + 1, this.height - 1);
+    ctx.lineTo(this.originX + WIDTH * c - 1, this.height - 1);
+    ctx.lineTo(this.originX + WIDTH * c - 1, this.cellY(TOP_VISIBLE_ROW));
     ctx.stroke();
 
     // Locked cells.
@@ -107,11 +115,11 @@ export class BoardRenderer {
 
     // Side panels.
     if (layout.leftCells > 0) {
-      this.drawLabel('HOLD', 0, 0, layout.leftCells);
+      this.drawBox('HOLD', 0, layout.leftCells, Math.max(1, view.holds.length));
       view.holds.forEach((p, i) => this.drawPreview(p, 0, 1 + i * 3, layout.leftCells, view.holdUsed ? 0.35 : 1, view.golden?.holds[i] ?? false, !!view.golden?.wrath));
     }
     if (layout.rightCells > 0) {
-      this.drawLabel('NEXT', this.originX + WIDTH * c, 0, layout.rightCells);
+      this.drawBox('NEXT', this.originX + WIDTH * c, layout.rightCells, Math.max(1, view.next.length));
       view.next.forEach((p, i) => this.drawPreview(p, this.originX + WIDTH * c, 1 + i * 3, layout.rightCells, 1, view.golden?.next === i, !!view.golden?.wrath));
     }
     if (fx) fx.drawFloaters(ctx);
@@ -164,14 +172,26 @@ export class BoardRenderer {
     ctx.restore();
   }
 
-  private drawLabel(text: string, px: number, row: number, cells: number): void {
+  // A side box: a title bar, then a panel behind `slots` previews (three
+  // rows each, from row one).
+  private drawBox(text: string, px: number, cells: number, slots: number): void {
     const { ctx, layout } = this;
+    const c = layout.cell;
+    const x = px + 3;
+    const w = cells * c - 6;
+    const head = c * 0.9;
     ctx.save();
-    ctx.fillStyle = THEME.dim;
-    ctx.font = `${Math.round(layout.cell * 0.42)}px system-ui, sans-serif`;
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'center';
-    ctx.fillText(text, px + (cells * layout.cell) / 2, row * layout.cell + 4);
+    ctx.fillStyle = THEME.box;
+    ctx.fillRect(x, 0, w, (1 + slots * 3) * c + c * 0.2);
+    ctx.fillStyle = THEME.boxHead;
+    ctx.fillRect(x, 0, w, head);
+    // Too small to read on a shrunken bot board: the bar alone says enough.
+    if (c < 14) { ctx.restore(); return; }
+    ctx.fillStyle = THEME.text;
+    ctx.font = font(800, c * 0.46);
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillText(text, x + c * 0.3, head / 2 + 1);
     ctx.restore();
   }
 

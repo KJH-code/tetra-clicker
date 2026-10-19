@@ -59,3 +59,17 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Fonts
+
+Both are bundled from npm and served with the page, under the SIL Open Font
+License 1.1 (the license text ships in each package and in the built files'
+CSS headers).
+
+- **Exo 2** — https://github.com/googlefonts/Exo-2.0, Copyright 2013 The Exo 2
+  Project Authors; via `@fontsource/exo-2` (Latin, weights 500 / 700 / 800).
+  Latin text and figures.
+- **Pretendard** — https://github.com/orioncactus/pretendard, Copyright (c)
+  2021 Kil Hyung-jin, with Reserved Font Name Pretendard; via `pretendard`
+  (variable, dynamic subset: only the Hangul blocks a page shows are fetched).
+  Korean text.

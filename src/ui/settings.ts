@@ -1,5 +1,7 @@
-import { ACTION_LABELS, DEFAULT_HANDLING, HANDLING_LIMITS, SDF_INSTANT, type HandlingSettings, type KeyBindings } from '../data/handling';
+import { ACTION_LABELS, DEFAULT_HANDLING, HANDLING_LIMITS, SDF_INSTANT, type HandlingSettings } from '../data/handling';
 import { t } from './i18n';
+import { addKey, keyName, removeKey } from './keys';
+import type { Action } from './input';
 
 // Moving a save between browsers: the page supplies the text and takes it back.
 export interface SaveTransfer {
@@ -8,11 +10,11 @@ export interface SaveTransfer {
   importText(text: string): boolean;
 }
 
-// Handling (DAS / ARR / SDF), keys, sound, moving the save, and the
-// language and accessibility options. Handling stays first: it is what a
-// player opens settings for most.
+// Handling (DAS / ARR / SDF) and keys first, as what a player opens
+// settings for most; then sound, language, accessibility and moving the save.
 export class SettingsPanel {
-  private listening: keyof KeyBindings | null = null;
+  // The action the next key pressed is added to.
+  private listening: Action | null = null;
   private importOpen = false;
   private note = '';
 
@@ -50,12 +52,7 @@ export class SettingsPanel {
     if (!this.listening) return;
     e.preventDefault();
     e.stopPropagation();
-    const action = this.listening;
-    // A key can serve one action only; take it away from any other.
-    for (const a of Object.keys(this.settings.keys) as (keyof KeyBindings)[]) {
-      this.settings.keys[a] = this.settings.keys[a].filter((k) => k !== e.code);
-    }
-    this.settings.keys[action] = [e.code];
+    addKey(this.settings.keys, this.listening, e.code);
     this.listening = null;
     this.onChange(this.settings);
     this.render();
@@ -69,47 +66,29 @@ export class SettingsPanel {
   private render(): void {
     const box = document.createElement('div');
     box.className = 'settings';
+    box.append(h2(t('SETTINGS')));
     box.append(h2(t('HANDLING')));
     box.append(this.slider('DAS', 'das', 'ms'));
     box.append(this.slider('ARR', 'arr', 'ms'));
     box.append(this.slider('SDF', 'sdf', '×'));
+    box.append(h2(t('KEYS')), this.keysSection());
     box.append(h2(t('SOUND')));
     const sound = this.slider(t('VOL'), 'volume', '');
-    const mute = document.createElement('button');
-    mute.className = 'btn mute' + (this.settings.muted ? ' on' : '');
-    mute.textContent = t(this.settings.muted ? 'MUTED' : 'MUTE');
-    mute.addEventListener('click', () => {
+    const mute = button(t(this.settings.muted ? 'MUTED' : 'MUTE'), () => {
       this.settings.muted = !this.settings.muted;
       this.onChange(this.settings);
       this.render();
     });
+    mute.classList.add('mute');
+    mute.classList.toggle('on', this.settings.muted);
     sound.append(mute);
     sound.classList.add('with-btn');
     box.append(sound);
-    if (this.transfer) box.append(...this.saveSection(this.transfer));
     box.append(...this.languageSection(), ...this.accessSection());
-    box.append(h2(t('KEYS')));
-    const keys = document.createElement('div');
-    keys.className = 'keys';
-    for (const action of Object.keys(ACTION_LABELS) as (keyof KeyBindings)[]) {
-      const row = document.createElement('div');
-      row.className = 'keyrow';
-      const label = document.createElement('span');
-      label.textContent = t(ACTION_LABELS[action]);
-      const btn = document.createElement('button');
-      btn.className = 'btn' + (this.listening === action ? ' listening' : '');
-      btn.textContent = this.listening === action ? t('PRESS…') : this.settings.keys[action].map(keyName).join(' / ') || '—';
-      btn.addEventListener('click', () => { this.listening = action; this.render(); });
-      row.append(label, btn);
-      keys.append(row);
-    }
-    box.append(keys);
+    if (this.transfer) box.append(...this.saveSection(this.transfer));
     const actions = document.createElement('div');
     actions.className = 'row';
-    const reset = document.createElement('button');
-    reset.className = 'btn';
-    reset.textContent = t('DEFAULTS');
-    reset.addEventListener('click', () => {
+    const reset = button(t('DEFAULTS'), () => {
       // Defaults for handling and sound; the tutorial stays where it got to,
       // and the language stays one the player can read.
       const { tutorial, language } = this.settings;
@@ -117,20 +96,62 @@ export class SettingsPanel {
       this.onChange(this.settings);
       this.render();
     });
-    const close = document.createElement('button');
-    close.className = 'btn';
-    close.textContent = t('CLOSE');
-    close.addEventListener('click', () => this.close());
+    const close = button(t('CLOSE'), () => this.close());
+    close.classList.add('primary');
     actions.append(reset, close);
     box.append(actions);
+    // Keep the scroll position across re-renders (a toggle should not jump to the top).
+    const scroll = (this.overlay.firstElementChild as HTMLElement | null)?.scrollTop ?? 0;
     this.overlay.replaceChildren(box);
+    box.scrollTop = scroll;
+  }
+
+  // One row per action: its keys as chips (× takes one off), + adds the next key pressed.
+  private keysSection(): HTMLElement {
+    const keys = document.createElement('div');
+    keys.className = 'keys';
+    for (const action of Object.keys(ACTION_LABELS) as Action[]) {
+      const row = document.createElement('div');
+      row.className = 'keyrow';
+      row.dataset['action'] = action;
+      const label = document.createElement('span');
+      label.textContent = t(ACTION_LABELS[action]);
+      const caps = document.createElement('div');
+      caps.className = 'caps';
+      for (const code of this.settings.keys[action]) {
+        const cap = document.createElement('span');
+        cap.className = 'keycap';
+        cap.dataset['code'] = code;
+        const x = document.createElement('button');
+        x.className = 'x';
+        x.textContent = '×';
+        x.title = t('Remove');
+        x.addEventListener('click', () => { removeKey(this.settings.keys, action, code); this.onChange(this.settings); this.render(); });
+        cap.append(keyName(code), x);
+        caps.append(cap);
+      }
+      if (!this.settings.keys[action].length) {
+        const none = document.createElement('span');
+        none.className = 'none';
+        none.textContent = '—';
+        caps.append(none);
+      }
+      const listening = this.listening === action;
+      const add = button(listening ? t('PRESS…') : '+', () => { this.listening = listening ? null : action; this.render(); });
+      add.classList.add('key-add');
+      add.classList.toggle('listening', listening);
+      add.title = t('Add a key');
+      row.append(label, caps, add);
+      keys.append(row);
+    }
+    return keys;
   }
 
   // Each language in its own name; a change reloads the page (main.ts),
   // since the shop and the tabs are built once.
   private languageSection(): HTMLElement[] {
     const row = document.createElement('div');
-    row.className = 'row a11y-row';
+    row.className = 'seg';
     for (const [value, name] of [['auto', t('AUTO')], ['en', 'English'], ['ko', '한국어']] as const) {
       const b = button(name, () => { this.settings.language = value; this.onChange(this.settings); this.render(); });
       b.classList.toggle('on', this.settings.language === value);
@@ -142,23 +163,35 @@ export class SettingsPanel {
 
   private accessSection(): HTMLElement[] {
     const s = this.settings;
+    const palette = document.createElement('div');
+    palette.className = 'seg';
+    for (const [value, name] of [['standard', t('STANDARD')], ['cvd', t('COLOUR-BLIND SAFE')]] as const) {
+      const b = button(name, () => { s.palette = value; this.onChange(s); this.render(); });
+      b.classList.toggle('on', s.palette === value);
+      b.dataset['palette'] = value;
+      palette.append(b);
+    }
+    const switches = document.createElement('div');
+    switches.className = 'switches';
     const toggle = (label: string, key: 'patterns' | 'reduceMotion' | 'highContrast'): HTMLElement => {
-      const b = button(`${t(label)}: ${t(s[key] ? 'ON' : 'OFF')}`, () => { s[key] = !s[key]; this.onChange(s); this.render(); });
-      b.classList.toggle('on', s[key]);
+      const b = document.createElement('button');
+      b.className = 'switch';
+      b.setAttribute('aria-pressed', String(s[key]));
       b.dataset['a11y'] = key;
+      const knob = document.createElement('span');
+      knob.className = 'knob';
+      b.append(label, knob);
+      b.addEventListener('click', () => { s[key] = !s[key]; this.onChange(s); this.render(); });
       return b;
     };
-    const palette = button(`${t('PIECE COLOURS')}: ${t(s.palette === 'cvd' ? 'COLOUR-BLIND SAFE' : 'STANDARD')}`, () => {
-      s.palette = s.palette === 'cvd' ? 'standard' : 'cvd';
-      this.onChange(s);
-      this.render();
-    });
-    palette.dataset['a11y'] = 'palette';
-    palette.classList.toggle('on', s.palette === 'cvd');
-    const row = document.createElement('div');
-    row.className = 'row a11y-row';
-    row.append(palette, toggle(t('PATTERNS'), 'patterns'), toggle(t('LESS MOTION'), 'reduceMotion'), toggle(t('HIGH CONTRAST'), 'highContrast'));
-    return [h2(t('ACCESSIBILITY')), row, this.slider(t('TEXT'), 'uiScale', '%')];
+    switches.append(toggle(t('PATTERNS'), 'patterns'), toggle(t('LESS MOTION'), 'reduceMotion'), toggle(t('HIGH CONTRAST'), 'highContrast'));
+    const paletteRow = document.createElement('div');
+    paletteRow.className = 'slider';
+    const pl = document.createElement('span');
+    pl.textContent = t('PIECE COLOURS');
+    paletteRow.style.gridTemplateColumns = '64px 1fr';
+    paletteRow.append(pl, palette);
+    return [h2(t('ACCESSIBILITY')), paletteRow, switches, this.slider(t('TEXT'), 'uiScale', '%')];
   }
 
   // EXPORT copies the save as text and downloads it as a file; IMPORT takes
@@ -245,9 +278,6 @@ function h2(text: string): HTMLElement {
   return e;
 }
 
-function keyName(code: string): string {
-  return code.replace(/^Key|^Digit|^Arrow/, '').replace('Left', 'L').replace('Right', 'R').replace('Space', 'SPACE').toUpperCase();
-}
 
 function button(text: string, onClick: () => void): HTMLButtonElement {
   const b = document.createElement('button');

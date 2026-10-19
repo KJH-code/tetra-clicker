@@ -1,11 +1,14 @@
 import type { World } from '../sim/world';
-import { format } from '../sim/num';
+import { format, toNumber } from '../sim/num';
 import { BUILDINGS } from '../data/buildings';
 import { UpgradeChips } from './upgradeChips';
 import { ACHIEVEMENTS } from '../data/achievements';
 import { t } from './i18n';
+import { buildingColor } from '../render/theme';
+import { durationParts, nextGoal } from './goal';
 
-// Right pane: balance, income, one button per building, settings.
+// Right pane: balance and income, upgrade chips, one card per building, the
+// next goal, then ascend, achievements and settings along the bottom.
 export class Shop {
   private balanceEl: HTMLElement;
   private incomeEl: HTMLElement;
@@ -15,52 +18,70 @@ export class Shop {
   private crownEl: HTMLElement;
   private ascendBtn: HTMLButtonElement;
   private achBtn: HTMLButtonElement;
+  private goal: { name: HTMLElement; time: HTMLElement; bar: HTMLElement };
 
   constructor(private root: HTMLElement, private world: World, onSettings: () => void, onAscend: () => void, onAchievements: () => void) {
     root.innerHTML = '';
+    const wallet = el('div', 'wallet', '');
     const balance = stat('LINES', 'balance');
     const income = stat(t('PER SECOND'), 'income', true);
     this.balanceEl = balance.value;
     this.incomeEl = income.value;
     this.crownEl = el('div', 'crowns', '');
-    root.append(balance.el, income.el, this.crownEl);
+    wallet.append(balance.el, income.el, this.crownEl);
+    root.append(wallet);
     this.chips = new UpgradeChips(root, world, () => this.refresh(true));
 
-    // Nine buildings outgrow a short window; the list scrolls on its own so
-    // the balance, chips and buttons below stay in view.
+    // Fifteen buildings outgrow a short window; the list scrolls on its own
+    // so the balance, chips and buttons stay in view.
     const list = el('div', 'buildings', '');
     root.append(list);
-    for (const b of BUILDINGS) {
+    BUILDINGS.forEach((b, i) => {
       const btn = document.createElement('button');
       btn.className = 'building';
       btn.dataset['building'] = b.id;
+      btn.style.setProperty('--b', buildingColor(i));
       const name = el('div', 'name', b.name);
       const owned = el('div', 'owned', '0');
       const price = el('div', 'price', '');
-      const hint = el('div', 'hint', t('+{pct}% / copy · {pps} PPS', { pct: b.effects[0]?.value ?? 0, pps: b.pps }));
-      btn.append(name, owned, price, hint);
+      // One line; the whole of it on hover when a narrow pane cuts it short.
+      const text = t('+{pct}% / copy · {pps} PPS', { pct: b.effects[0]?.value ?? 0, pps: b.pps });
+      const hint = el('div', 'hint', text);
+      hint.title = text;
+      btn.append(name, owned, hint, price);
       btn.addEventListener('click', () => {
         if (this.world.buy(b.id)) this.refresh(true);
       });
       btn.dataset['label'] = b.name;
       list.append(btn);
       this.buttons.set(b.id, { btn, owned, price });
-    }
+    });
 
+    const goal = el('div', 'goal', '');
+    const goalName = el('div', 'goal-name', '');
+    const goalTime = el('div', 'goal-time', '');
+    const bar = el('div', 'goal-bar', '');
+    const fill = document.createElement('i');
+    bar.append(fill);
+    goal.append(el('div', 't-label', t('NEXT GOAL')), goalName, goalTime, bar);
+    root.append(goal);
+    this.goal = { name: goalName, time: goalTime, bar: fill };
+
+    const foot = el('div', 'shop-foot', '');
     this.ascendBtn = document.createElement('button');
-    this.ascendBtn.className = 'btn ascend-btn';
+    this.ascendBtn.className = 'btn primary ascend-btn';
     this.ascendBtn.addEventListener('click', onAscend);
-    root.append(this.ascendBtn);
     const row = el('div', 'btn-row', '');
     this.achBtn = document.createElement('button');
     this.achBtn.className = 'btn ach-btn';
     this.achBtn.addEventListener('click', onAchievements);
     const settings = document.createElement('button');
-    settings.className = 'btn';
+    settings.className = 'btn settings-btn';
     settings.textContent = t('SETTINGS');
     settings.addEventListener('click', onSettings);
     row.append(this.achBtn, settings);
-    root.append(row);
+    foot.append(this.ascendBtn, row);
+    root.append(foot);
     this.refresh(true);
   }
 
@@ -106,6 +127,26 @@ export class Shop {
       ui.price.classList.toggle('cant', !can);
       ui.btn.disabled = !can;
     }
+    this.refreshGoal(balance);
+  }
+
+  private refreshGoal(balance: number): void {
+    const eco = this.world.economy;
+    const goal = nextGoal(BUILDINGS.map((b) => ({
+      id: b.id, name: b.name, price: Number(eco.price(b.id)), owned: eco.owned(b.id), unlocked: this.world.isUnlocked(b.id),
+    })), balance, toNumber(this.world.incomePerSecond()));
+    const card = this.goal.name.parentElement!;
+    card.hidden = !goal;
+    if (!goal) return;
+    this.goal.name.textContent = goal.name;
+    this.goal.time.classList.toggle('ready', goal.seconds === 0);
+    if (goal.seconds === 0) this.goal.time.textContent = t('READY');
+    else if (goal.seconds === null) this.goal.time.textContent = '—';
+    else {
+      const d = durationParts(goal.seconds);
+      this.goal.time.textContent = t(d.key, d.vars);
+    }
+    this.goal.bar.style.width = `${Math.round(goal.progress * 100)}%`;
   }
 }
 

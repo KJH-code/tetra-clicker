@@ -1,3 +1,9 @@
+// Fonts ship with the page (OFL; see THIRD_PARTY.md): Exo 2 for Latin and
+// figures, Pretendard for Hangul, fetched in subsets as text needs them.
+import '@fontsource/exo-2/latin-500.css';
+import '@fontsource/exo-2/latin-700.css';
+import '@fontsource/exo-2/latin-800.css';
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import { World, type WorldEvent } from './sim/world';
 import type { LockResult } from './sim/game';
 import type { BotTech } from './sim/attack';
@@ -7,13 +13,14 @@ import { SAVE_VERSION, type SaveData } from './save/schema';
 import { startAutosave } from './save/autosave';
 import { exportSave, importSave } from './save/transfer';
 import { DEFAULT_HANDLING, type HandlingSettings } from './data/handling';
-import { buildingById } from './data/buildings';
+import { BUILDINGS, buildingById } from './data/buildings';
 import { SYNERGIES } from './data/synergies';
 import { tag } from './sim/tags';
 import { BoardRenderer, type BoardView } from './render/boardRenderer';
+import { WIDTH } from './sim/board';
 import { Fx } from './render/fx';
 import { animatedPlacement, isLanded, type BotAnimation } from './render/botAnim';
-import { GOLD, PIECE_COLORS, WRATH_RIM, THEME, VIEW, setPalette } from './render/theme';
+import { GOLD, PIECE_COLORS, WRATH_RIM, THEME, VIEW, setPalette, buildingColor, font } from './render/theme';
 import { BUFFS } from './data/golden';
 import { drawRoundHud } from './render/roundHud';
 import { drawEventHud, drawDuelGauge } from './render/eventHud';
@@ -33,6 +40,13 @@ import { resolveLanguage, setLanguage, t } from './ui/i18n';
 // The technique bots think with Cold Clear compiled to wasm. Browsers only
 // compile a module this size asynchronously, so it loads before anything plays.
 installEngine(await loadEngine());
+// Board text uses the page's fonts; wait for them (a moment at most) so the
+// first frames do not draw in a fallback.
+await Promise.race([
+  Promise.all([['800 16px "Exo 2"', 'A'], ['700 16px "Exo 2"', 'A'], ['700 16px "Pretendard Variable"', '금고레벨']]
+    .map(([f, text]) => document.fonts.load(f!, text).catch(() => []))),
+  new Promise((r) => setTimeout(r, 1500)),
+]);
 
 async function loadEngine(): Promise<WebAssembly.Instance> {
   const response = await fetch(engineUrl);
@@ -60,7 +74,7 @@ function applyDisplay(): void {
   VIEW.reduceMotion = settings.reduceMotion;
   VIEW.highContrast = settings.highContrast;
   VIEW.textScale = settings.uiScale / 100;
-  THEME.grid = settings.highContrast ? '#33335c' : '#15152a';
+  THEME.grid = settings.highContrast ? '#343b52' : '#161a25';
   const root = document.documentElement;
   root.classList.toggle('high-contrast', settings.highContrast);
   root.classList.toggle('reduce-motion', settings.reduceMotion);
@@ -477,9 +491,9 @@ function render(): void {
     const hold = { holds: board.game.holds, holdUsed: false, next: [] as never[] };
     if (v.anim) {
       const p = animatedPlacement(v.anim);
-      v.renderer.render({ grid: v.anim.before, active: p, ghostY: null, ...hold }, v.fx, (ctx) => label(ctx, v.renderer, boardLabel(board.buildingId, def?.name)));
+      v.renderer.render({ grid: v.anim.before, active: p, ghostY: null, ...hold }, v.fx, (ctx) => label(ctx, v.renderer, boardLabel(board.buildingId, def?.name), board.buildingId));
     } else {
-      v.renderer.render({ grid: board.game.grid, active: null, ghostY: null, ...hold }, v.fx, (ctx) => label(ctx, v.renderer, boardLabel(board.buildingId, def?.name)));
+      v.renderer.render({ grid: board.game.grid, active: null, ghostY: null, ...hold }, v.fx, (ctx) => label(ctx, v.renderer, boardLabel(board.buildingId, def?.name), board.buildingId));
     }
   });
 }
@@ -496,13 +510,23 @@ function boardLabel(id: string, name: string | undefined): string {
   return `${name ?? id}${syn}${duel}${buff > 1 ? ` ×${buff}` : ''}`;
 }
 
-function label(ctx: CanvasRenderingContext2D, r: BoardRenderer, text: string): void {
+// The board's name over the buffer rows, after a bar in the building's
+// colour (the same as its shop card).
+function label(ctx: CanvasRenderingContext2D, r: BoardRenderer, text: string, id: string): void {
+  const c = r.layout.cell;
+  const h = Math.max(12, Math.round(c * 1.3));
   ctx.save();
-  ctx.fillStyle = '#7a7aa0';
-  ctx.font = '11px system-ui, sans-serif';
+  ctx.fillStyle = buildingColor(BUILDINGS.findIndex((b) => b.id === id));
+  ctx.fillRect(r.cellX(0) + 3, 4, 4, h - 4);
+  ctx.fillStyle = THEME.text;
+  // As large as fits across the well, 9-13 px.
+  const room = WIDTH * c - 12;
+  let size = 13;
+  ctx.font = font(800, size);
+  while (size > 9 && ctx.measureText(text).width > room) ctx.font = font(800, --size);
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText(text, r.cellX(0) + 4, 4);
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, r.cellX(0) + 12, 2 + h / 2);
   ctx.restore();
 }
 

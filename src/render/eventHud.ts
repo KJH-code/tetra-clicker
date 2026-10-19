@@ -2,7 +2,7 @@ import type { BoardRenderer } from './boardRenderer';
 import type { LifeEvent } from '../sim/events';
 import { HEIGHT, WIDTH, TOP_VISIBLE_ROW, occupiedCells } from '../sim/board';
 import { pieceFromId } from '../sim/pieces';
-import { PIECE_COLORS, THEME, VIEW } from './theme';
+import { PIECE_COLORS, THEME, VIEW, font } from './theme';
 import { t } from '../ui/i18n';
 
 const NAMES = { rival: 'RIVAL', invader: 'INVADER', helper: 'HELPER' } as const;
@@ -20,7 +20,7 @@ export function drawEventHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ev
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillStyle = COLORS[ev.kind];
-  ctx.font = `800 ${Math.round(c * 0.5 * VIEW.textScale)}px system-ui, sans-serif`;
+  ctx.font = font(800, c * 0.5 * VIEW.textScale);
   const time = ev.kind === 'rival' ? t('UNTIL ONE TOPS OUT') : `${Math.ceil(ev.msLeft / 1000)}s`;
   ctx.fillText(`${NAMES[ev.kind]} · ${time}`, left + (WIDTH * c) / 2, top + c * 0.2);
   ctx.restore();
@@ -60,7 +60,7 @@ export function drawEventHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ev
     for (const [x, y] of occupiedCells(g.active)) if (y >= TOP_VISIBLE_ROW) ctx.fillRect(ox + x * mini, oy + (y - TOP_VISIBLE_ROW) * mini, mini - 1, mini - 1);
   }
   ctx.fillStyle = COLORS.rival;
-  ctx.font = `700 ${Math.round(c * 0.36 * VIEW.textScale)}px system-ui, sans-serif`;
+  ctx.font = font(700, c * 0.36 * VIEW.textScale);
   ctx.textAlign = 'center';
   ctx.fillText(`RIVAL L${ev.level}`, ox + (mini * WIDTH) / 2, oy - c * 0.5);
   if (ev.toRival > 0) gauge(ctx, ox - 4, oy + mini * rows, Math.min(rows, ev.toRival) * mini, '#ff3b3b');

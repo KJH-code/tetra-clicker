@@ -1,6 +1,6 @@
 import { WIDTH } from '../sim/board';
 import type { BoardRenderer } from './boardRenderer';
-import { THEME, VIEW } from './theme';
+import { THEME, VIEW, font } from './theme';
 
 interface RowFlash { row: number; t: number; dur: number }
 interface Floater { text: string; x: number; y: number; t: number; dur: number; color: string; size: number }
@@ -63,7 +63,7 @@ export class Fx {
       ctx.fillStyle = f.color;
       ctx.shadowColor = f.color;
       ctx.shadowBlur = 12;
-      ctx.font = `700 ${f.size}px system-ui, sans-serif`;
+      ctx.font = font(800, f.size);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(f.text, f.x, f.y - k * 40);

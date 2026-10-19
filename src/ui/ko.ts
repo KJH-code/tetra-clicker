@@ -8,6 +8,9 @@ export const KO: Record<string, string> = {
   'PER SECOND': '초당',
   '+{pct}% / copy · {pps} PPS': '1개당 +{pct}% · {pps} PPS',
   'SETTINGS': '설정',
+  'NEXT GOAL': '다음 목표',
+  '{n}s': '{n}초',
+  '{d}d {h}h': '{d}일 {h}시간',
   '♛ {crowns} CROWN · +{earned}% income': '♛ {crowns} CROWN · 수입 +{earned}%',
   'ASCEND +{n} CROWN': '환생 +{n} CROWN',
   'ASCEND': '환생',
@@ -88,7 +91,6 @@ export const KO: Record<string, string> = {
   'CHALLENGE · {pts} POINTS{needs} · hardcore + these rules · cleared by ascending alive · best {best} (+{pct}% income)':
     '챌린지 · {pts}점{needs} · 하드코어 + 이 규칙 · 살아서 환생하면 클리어 · 최고 {best} (수입 +{pct}%)',
   'OFF': '끔',
-  'ON': '켬',
 
   // settings
   'HANDLING': '조작',
@@ -98,6 +100,8 @@ export const KO: Record<string, string> = {
   'MUTE': '음소거',
   'KEYS': '키',
   'PRESS…': '누르세요…',
+  'Remove': '삭제',
+  'Add a key': '키 추가',
   'DEFAULTS': '기본값',
   'LEFT': '왼쪽',
   'RIGHT': '오른쪽',

@@ -3,6 +3,7 @@ import { BUILDINGS } from '../data/buildings';
 import { format, toNumber } from '../sim/num';
 import { tag } from '../sim/tags';
 import { t } from './i18n';
+import { FONT } from '../render/theme';
 
 // The STATS tab: this run beside every run, techniques, records, and two
 // charts (PER SECOND through the run, and each building's share of it now).
@@ -58,7 +59,7 @@ export function statsView(world: World): HTMLElement {
   return wrap;
 }
 
-const INK = { text: '#e8e8ff', dim: '#7a7aa0', grid: '#1a1a30', line: '#00f0ff', surface: '#0d0d1a' };
+const INK = { text: '#f2f4fa', dim: '#8d93ab', grid: '#242a3a', line: '#ffc233', surface: '#12151d' };
 
 function chartBox(title: string): { box: HTMLElement; canvas: HTMLCanvasElement; tip: HTMLElement } {
   const box = document.createElement('div');
@@ -98,7 +99,7 @@ function incomeChart(world: World): HTMLElement {
   const y = (v: number) => H - B - (v / max) * (H - T - B);
   const draw = (hover: number | null) => {
     ctx.clearRect(0, 0, W, H);
-    ctx.font = '10px system-ui, sans-serif';
+    ctx.font = `600 10px ${FONT}`;
     ctx.fillStyle = INK.dim;
     ctx.strokeStyle = INK.grid;
     ctx.lineWidth = 1;
@@ -158,7 +159,7 @@ function shareChart(world: World): HTMLElement {
   const ctx = setup(canvas, W, H);
   const max = Math.max(1e-9, ...rows.map((r) => r.v));
   const total = rows.reduce((n, r) => n + r.v, 0);
-  ctx.font = '11px system-ui, sans-serif';
+  ctx.font = `600 11px ${FONT}`;
   if (!rows.length) {
     ctx.fillStyle = INK.dim;
     ctx.textAlign = 'center';
