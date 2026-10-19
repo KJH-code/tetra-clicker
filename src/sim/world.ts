@@ -187,6 +187,7 @@ export class World {
     this.garbageHoles = createRng(snapshot?.garbage?.holes ?? (seed * 2654435761 + 97) >>> 0);
     this.applyRules();
     this.countBoardGarbage();
+    this.syncLive();
   }
 
   // Manual-board rules bought as upgrades. Recomputed after every purchase;
@@ -219,10 +220,11 @@ export class World {
   }
 
   buyUpgrade(id: string): boolean {
+    this.syncLive();
     if (this.ascending || !this.upgradeAllowed(id)) return false;
-    const def = upgradeById(id);
-    if (!def || !this.economy.buyUpgrade(id)) return false;
-    this.queueGarbage(def.price);
+    const price = Number(this.economy.upgradePrice(id));
+    if (!upgradeById(id) || !this.economy.buyUpgrade(id)) return false;
+    this.queueGarbage(price);
     this.applyRules();
     this.events.push({ type: 'upgraded', upgradeId: id });
     return true;
@@ -324,10 +326,12 @@ export class World {
   // the buy_garbage effects. With no income yet there is nothing to weigh it
   // against, and nothing to slow: no rows.
   garbageFor(price: number): number {
+    this.syncLive();
     const perSecond = toNumber(this.incomePerSecond()) + this.manualRate;
     if (perSecond <= 0) return 0;
     const raw = (price / (perSecond * GARBAGE.secondsPerRow)) * this.fx('buy_garbage', 1);
-    return Math.min(GARBAGE.maxRowsPerBuy, Math.floor(raw + 1e-9));
+    const cap = this.economy.lifeLive ? GARBAGE.maxRowsPerBuy : GARBAGE.idleMaxRows;
+    return Math.min(cap, Math.floor(raw + 1e-9));
   }
 
   private queueGarbage(price: number): void {
@@ -454,23 +458,32 @@ export class World {
     return Math.max(1, Math.floor(this.fx('start_level', LEVELS.startLevel)));
   }
 
+  // Prices and purchase garbage read whether a life is live; kept in step
+  // with every change of state.
+  private syncLive(): void {
+    this.economy.lifeLive = this.round.live ? 1 : 0;
+  }
+
   startRound(): boolean {
     if (this.round.active || this.ascending) return false;
     this.round.start(this.nextStartLevel(), this.fx('rows_per_level', LEVELS.rowsPerLevel), this.goldenScale());
     this.economy.stats.rounds += 1;
     this.economy.stats.maxLevel = Math.max(this.economy.stats.maxLevel, this.round.level);
     this.events.push({ type: 'roundStart', level: this.round.level });
+    this.syncLive();
     return true;
   }
 
   pauseRound(): void {
     if (!this.round.active || this.round.paused) return;
     this.round.paused = true;
+    this.syncLive();
     this.events.push({ type: 'paused' });
   }
 
   resumeRound(): void {
     this.round.paused = false;
+    this.syncLive();
   }
 
   // A top-out is the only way a life ends: the unbanked vault is lost, save
@@ -491,12 +504,15 @@ export class World {
     if (vault > 0) this.economy.stats.riskLines += this.round.vaultRisk * (kept / vault) * this.riskWeight();
     this.economy.stats.deaths += 1;
     this.round.end();
+    this.syncLive();
     // Under a Line of carry belongs to the finished round.
     this.toVault.carry = 0;
     // Garbage still on the board waits for the next life: a top-out is no
     // way to shed it.
     this.garbageQueue += this.manual.garbageRows();
     this.manual.reset();
+    // The next life opens on a fresh bag, hold empty.
+    this.manual.newBag(this.round.eventSeed());
     this.countBoardGarbage();
     // A golden piece belongs to its round.
     this.manual.clearGolden();
@@ -510,12 +526,13 @@ export class World {
   private stepRound(dtMs: number): void {
     if (!this.round.live) return;
     const ev = this.lifeEvent;
-    // An invader brings garbage faster.
-    const speed = ev?.kind === 'invader' ? EVENTS.invader.garbageSpeed : 1;
-    // Timed cheese only in hardcore, and while an invader is on.
-    const timed = ev?.kind === 'invader' || flagCount(this.economy.effects, 'timed_garbage', this.economy) > 0;
+    // Timed cheese only in hardcore, and while an invader is on (a row
+    // every few seconds, whatever the level).
+    const invader = ev?.kind === 'invader';
+    const timed = invader || flagCount(this.economy.effects, 'timed_garbage', this.economy) > 0;
     const { garbage: rows, golden } = this.round.advance(dtMs, { ready: !this.manual.hasGolden, scale: this.goldenScale() },
-      this.fx('garbage_interval', 1) / speed, timed ? this.fx('garbage_from_level', LEVELS.garbageFromLevel) : Infinity);
+      invader ? 1 : this.fx('garbage_interval', 1), timed ? this.fx('garbage_from_level', LEVELS.garbageFromLevel) : Infinity,
+      invader ? EVENTS.invader.rowSeconds : undefined);
     // Attack banked against an invader blocks rows before they land.
     let garbage = rows;
     if (ev?.kind === 'invader' && ev.shield > 0) {
@@ -714,6 +731,7 @@ export class World {
   }
 
   buy(id: string): boolean {
+    this.syncLive();
     const def = buildingById(id);
     if (this.ascending) return false;
     const price = Number(this.economy.price(id));
@@ -807,6 +825,7 @@ export class World {
 
   // One fixed step: every bot counts down to its next piece.
   step(dtMs: number): void {
+    this.syncLive();
     // The hand's recent rate fades over about a minute.
     this.manualRate *= Math.exp(-dtMs / 1000 / GARBAGE.manualWindowSeconds);
     this.stepRound(dtMs);

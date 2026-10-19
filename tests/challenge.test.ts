@@ -43,7 +43,7 @@ describe('challenge runs', () => {
     expect(w.manual.swapHold()).toBe(false);
     // Hardcore's three next pieces, two fewer.
     expect(w.manual.rules.nextCount).toBe(1);
-    expect((w as unknown as { fx(t: string, b: number): number }).fx('buy_garbage', 1)).toBeCloseTo(2, 9);
+    expect((w as unknown as { fx(t: string, b: number): number }).fx('buy_garbage', 1)).toBeCloseTo(2 * 2, 9); // ×2 more between lives
     expect((w as unknown as { fx(t: string, b: number): number }).fx('gravity', 1)).toBe(Infinity);
   });
 
@@ -56,7 +56,8 @@ describe('challenge runs', () => {
     expect(w.upgradeAllowed('manual_200')).toBe(false);
     w.economy.stats.manualLines = 1e9;
     expect(w.buyUpgrade('manual_200')).toBe(false);
-    expect(Number(w.economy.price('single'))).toBe(Math.ceil(110 * 1.15 ** 2 * 2 - 1e-9));
+    // Between lives: list price, ×1.25 over the base.
+    expect(Number(w.economy.price('single'))).toBe(Math.ceil(110 * 1.15 ** 2 * 2 * 1.25 - 1e-9));
     const s = run({ no_synergies: 1, price: 1, next: 1 });
     expect(s.upgradeAllowed('syn_single_double')).toBe(false);
     expect(s.upgradeAllowed('manual_200')).toBe(true);

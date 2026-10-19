@@ -238,7 +238,8 @@ describe('prestige shop', () => {
     b['endRound']();
     expect(Number(b.economy.balance)).toBe(500);
     expect(b.economy.stats.riskLines).toBeCloseTo(2000, 9); // the kept half counts as banked
-    expect(b['fx']('buy_garbage', 1)).toBeCloseTo(0.8, 12);
+    // Measured between lives, where purchases send twice the rows.
+    expect(b['fx']('buy_garbage', 1)).toBeCloseTo(0.8 * 2, 12);
   });
 
   it('START LEVEL +2 raises every life’s starting level', () => {

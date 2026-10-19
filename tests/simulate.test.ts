@@ -25,6 +25,9 @@ describe('economy simulator', () => {
     const w = new World(1);
     w.awardAchievements = false; // the simulator has none
     w.economy.balance = 1e9;
+    // The model player buys mid-life, at the live price.
+    w.advance(0);
+    w.startRound();
     w.buy('single'); w.buy('single');
     // The third copy costs what the game charges after two are owned.
     expect(third.price).toBeCloseTo(Number(w.economy.price('single')), 10);

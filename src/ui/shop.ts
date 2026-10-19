@@ -6,6 +6,7 @@ import { ACHIEVEMENTS } from '../data/achievements';
 import { t } from './i18n';
 import { buildingColor } from '../render/theme';
 import { durationParts, nextGoal } from './goal';
+import { GARBAGE } from '../data/garbage';
 
 // Right pane: balance and income, upgrade chips, one card per building, the
 // next goal, then ascend, achievements and settings along the bottom.
@@ -19,6 +20,7 @@ export class Shop {
   private ascendBtn: HTMLButtonElement;
   private achBtn: HTMLButtonElement;
   private goal: { name: HTMLElement; time: HTMLElement; bar: HTMLElement };
+  private band: HTMLElement;
 
   constructor(private root: HTMLElement, private world: World, onSettings: () => void, onAscend: () => void, onAchievements: () => void) {
     root.innerHTML = '';
@@ -28,7 +30,9 @@ export class Shop {
     this.balanceEl = balance.value;
     this.incomeEl = income.value;
     this.crownEl = el('div', 'crowns', '');
-    wallet.append(balance.el, income.el, this.crownEl);
+    // Whether buying now is cheap (a life running) or sends double garbage.
+    this.band = el('div', 'live-band', '');
+    wallet.append(balance.el, income.el, this.crownEl, this.band);
     root.append(wallet);
     this.chips = new UpgradeChips(root, world, () => this.refresh(true));
 
@@ -97,6 +101,9 @@ export class Shop {
       this.lastBalance = balance;
     }
     this.incomeEl.textContent = `${format(this.world.incomePerSecond(true))}/s`;
+    const live = this.world.economy.lifeLive > 0;
+    this.band.classList.toggle('idle', !live);
+    this.band.textContent = live ? t('LIVE · prices −{n}%', { n: GARBAGE.liveDiscountPct }) : t('READY · purchase garbage ×{n}', { n: GARBAGE.idleGarbageMul });
     this.incomeEl.classList.toggle('buffed', this.world.buffs.active.length > 0);
     this.chips.refresh();
     const meta = this.world.economy.meta;
@@ -123,12 +130,29 @@ export class Shop {
       const price = this.world.economy.price(b.id);
       const can = this.world.canBuy(b.id);
       ui.owned.textContent = String(this.world.economy.owned(b.id));
-      ui.price.textContent = format(price);
+      // In a life the card shows the discount against the full price.
+      const live = this.world.economy.lifeLive;
+      this.world.economy.lifeLive = 0;
+      const full = this.world.economy.price(b.id);
+      this.world.economy.lifeLive = live;
+      ui.price.replaceChildren();
+      if (this.world.economy.lifeLive && unlocked) {
+        const was = document.createElement('s');
+        was.textContent = format(full);
+        ui.price.append(was, ' ');
+      }
+      ui.price.append(format(price));
       ui.price.classList.toggle('cant', !can);
       ui.btn.disabled = !can;
       // What buying it now would send to the manual board.
       const rows = unlocked ? this.world.garbageFor(Number(price)) : 0;
       ui.btn.title = rows > 0 ? t('Buying sends {n} garbage rows to your board', { n: rows }) : '';
+      if (rows > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'garbage-badge';
+        badge.textContent = `▲${rows}`;
+        ui.price.prepend(badge, ' ');
+      }
     }
     this.refreshGoal(balance);
   }

@@ -48,6 +48,7 @@ describe('upgrade unlocks and purchase', () => {
 
   it('refuses an upgrade it cannot afford and charges the price', () => {
     const e = new Economy();
+    e.lifeLive = 1; // live: the data price
     e.setOwned('single', 1);
     const price = upgradeById('ms_single_1')!.price;
     e.balance = price - 1;

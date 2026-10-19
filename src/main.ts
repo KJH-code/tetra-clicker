@@ -466,7 +466,8 @@ function tick(): void {
           const tech = buildingById(world.autoBoards[autoViews.indexOf(v)]?.buildingId ?? '')?.tech;
           const label = tech ? techLabel(r, tech) : null;
           if (label) {
-            v.fx.float(label, v.renderer.cellX(5), v.renderer.cellY((r.clearedRows[0] ?? 30) - 2), { color: '#ffffff', size: Math.max(8, Math.round(v.renderer.layout.cell * 0.8)), dur: 900 });
+            v.fx.float(label, v.renderer.cellX(5), v.renderer.cellY((r.clearedRows[0] ?? 30) - 2), { color: '#ffffff', size: Math.max(8, Math.round(v.renderer.layout.cell * 0.8)), dur: 900,
+              maxWidth: WIDTH * v.renderer.layout.cell - 4 });
           }
         }
         v.anim = null;

@@ -149,6 +149,8 @@ export const KO: Record<string, string> = {
   '{name} LEAVES': '{name} 떠남',
   '★ {name} · +1% income': '★ {name} · 수입 +1%',
   'WIN {n}': '{n}연승',
+  'LIVE · prices −{n}%': 'LIVE · 가격 −{n}%',
+  'READY · purchase garbage ×{n}': 'READY · 구매 가비지 ×{n}',
   'GARBAGE BONUS +{v}': '가비지 보너스 +{v}',
   '+{n} GARBAGE': '가비지 +{n}',
   'BOTS −{n}%': '봇 −{n}%',

@@ -227,6 +227,10 @@ export function simulate(params: SimParams): SimResult {
       if (payback < bestPayback) { bestPayback = payback; best = o; }
     }
     if (!best || rate <= 0) break;
+    // The model player buys mid-life, at the live price, which is the
+    // ladder's (list ×1.25, live ×0.8). Buying between lives costs a quarter
+    // more and sends double garbage: a choice the ladder does not take.
+    const live = true;
     const price = best.price;
     let next = t + Math.max(0, (price - balance) / rate);
     // Events that change the rate or the options come first: the end of the
@@ -265,7 +269,9 @@ export function simulate(params: SimParams): SimResult {
       // bots 5%. r rows cost about 5% of bot income over r²/2 rows' digging.
       const perSecond = botIncome() + manualIncome(t);
       if (perSecond > 0) {
-        const rows = Math.min(GARBAGE.maxRowsPerBuy, Math.floor((price / (perSecond * GARBAGE.secondsPerRow)) * multiplierOf(eco, 'buy_garbage') + 1e-9));
+        const idle = live ? 1 : GARBAGE.idleGarbageMul;
+        const rows = Math.min(live ? GARBAGE.maxRowsPerBuy : GARBAGE.idleMaxRows,
+          Math.floor((price / (perSecond * GARBAGE.secondsPerRow)) * multiplierOf(eco, 'buy_garbage') * idle + 1e-9));
         const lost = (GARBAGE.penaltyPctPerRow / 100) * botIncome() * (rows * rows) / (2 * rowsPerSecond);
         balance = Math.max(0, balance - lost);
       }

@@ -49,7 +49,7 @@ export class UpgradeChips {
 
   private show(u: UpgradeDef, anchor: HTMLElement): void {
     const rule = u.rule ? `<span class="rule">${t('RULE')}</span>` : '';
-    this.tip.innerHTML = `<div class="tip-name">${t(u.name)}${rule}</div><div class="tip-price">${format(u.price)}</div>`;
+    this.tip.innerHTML = `<div class="tip-name">${t(u.name)}${rule}</div><div class="tip-price">${format(this.world.economy.upgradePrice(u.id))}</div>`;
     this.tip.hidden = false;
     const parent = this.tip.offsetParent as HTMLElement | null;
     const a = anchor.getBoundingClientRect();

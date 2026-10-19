@@ -3,7 +3,7 @@ import type { BoardRenderer } from './boardRenderer';
 import { THEME, VIEW, font } from './theme';
 
 interface RowFlash { row: number; t: number; dur: number }
-interface Floater { text: string; x: number; y: number; t: number; dur: number; color: string; size: number }
+interface Floater { text: string; x: number; y: number; t: number; dur: number; color: string; size: number; maxWidth?: number }
 
 // Clear-time spectacle: rows flash white and fade, the board shakes in
 // proportion to the clear, and the amount earned drifts up and dissolves.
@@ -23,8 +23,9 @@ export class Fx {
     this.shake = { amp: Math.min(10, 2 + strength * 2), t: 0, dur: 180 + strength * 40 };
   }
 
-  float(text: string, x: number, y: number, opts: { color?: string; size?: number; dur?: number } = {}): void {
-    this.floaters.push({ text, x, y, t: 0, dur: opts.dur ?? 900, color: opts.color ?? THEME.text, size: (opts.size ?? 16) * VIEW.textScale });
+  // `maxWidth` shrinks the text to fit (a bot board is narrow, larger text more so).
+  float(text: string, x: number, y: number, opts: { color?: string; size?: number; dur?: number; maxWidth?: number } = {}): void {
+    this.floaters.push({ text, x, y, t: 0, dur: opts.dur ?? 900, color: opts.color ?? THEME.text, size: (opts.size ?? 16) * VIEW.textScale, ...(opts.maxWidth ? { maxWidth: opts.maxWidth } : {}) });
   }
 
   update(dt: number): void {
@@ -64,6 +65,10 @@ export class Fx {
       ctx.shadowColor = f.color;
       ctx.shadowBlur = 12;
       ctx.font = font(800, f.size);
+      if (f.maxWidth) {
+        const w = ctx.measureText(f.text).width;
+        if (w > f.maxWidth) ctx.font = font(800, Math.max(6, (f.size * f.maxWidth) / w));
+      }
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(f.text, f.x, f.y - k * 40);

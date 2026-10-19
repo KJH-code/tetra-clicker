@@ -15,6 +15,8 @@ export class Economy implements EffectContext {
   meta: Meta = emptyMeta();
   // Garbage rows on the manual board, capped, as the world last counted them.
   boardGarbage = 0;
+  // 1 while a life runs unpaused (purchases are cheaper then), else 0.
+  lifeLive = 0;
   readonly effects: Effect[];
   private readonly upgradeDefs: Map<string, UpgradeDef>;
 
@@ -46,6 +48,7 @@ export class Economy implements EffectContext {
   stat(name: string): number {
     if (name === 'achievementCount') return this.meta.achievements.size;
     if (name === 'boardGarbage') return this.boardGarbage;
+    if (name === 'lifeLive') return this.lifeLive;
     const run = (this.stats as unknown as Record<string, number>)[name];
     if (run !== undefined) return run;
     const meta = (this.meta as unknown as Record<string, unknown>)[name];
@@ -92,12 +95,19 @@ export class Economy implements EffectContext {
 
   canBuyUpgrade(id: string): boolean {
     const def = this.upgradeDef(id);
-    return !!def && this.isUpgradeUnlocked(id) && gte(this.balance, num(def.price));
+    return !!def && this.isUpgradeUnlocked(id) && gte(this.balance, this.upgradePrice(id));
+  }
+
+  // An upgrade's price after effects (the live discount), whole Lines rounded up.
+  upgradePrice(id: string): Num {
+    const def = this.upgradeDef(id);
+    if (!def) return num(Infinity);
+    return num(Math.ceil(evaluate(this.effects, 'upgrade_price', [], this, def.price) - 1e-9));
   }
 
   buyUpgrade(id: string): boolean {
     if (!this.canBuyUpgrade(id)) return false;
-    this.balance = sub(this.balance, num(this.upgradeDef(id)!.price));
+    this.balance = sub(this.balance, this.upgradePrice(id));
     this.upgrades.add(id);
     return true;
   }

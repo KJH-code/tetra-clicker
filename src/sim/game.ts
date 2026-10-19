@@ -535,6 +535,17 @@ export class Game {
     if (this.active) this.active = this.spawnPlacement(this.active.piece);
   }
 
+  // A fresh 7-bag from `seed`, with hold and the piece in play cleared:
+  // every life starts from the same kind of opening.
+  newBag(seed: number): void {
+    this.bag = createBag(createRng(seed), QUEUE_LOOKAHEAD);
+    this.holds = [];
+    this.golden = { queue: -1, active: false, holds: [] };
+    this.holdUsed = false;
+    this.active = null;
+    this.spawn();
+  }
+
   // Place the active piece at an explicit position (bot use). Returns false if
   // the position collides.
   setActive(p: Placement): boolean {

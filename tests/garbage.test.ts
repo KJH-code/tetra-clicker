@@ -65,13 +65,13 @@ describe('purchase garbage', () => {
     w.awardAchievements = false;
     inner(w).manualRate = 1;
     w.economy.balance = num(1e6);
-    w.buy('single');
-    expect(w.garbageQueue).toBe(1);
+    w.buy('single'); // 138 (list price) over a minute of 1/s, twice over between lives: 4 rows
+    expect(w.garbageQueue).toBe(4);
     expect(w.manual.garbageRows()).toBe(0);
     w.advance(0);
     w.startRound();
     w.manualLock(lock({ lines: 0 }));
-    expect(w.manual.garbageRows()).toBe(1);
+    expect(w.manual.garbageRows()).toBe(4);
   });
 
   it('a top-out sends the board\'s garbage back to the queue', () => {

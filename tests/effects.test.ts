@@ -44,6 +44,7 @@ describe('effect evaluation order', () => {
 describe('economy', () => {
   it('price follows base × 1.15^n', () => {
     const e = new Economy();
+    e.lifeLive = 1; // the live price is the base price; between lives it is ×1.25
     // Rounded up to whole Lines.
     expect(e.price('single')).toBe(110);
     e.balance = 1000;

@@ -122,6 +122,11 @@ canvas { display: block; image-rendering: pixelated; }
 .stat .value.bump { animation: bump 160ms ease-out; }
 @keyframes bump { from { transform: scale(1.06); } to { transform: scale(1); } }
 .buffed { color: var(--gold) !important; text-shadow: 0 0 10px #ffc23366; }
+.live-band { margin-top: 6px; padding: 5px 9px; border-radius: var(--radius); font-size: 11px; font-weight: 800; letter-spacing: 0.08em;
+  background: color-mix(in srgb, var(--shop) 18%, transparent); color: var(--shop); border-left: 3px solid var(--shop); }
+.live-band.idle { background: color-mix(in srgb, var(--danger) 16%, transparent); color: #ff8a95; border-left-color: var(--danger); }
+.building .price s { color: var(--faint); font-weight: 600; margin-right: 2px; }
+.garbage-badge { color: var(--danger); font-size: 11px; font-weight: 800; }
 .crowns { color: #cdb2ff; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; }
 
 .buildings { flex: 0 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; padding-right: 2px; }

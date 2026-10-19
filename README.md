@@ -93,6 +93,14 @@ skill.
   between lives, they wait for the next one). A clear's attack (table value
   ÷ 2) cancels them first; a piece that clears nothing lets up to four rise,
   each with one random hole, as in a versus game.
+- **Buy while you play**: a running life buys buildings and upgrades 20%
+  under the list price (list prices are ×1.25 the ladder's, so the live
+  price is the ladder's). Between lives or paused, the list price applies
+  and a purchase sends twice the rows, up to eight. The shop's band says
+  which (LIVE · prices −20% / READY · purchase garbage ×2), cards show the
+  struck list price in a life and ▲n for the rows a purchase would send.
+- **A fresh bag every life**: after a top-out the next life opens on a new
+  7-bag with hold empty.
 - **Garbage on the board slows the bots**: each row 5% off bot income, half
   at most (BOTS −n% under the level). A top-out sends whatever garbage is on
   the board back to the queue, so dying never sheds it.
@@ -315,8 +323,8 @@ three turns up; the higher the level, the likelier the first two
   nothing takes what is waiting (up to 6 rows). Stronger with the level
   (0.5 + 0.06 × level PPS, up to 2); beating it pays 120 s of PER SECOND per
   level into the vault.
-- **Invader**: 45 s of timed cheese, a row every `max(1.5, 24 / level) / 3`
-  seconds (the one time a normal life sees timed garbage). Your attack is banked
+- **Invader**: 45 s of timed cheese, a row every 3 seconds whatever the
+  level (the one time a normal life sees timed garbage). Your attack is banked
   and blocks rows before they land. Outlasting it adds three times the Lines
   made by hand meanwhile.
 - **Helper**: for 60 s, each clear that keeps a combo or back-to-back going

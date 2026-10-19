@@ -26,7 +26,9 @@ export const EVENTS = {
   },
   // Garbage comes three times as fast for 45 s; your attack blocks rows.
   // Surviving adds three times the Lines you made by hand meanwhile.
-  invader: { seconds: 45, garbageSpeed: 3, payout: 3 },
+  // A cheese row every rowSeconds whatever the level: at the old level-scaled
+  // rate a high-level invader buried the board in a second a row.
+  invader: { seconds: 45, rowSeconds: 3, payout: 3 },
   // For 60 s each clear that keeps a combo or back-to-back going lifts one
   // garbage row off the bottom, paid like a single.
   helper: { seconds: 60 },
