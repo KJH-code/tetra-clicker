@@ -1,6 +1,6 @@
 import { Game, type GameSnapshot, type LockResult } from './game';
 import { Economy } from './economy';
-import { earnedFor, botAttack } from './attack';
+import { earnedFor, botAttack, isTechClear } from './attack';
 import { tag, type Tag } from './tags';
 import { policyFor, playOne, type BotMove } from './bot/index';
 import { OPENERS } from '../data/openers';
@@ -19,6 +19,7 @@ import { BUFFS, WRATH, type GoldenOutcome } from '../data/golden';
 import { PRESTIGE, TECH_CHECKS, prestigeById, prestigeRequires } from '../data/prestige';
 import { crownGain, metaFrom, metaSnapshot, type MetaSnapshot } from './prestige';
 import { LEVELS } from '../data/levels';
+import { GARBAGE } from '../data/garbage';
 import { ACHIEVEMENTS } from '../data/achievements';
 import { challengePoints, CHALLENGE, BUILDING_KINDS_ANY } from '../data/challenges';
 import { EVENTS, RIVAL_DUEL, type EventKind } from '../data/events';
@@ -58,6 +59,8 @@ export interface WorldSnapshot {
   // PER SECOND through this run, one sample every `sampleEvery` seconds of play.
   samples?: number[];
   sampleEvery?: number;
+  // Purchase garbage still to rise, and what sizes the next purchase's rows.
+  garbage?: { queue: number; carry: number; manualRate: number; holes: number };
 }
 
 export const SAMPLE_SECONDS = 30;
@@ -76,6 +79,10 @@ export type WorldEvent =
   | { type: 'checkpoint'; banked: Num }
   | { type: 'roundEnd'; deposited: Num; forfeited: Num; level: number }
   | { type: 'garbage'; rows: number }
+  // A purchase sent rows to the queue.
+  | { type: 'garbageQueued'; rows: number }
+  // Garbage rows cleared with a technique paid this much.
+  | { type: 'garbageBonus'; rows: number; amount: Num }
   | { type: 'paused' }
   | { type: 'buff'; id: string; ms: number }
   | { type: 'goldenSpawn'; wrath: boolean }
@@ -132,6 +139,13 @@ export class World {
   duel: { toMe: number; toRival: number; myCarry: number; rivalCarry: number; holes: Rng } | null = null;
   // HELPER: qualifying clears since the last garbage row it lifted.
   private helperCount = 0;
+  // Purchase garbage waiting to rise (the red gauge), the fraction of a row
+  // of attack carried toward cancelling it, and the hand's recent Lines a
+  // second (sizes purchases while bots earn little).
+  garbageQueue = 0;
+  private garbageCarry = 0;
+  private manualRate = 0;
+  private garbageHoles: Rng;
   // PER SECOND (without buffs) through the run, for the stats graph.
   samples: number[] = [];
   sampleEvery = SAMPLE_SECONDS;
@@ -167,7 +181,12 @@ export class World {
     this.toVault = new Payout(snapshot?.carry?.vault ?? 0);
     this.samples = [...(snapshot?.samples ?? [])];
     this.sampleEvery = snapshot?.sampleEvery ?? SAMPLE_SECONDS;
+    this.garbageQueue = snapshot?.garbage?.queue ?? 0;
+    this.garbageCarry = snapshot?.garbage?.carry ?? 0;
+    this.manualRate = snapshot?.garbage?.manualRate ?? 0;
+    this.garbageHoles = createRng(snapshot?.garbage?.holes ?? (seed * 2654435761 + 97) >>> 0);
     this.applyRules();
+    this.countBoardGarbage();
   }
 
   // Manual-board rules bought as upgrades. Recomputed after every purchase;
@@ -179,7 +198,7 @@ export class World {
       comboGrace: flagCount(fx, 'rule:combo_grace', eco),
       b2bShield: flagCount(fx, 'rule:b2b_shield', eco) > 0,
       nextCount: Math.max(1, Math.round(this.fx('next_count', 5 + flagCount(fx, 'rule:next_plus', eco)))),
-      holdSlots: Math.max(0, Math.round(this.fx('hold_slots', 1 + flagCount(fx, 'rule:hold2', eco)))),
+      holdSlots: Math.max(0, Math.round(this.fx('hold_slots', 1))),
     };
   }
 
@@ -201,7 +220,9 @@ export class World {
 
   buyUpgrade(id: string): boolean {
     if (this.ascending || !this.upgradeAllowed(id)) return false;
-    if (!upgradeById(id) || !this.economy.buyUpgrade(id)) return false;
+    const def = upgradeById(id);
+    if (!def || !this.economy.buyUpgrade(id)) return false;
+    this.queueGarbage(def.price);
     this.applyRules();
     this.events.push({ type: 'upgraded', upgradeId: id });
     return true;
@@ -221,6 +242,7 @@ export class World {
       autoBoards: this.autoBoards.map((b) => ({ buildingId: b.buildingId, game: b.game.snapshot(), timerMs: b.timerMs })),
       samples: [...this.samples],
       sampleEvery: this.sampleEvery,
+      garbage: { queue: this.garbageQueue, carry: this.garbageCarry, manualRate: this.manualRate, holes: this.garbageHoles.state() },
     };
   }
 
@@ -250,7 +272,10 @@ export class World {
     }
     recordManual(this.economy.stats, result, Number(final));
     this.economy.stats.linesEarned += toNumber(final);
-    if (this.round.active && !result.topped && (this.duelOnLock(result) || this.helperOnLock(result))) {
+    this.manualRate += Number(final) / GARBAGE.manualWindowSeconds;
+    if (this.round.active && result.garbageCleared && isTechClear(result)) this.garbageBonus(result.garbageCleared.clean + result.garbageCleared.cheese);
+    if (this.round.active && !result.topped && (this.buyGarbageOnLock(result) || this.duelOnLock(result) || this.helperOnLock(result))) {
+      this.countBoardGarbage();
       this.events.push({ type: 'manualLock', result, earned: final, tags: earned.tags, at });
       this.endRound();
       return final;
@@ -287,8 +312,56 @@ export class World {
       if (levelUp) this.events.push({ type: 'levelUp', level: this.round.level });
       if (checkpoints > 0) this.checkpoint(checkpoints);
     }
+    this.countBoardGarbage();
     this.checkAchievements();
     return final;
+  }
+
+  // --- purchase garbage --------------------------------------------------
+
+  // Rows a purchase sends: its price over a minute of what the game earns
+  // (bots plus the hand's recent rate), rounded down, at most four, times
+  // the buy_garbage effects. With no income yet there is nothing to weigh it
+  // against, and nothing to slow: no rows.
+  garbageFor(price: number): number {
+    const perSecond = toNumber(this.incomePerSecond()) + this.manualRate;
+    if (perSecond <= 0) return 0;
+    const raw = (price / (perSecond * GARBAGE.secondsPerRow)) * this.fx('buy_garbage', 1);
+    return Math.min(GARBAGE.maxRowsPerBuy, Math.floor(raw + 1e-9));
+  }
+
+  private queueGarbage(price: number): void {
+    const rows = this.garbageFor(price);
+    if (rows <= 0) return;
+    this.garbageQueue += rows;
+    this.events.push({ type: 'garbageQueued', rows });
+  }
+
+  // A clear's attack cancels queued rows first; a piece that clears nothing
+  // lets up to four rise. True if they pushed the stack out.
+  private buyGarbageOnLock(result: LockResult): boolean {
+    if (this.garbageQueue <= 0) return false;
+    const a = attackRows(result, this.garbageCarry);
+    this.garbageCarry = a.carry;
+    this.garbageQueue = cancel(this.garbageQueue, a.rows).incoming;
+    if (result.lines > 0 || this.garbageQueue <= 0) return false;
+    const n = Math.min(this.garbageQueue, GARBAGE.maxRowsPerLock);
+    this.garbageQueue -= n;
+    for (let i = 0; i < n; i++) if (this.manual.addGarbage(randomHole(this.garbageHoles))) return true;
+    this.events.push({ type: 'garbage', rows: n });
+    return false;
+  }
+
+  // Garbage rows cleared by a technique: ten seconds of PER SECOND each, into the vault.
+  private garbageBonus(rows: number): void {
+    const amount = this.payVault(toNumber(this.incomePerSecond()) * GARBAGE.techBonusSeconds * rows);
+    this.economy.stats.garbageBonusRows += rows;
+    this.events.push({ type: 'garbageBonus', rows, amount });
+  }
+
+  // The penalty reads this count; refreshed whenever the board can change.
+  private countBoardGarbage(): void {
+    this.economy.boardGarbage = Math.min(GARBAGE.penaltyMaxRows, this.manual.garbageRows());
   }
 
   // Bank the vault: its Lines go to the balance and its risk weight counts
@@ -420,7 +493,11 @@ export class World {
     this.round.end();
     // Under a Line of carry belongs to the finished round.
     this.toVault.carry = 0;
+    // Garbage still on the board waits for the next life: a top-out is no
+    // way to shed it.
+    this.garbageQueue += this.manual.garbageRows();
     this.manual.reset();
+    this.countBoardGarbage();
     // A golden piece belongs to its round.
     this.manual.clearGolden();
     this.events.push({ type: 'roundEnd', deposited: num(kept), forfeited: num(vault - kept), level });
@@ -435,8 +512,10 @@ export class World {
     const ev = this.lifeEvent;
     // An invader brings garbage faster.
     const speed = ev?.kind === 'invader' ? EVENTS.invader.garbageSpeed : 1;
+    // Timed cheese only in hardcore, and while an invader is on.
+    const timed = ev?.kind === 'invader' || flagCount(this.economy.effects, 'timed_garbage', this.economy) > 0;
     const { garbage: rows, golden } = this.round.advance(dtMs, { ready: !this.manual.hasGolden, scale: this.goldenScale() },
-      this.fx('garbage_interval', 1) / speed / this.fx('garbage_speed', 1), this.fx('garbage_from_level', LEVELS.garbageFromLevel));
+      this.fx('garbage_interval', 1) / speed, timed ? this.fx('garbage_from_level', LEVELS.garbageFromLevel) : Infinity);
     // Attack banked against an invader blocks rows before they land.
     let garbage = rows;
     if (ev?.kind === 'invader' && ev.shield > 0) {
@@ -460,6 +539,7 @@ export class World {
       if (this.manual.addGarbage(hole)) { this.endRound(); return; }
     }
     if (garbage.length) this.events.push({ type: 'garbage', rows: garbage.length });
+    this.countBoardGarbage();
     const locked = this.manual.tick(dtMs, this.round.gravity() * this.fx('gravity', 1));
     if (locked) this.manualLock(locked);
   }
@@ -636,7 +716,9 @@ export class World {
   buy(id: string): boolean {
     const def = buildingById(id);
     if (this.ascending) return false;
+    const price = Number(this.economy.price(id));
     if (!def || !this.isUnlocked(id) || !this.kindAllowed(id) || !this.economy.buy(id)) return false;
+    this.queueGarbage(price);
     // The first copy of a building is its board; later copies only add income.
     if (!this.autoBoards.some((b) => b.buildingId === id)) {
       // Each board gets its own stream so two boards never mirror each other.
@@ -725,6 +807,8 @@ export class World {
 
   // One fixed step: every bot counts down to its next piece.
   step(dtMs: number): void {
+    // The hand's recent rate fades over about a minute.
+    this.manualRate *= Math.exp(-dtMs / 1000 / GARBAGE.manualWindowSeconds);
     this.stepRound(dtMs);
     for (let i = 0; i < this.autoBoards.length; i++) {
       const board = this.autoBoards[i]!;

@@ -99,13 +99,14 @@ describe('simulator options', () => {
     expect(at(syn, 24).bots).toBeGreaterThan(at(plain, 24).bots);
   });
 
-  it('hardcore doubles manual pay, triples risk weight, lives run three levels up', () => {
+  it('hardcore doubles manual pay but halves plain clears, triples risk weight, lives run three levels up', () => {
     const plain = simulate(full());
     const hc = simulate(full({ hardcore: true }));
     expect(hc.riskWeight).toBe(3);
     expect(plain.riskWeight).toBe(1);
-    // Manual at level 7 ×2 against level 4 ×1, before any upgrade.
-    expect(hc.series[0]!.manualActive / plain.series[0]!.manualActive).toBeCloseTo((7 * 2) / 4, 6);
+    // Manual at level 7 ×2 ×0.5 (the model player's singles are plain)
+    // against level 4 ×1, before any upgrade.
+    expect(hc.series[0]!.manualActive / plain.series[0]!.manualActive).toBeCloseTo((7 * 2 * 0.5) / 4, 6);
     expect(hc.manualLines).toBeGreaterThan(plain.manualLines);
   });
 

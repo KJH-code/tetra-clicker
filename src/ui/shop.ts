@@ -126,6 +126,9 @@ export class Shop {
       ui.price.textContent = format(price);
       ui.price.classList.toggle('cant', !can);
       ui.btn.disabled = !can;
+      // What buying it now would send to the manual board.
+      const rows = unlocked ? this.world.garbageFor(Number(price)) : 0;
+      ui.btn.title = rows > 0 ? t('Buying sends {n} garbage rows to your board', { n: rows }) : '';
     }
     this.refreshGoal(balance);
   }

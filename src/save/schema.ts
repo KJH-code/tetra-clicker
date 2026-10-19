@@ -3,7 +3,7 @@ import { BUILDINGS } from '../data/buildings';
 import { UPGRADES } from '../data/upgrades';
 import type { HandlingSettings } from '../data/handling';
 
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 export interface SaveData {
   version: number;
@@ -148,7 +148,25 @@ const MIGRATIONS: Migration[] = [
     if (meta) { meta['rivalStreak'] ??= 0; meta['rivalBest'] ??= 0; }
     return raw;
   },
+  // 10 → 11: HOLD ×2 is gone, bought or not; a run that bought it gets its
+  // price back, and the second hold slot is emptied. Purchase garbage
+  // starts with an empty queue (the world defaults it).
+  (raw) => {
+    const world = raw['world'] as Record<string, unknown>;
+    const eco = world['economy'] as { balance: string; upgrades: string[] } | undefined;
+    if (eco?.upgrades.includes('hold2')) {
+      eco.upgrades = eco.upgrades.filter((u) => u !== 'hold2');
+      eco.balance = String(Number(eco.balance) + HOLD2_REFUND);
+    }
+    const manual = world['manual'] as { holds?: unknown[]; golden?: { holds: unknown[] } } | undefined;
+    if (manual?.holds && manual.holds.length > 1) manual.holds = manual.holds.slice(0, 1);
+    if (manual?.golden && manual.golden.holds.length > 1) manual.golden.holds = manual.golden.holds.slice(0, 1);
+    return raw;
+  },
 ];
+
+// What HOLD ×2 cost when it was sold.
+const HOLD2_REFUND = 20_000;
 
 export function migrate(raw: unknown): SaveData | null {
   if (!raw || typeof raw !== 'object') return null;

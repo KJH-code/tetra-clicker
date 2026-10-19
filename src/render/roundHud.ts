@@ -11,7 +11,7 @@ import { t } from '../ui/i18n';
 // checkpoint. A centred banner covers the states where the board is not
 // live (waiting, paused).
 export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, round: Round, wrath: number,
-  buffs: { label: string; msLeft: number }[] = [], nextStartLevel = 1, hardcore = false): void {
+  buffs: { label: string; msLeft: number }[] = [], nextStartLevel = 1, hardcore = false, botPenaltyPct = 0): void {
   const c = r.layout.cell;
   const colW = r.layout.leftCells * c;
   const x0 = 6;
@@ -68,6 +68,13 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
   ctx.fillStyle = color;
   ctx.fillRect(x0, y, w * k, h);
   y += h + c * 0.4;
+  // Garbage left on the board slows the bots.
+  if (botPenaltyPct > 0) {
+    ctx.fillStyle = '#ff4d5e';
+    const text = t('BOTS −{n}%', { n: botPenaltyPct });
+    font(c * 0.42, text, '800');
+    ctx.fillText(text, x0, y);
+  }
   // Running buffs, under the multiplier they stack with.
   y += c * 1.0;
   for (const b of buffs) {

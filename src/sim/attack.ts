@@ -2,6 +2,7 @@ import { ATTACK } from '../data/attackTable';
 import type { LockResult } from './game';
 import { tag, type Tag } from './tags';
 import { num, type Num } from './num';
+import { GARBAGE } from '../data/garbage';
 
 export interface Earned {
   amount: Num;
@@ -39,7 +40,15 @@ export function tagsFor(r: LockResult, origin: Tag[]): Tag[] {
   if (r.comboIndex > 0) tags.push(tag.tech('combo'));
   if (r.b2bExtended) tags.push(tag.tech('b2b'));
   if (r.perfectClear) tags.push(tag.tech('pc'));
+  if (r.lines > 0 && !isTechClear(r)) tags.push(tag.tech('none'));
   return tags;
+}
+
+// A clear that counts as a technique: a full spin, a tetris, back-to-back,
+// a perfect clear, or a combo from its fourth step. Hardcore pays the rest
+// half, and garbage rows cleared by one pay a bonus.
+export function isTechClear(r: LockResult): boolean {
+  return r.lines > 0 && (r.spin === 'full' || r.lines === 4 || r.b2bExtended || r.perfectClear || r.comboIndex >= GARBAGE.techComboMin);
 }
 
 export function earnedFor(r: LockResult, origin: Tag[], comboStep: number = ATTACK.comboStep): Earned {

@@ -25,11 +25,11 @@ function world(id: string, owned = 1): World {
 const fx = (w: World, t: string) => (w as unknown as { fx(t: string, b: number): number }).fx(t, 1);
 
 describe('buildings that reach into the manual board', () => {
-  it('INVADER: garbage 5% faster a copy, hand income 10% more a copy', () => {
+  it('INVADER: purchase garbage 5% more a copy, hand income 10% more a copy', () => {
     const none = world('single');
     const three = world('invader', 3);
-    expect(fx(none, 'garbage_speed')).toBe(1);
-    expect(fx(three, 'garbage_speed')).toBeCloseTo(1.15, 9);
+    expect(fx(none, 'buy_garbage')).toBe(1);
+    expect(fx(three, 'buy_garbage')).toBeCloseTo(1.15, 9);
     expect(three.economy.incomeMultiplier(['board:manual']) / none.economy.incomeMultiplier(['board:manual'])).toBeCloseTo(1.3, 9);
   });
 

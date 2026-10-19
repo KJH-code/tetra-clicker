@@ -14,6 +14,7 @@ import { startAutosave } from './save/autosave';
 import { exportSave, importSave } from './save/transfer';
 import { DEFAULT_HANDLING, type HandlingSettings } from './data/handling';
 import { BUILDINGS, buildingById } from './data/buildings';
+import { GARBAGE } from './data/garbage';
 import { SYNERGIES } from './data/synergies';
 import { tag } from './sim/tags';
 import { BoardRenderer, type BoardView } from './render/boardRenderer';
@@ -366,6 +367,12 @@ function handleEvent(e: WorldEvent): void {
     case 'rivalWin':
       manualFx.float(t('RIVAL DOWN ×{n} +{v}', { n: e.streak, v: format(e.amount) }), manual.cellX(5), manual.cellY(24), { color: '#ff5050', size: 26, dur: 2200 });
       break;
+    case 'garbageBonus':
+      manualFx.float(t('GARBAGE BONUS +{v}', { v: format(e.amount) }), manual.cellX(5), manual.cellY(27), { color: GOLD, size: 18, dur: 1400 });
+      break;
+    case 'garbageQueued':
+      manualFx.float(t('+{n} GARBAGE', { n: e.rows }), manual.cellX(1), manual.cellY(38), { color: '#ff4d5e', size: 13, dur: 1200 });
+      break;
     case 'helperRow':
       manualFx.float(`HELPER +${format(e.amount)}`, manual.cellX(5), manual.cellY(30), { color: '#39ff14', size: 16, dur: 1000 });
       break;
@@ -479,9 +486,10 @@ function render(): void {
   };
   const buffs = world.buffs.active.map((b) => ({ label: BUFFS[b.id]?.label ?? b.id, msLeft: b.msLeft }));
   manual.render(view, manualFx, (ctx) => {
-    drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore);
+    drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore, world.economy.boardGarbage * GARBAGE.penaltyPctPerRow);
     drawEventHud(ctx, manual, world.lifeEvent, view.next.length);
-    drawDuelGauge(ctx, manual, world.duel?.toMe ?? 0);
+    // Rows waiting for the board: the rival's and what purchases sent.
+    drawDuelGauge(ctx, manual, (world.duel?.toMe ?? 0) + world.garbageQueue);
   });
   manualPane.classList.toggle('hardcore', world.economy.meta.hardcore);
   ensureAutoViews();

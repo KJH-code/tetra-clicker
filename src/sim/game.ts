@@ -376,6 +376,18 @@ export class Game {
 
   // Lift the lowest garbage row out of the stack (a helper's gift); the rows
   // above it drop by one. False if there is no garbage.
+  // Rows holding any garbage cell (what slows the bots).
+  garbageRows(): number {
+    let n = 0;
+    for (let y = 0; y < HEIGHT; y++) {
+      for (let x = 0; x < WIDTH; x++) {
+        const c = this.grid[y * WIDTH + x];
+        if (c === GARBAGE_ID || c === CHEESE_ID) { n++; break; }
+      }
+    }
+    return n;
+  }
+
   removeGarbageRow(): boolean {
     for (let y = HEIGHT - 1; y >= 0; y--) {
       let garbage = false;

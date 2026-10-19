@@ -96,8 +96,7 @@ describe('upgrade effects', () => {
     expect(flagCount(e.effects, 'rule:combo_grace', e)).toBe(1);
     e.upgrades.add('grace_2');
     expect(flagCount(e.effects, 'rule:combo_grace', e)).toBe(2);
-    expect(flagCount(e.effects, 'rule:hold2', e)).toBe(0);
-    expect(upgradeById('hold2')?.rule).toBe(true);
+    expect(upgradeById('hold2')).toBeUndefined();
   });
 });
 
@@ -111,6 +110,6 @@ describe('manual stats', () => {
     recordManual(s, lock({ piece: 'T', spin: 'mini', lines: 1, comboIndex: 0 }), 1);
     expect(s).toEqual({ linesEarned: 0, manualPieces: 5, manualLines: 23.4, spins: 1, combo5: 1, b2bs: 1, pcs: 1, riskLines: 0, rounds: 0, checkpoints: 0, deaths: 0, maxLevel: 0, goldens: 0,
       tss: 0, tsd: 1, tst: 0, combo10: 0, b2b5: 0, tetrises: 1, maxLifeRows: 0, maxLifeSeconds: 0,
-      wraths: 0, ruins: 0, goldensLost: 0, clotTetrises: 0, rivalWins: 0, invadersSurvived: 0, helperRows: 0, playSeconds: 0 });
+      wraths: 0, ruins: 0, goldensLost: 0, clotTetrises: 0, rivalWins: 0, invadersSurvived: 0, helperRows: 0, garbageBonusRows: 0, playSeconds: 0 });
   });
 });

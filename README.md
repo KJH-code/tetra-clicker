@@ -86,8 +86,19 @@ skill.
 - **Gravity** is always on and follows the level: 0.5 cells/s at level 1,
   1.5 at 5, 4 at 10, 10 at 15, and at level 20 pieces land at once (20G).
   A resting piece locks after 500 ms; moves and turns reset that up to 15 times.
-- **Garbage**: from level 3, a cheese row (one random hole) every
-  `max(1.5, 24 / level)` seconds.
+- **Garbage comes from spending, not from the clock** (`src/data/garbage.ts`).
+  Buying a building or an upgrade sends rows: its price over a minute of
+  what the game earns (PER SECOND plus the hand's recent rate), rounded down,
+  four at most. They wait in the red gauge up the well's left edge (bought
+  between lives, they wait for the next one). A clear's attack (table value
+  ÷ 2) cancels them first; a piece that clears nothing lets up to four rise,
+  each with one random hole, as in a versus game.
+- **Garbage on the board slows the bots**: each row 5% off bot income, half
+  at most (BOTS −n% under the level). A top-out sends whatever garbage is on
+  the board back to the queue, so dying never sheds it.
+- **Digging with technique pays**: a garbage row cleared by a full spin, a
+  tetris, back-to-back, a perfect clear or a combo from its fourth step pays
+  ten seconds of PER SECOND into the vault.
 - **Vault and checkpoints**: manual Lines go to the vault. Every 40 rows
   cleared in a life, a checkpoint banks the vault into the balance. A top-out
   loses whatever the vault still holds, and the level goes back to the start.
@@ -181,7 +192,7 @@ before:
 |---|---|---|
 | all income ×2 | gravity ×0.8 | risk weight ×1.5 |
 | start with 2K Lines | keep 25% of the vault on a top-out | tech cap +0.5 |
-| manual ×3 | garbage gaps ×1.25 | risk weight ×2 |
+| manual ×3 | purchase garbage ×0.8 | risk weight ×2 |
 | all income ×2 | keep 50% of the vault on a top-out | start level +2 |
 
 The fourth, WRATH (ids `elder_1..4`, clear of the run upgrades
@@ -198,8 +209,10 @@ Everything is data in `src/data/prestige.ts`.
 From the second run on, the prestige shop picks the next run's mode, NORMAL or
 HARDCORE (it stays as last time unless changed). A hardcore run is one life:
 
-- **Harder**: starts three levels up, garbage from level 1 (normal: 3), three
-  next pieces instead of five.
+- **Harder**: starts three levels up, three next pieces instead of five, and
+  a slow trickle of timed cheese on top of purchase garbage (from level 1,
+  a row every `3 × max(1.5, 24 / level)` seconds). Only techniques earn in
+  full: a plain single, double or triple pays half.
 - **Pays more**: manual income ×2 and risk weight ×3 (about ×1.44 crowns by
   itself, more with the extra Lines). The tech cap rises by 0.5 to make room
   for four hardcore-only checks: level 15, 10 checkpoints, 30 minutes alive,
@@ -278,7 +291,7 @@ steps worth difficulty points (`src/data/challenges.ts`):
 |---|---|
 | NO HOLD | 2 |
 | FEWER NEXT (below hardcore's 3) | NEXT 2 (1), NEXT 1 (2) |
-| MORE GARBAGE | ×1.5 (1), ×2 (2) |
+| MORE GARBAGE (purchase garbage) | ×1.5 (1), ×2 (2) |
 | FASTER GRAVITY | ×1.5 (1), ×3 (2), 20G (3) |
 | FEW BUILDINGS | 3 kinds (1), 1 kind (2), none (3) |
 | NO RUN UPGRADES | 2 |
@@ -302,7 +315,8 @@ three turns up; the higher the level, the likelier the first two
   nothing takes what is waiting (up to 6 rows). Stronger with the level
   (0.5 + 0.06 × level PPS, up to 2); beating it pays 120 s of PER SECOND per
   level into the vault.
-- **Invader**: 45 s of garbage three times as fast. Your attack is banked
+- **Invader**: 45 s of timed cheese, a row every `max(1.5, 24 / level) / 3`
+  seconds (the one time a normal life sees timed garbage). Your attack is banked
   and blocks rows before they land. Outlasting it adds three times the Lines
   made by hand meanwhile.
 - **Helper**: for 60 s, each clear that keeps a combo or back-to-back going
@@ -394,7 +408,7 @@ average level 4.
 | 4-WIDE | 3,800,000 | walls stand full on both sides; endless combos in the 4-wide well (up to 165) | 1.03 | 2.918 | combo |
 | OPENER | 16,000,000 | a DPC loop by search: PC, TSD, PC from the leftovers (a PC per 15 pieces, a TSD per 29) | 1.6 | 2.064 | PC, TSD and B2B |
 | HELPER | 46,000,000 | the COMBO bot; lifts garbage off your board (below) | 3.05 | 1.18 | combo |
-| INVADER | 160,000,000 | the DOWNSTACK bot; speeds up your garbage (below) | 1.625 | 2.40 | table value + garbage rows |
+| INVADER | 160,000,000 | the DOWNSTACK bot; adds to your purchase garbage (below) | 1.625 | 2.40 | table value + garbage rows |
 | RIVAL | 390,000,000 | Cold Clear's own weights, 6,000 nodes; fights your board (below) | 2.82 | 1.488 | B2B |
 
 Each building unlocks after one copy of the previous tier. Its bot never
@@ -414,7 +428,7 @@ The last three reach into the manual board, from the moment one is bought
 - **HELPER**: every Nth clear by hand that keeps a combo or back-to-back
   going lifts the lowest garbage row out of your board and pays it like a
   single. N is 4 with one copy, 3 with two, 2 with three to nine, 1 from ten.
-- **INVADER**: each copy makes your garbage come 5% faster and adds 10% to
+- **INVADER**: each copy makes every purchase send 5% more garbage and adds 10% to
   your manual income.
 - **RIVAL**: while a life runs, the RIVAL board trades garbage with yours,
   like the rival event (table value ÷ 2 in rows, your attack cancels what is
@@ -482,7 +496,7 @@ unlock. All of them are data in `src/data/upgrades.ts`.
 | COMBO | 5 / 25 / 100 runs reaching a 5 combo | combo step 0.1 → 0.15 → 0.2 → 0.25 |
 | GRACE | 5 combo 10 / 50 times | a combo survives 1, then 2, empty pieces |
 | SHIELD | 25 back-to-back clears | one ordinary clear per chain does not break B2B |
-| NEXT+1 / HOLD2 | 500 / 2,000 manual pieces | six next pieces / a two-slot hold queue |
+| NEXT+1 | 500 manual pieces | six next pieces |
 
 Technique upgrades and buffs only matter on the manual board: bot income
 carries no technique tags, so the SPIN / B2B / PC / COMBO multipliers never
@@ -526,7 +540,7 @@ fitted to.
 ## Save
 
 localStorage, key `tetra-clicker/save`, every 10 s plus on tab hide and
-unload. The file has a `version` (now 10); `src/save/schema.ts` upgrades
+unload. The file has a `version` (now 11); `src/save/schema.ts` upgrades
 older saves step by step, so a version 1 save loads with no upgrades and
 zeroed stats, a version 2 save loads with no round in play, a version 3
 save loads with no buffs or golden piece, a version 4 save has never
@@ -540,7 +554,9 @@ filled in from FIRST achievements and what it owns, and its lifetime Lines
 (not counted before version 8) raised to a floor estimated from the balance,
 what it bought, Lines by hand and banked risk, and a version 9 save has no
 RIVAL streak yet; its new settings (language, accessibility) take their
-defaults.
+defaults; and a version 10 save loses HOLD ×2 (no longer sold: a run that
+bought it gets its 20,000 back and one hold slot) and starts with an empty
+purchase-garbage queue.
 
 SETTINGS → SAVE moves a game between browsers. EXPORT copies the save as
 text (`TETRA1:` and base64 JSON) and downloads it as a `.txt`; IMPORT takes

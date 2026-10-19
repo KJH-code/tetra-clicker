@@ -78,7 +78,7 @@ export const PRESTIGE_UPGRADES: PrestigeDef[] = [
   ...branch('survival', [
     { name: 'GRAVITY ×0.8', effects: [{ target: 'gravity', op: 'mul', value: 0.8 }] },
     { name: 'KEEP 25% OF THE VAULT ON A TOP-OUT', effects: [{ target: 'retain', op: 'add', value: 0.25 }] },
-    { name: 'GARBAGE GAPS ×1.25', effects: [{ target: 'garbage_interval', op: 'mul', value: 1.25 }] },
+    { name: 'PURCHASE GARBAGE ×0.8', effects: [{ target: 'buy_garbage', op: 'mul', value: 0.8 }] },
     { name: 'KEEP 50% OF THE VAULT ON A TOP-OUT', effects: [{ target: 'retain', op: 'add', value: 0.25 }] },
   ]),
   ...branch('proportion', [

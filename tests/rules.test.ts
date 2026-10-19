@@ -118,16 +118,15 @@ describe('upgrades reach the manual game', () => {
     w.economy.stats.combo5 = 100;
     w.economy.stats.b2bs = 100;
     expect(w.manual.rules).toEqual(DEFAULT_RULES);
-    expect(w.buyUpgrade('hold2')).toBe(true);
+    expect(w.buyUpgrade('hold2')).toBe(false); // removed
     expect(w.buyUpgrade('next_plus')).toBe(true);
     expect(w.buyUpgrade('grace_1')).toBe(true);
     expect(w.buyUpgrade('grace_2')).toBe(true);
     expect(w.buyUpgrade('b2b_shield')).toBe(true);
-    expect(w.manual.rules).toEqual({ comboGrace: 2, b2bShield: true, nextCount: 6, holdSlots: 2 });
+    expect(w.manual.rules).toEqual({ comboGrace: 2, b2bShield: true, nextCount: 6, holdSlots: 1 });
     // and survive a reload
     const w2 = new World(1, JSON.parse(JSON.stringify(w.snapshot())));
     expect(w2.manual.rules).toEqual(w.manual.rules);
-    expect(w2.economy.hasUpgrade('hold2')).toBe(true);
   });
 
   it('combo upgrades raise the combo step', () => {

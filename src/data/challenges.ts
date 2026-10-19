@@ -30,8 +30,8 @@ export const CHALLENGE_RULES: ChallengeRule[] = [
     { label: 'NEXT 1', points: 2, effects: [{ target: 'next_count', op: 'add', value: -2 }] },
   ]),
   rule('garbage', 'MORE GARBAGE', 'rule', [
-    { label: 'GARBAGE ×1.5', points: 1, effects: [{ target: 'garbage_interval', op: 'mul', value: 1 / 1.5 }] },
-    { label: 'GARBAGE ×2', points: 2, effects: [{ target: 'garbage_interval', op: 'mul', value: 0.5 }] },
+    { label: 'GARBAGE ×1.5', points: 1, effects: [{ target: 'buy_garbage', op: 'mul', value: 1.5 }] },
+    { label: 'GARBAGE ×2', points: 2, effects: [{ target: 'buy_garbage', op: 'mul', value: 2 }] },
   ]),
   rule('gravity', 'FASTER GRAVITY', 'rule', [
     { label: 'GRAVITY ×1.5', points: 1, effects: [{ target: 'gravity', op: 'mul', value: 1.5 }] },

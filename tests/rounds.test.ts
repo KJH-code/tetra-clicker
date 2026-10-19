@@ -176,14 +176,25 @@ describe('gravity and garbage', () => {
     expect(Array.from(w.manual.grid).filter((c) => c === 8)).toHaveLength(0);
   });
 
-  it('cheese rows on schedule with the same holes for the same seed', () => {
+  it('timed cheese: none in a normal life; in hardcore on schedule (a third as often) with the same holes for the same seed', () => {
+    const normal = new World(5);
+    normal.advance(0);
+    normal.startRound();
+    normal.round.rows = 20;
+    for (let t = 1; t < 60_000; t += STEP) {
+      normal.advance(t);
+      if (normal.manual.active) normal.manual.active = { ...normal.manual.active, y: 20 };
+    }
+    expect(normal.drainEvents().filter((e) => e.type === 'garbage')).toHaveLength(0);
     const holes = (seed: number) => {
       const w = new World(seed);
+      w.economy.meta.hardcore = true;
       w.advance(0);
       w.startRound();
-      w.round.rows = 20; // level 3: a row every 8 s
+      // Two rows' worth of time at this level, three times the old gap.
+      const until = 2.1 * garbageSecondsAt(w.round.level, 1)! * 3 * 1000;
       let rows = 0;
-      for (let t = 1; t < 17_000; t += STEP) {
+      for (let t = 1; t < until; t += STEP) {
         w.advance(t);
         // Keep the piece from locking so only garbage changes the stack.
         if (w.manual.active) w.manual.active = { ...w.manual.active, y: 20 };

@@ -43,7 +43,7 @@ describe('challenge runs', () => {
     expect(w.manual.swapHold()).toBe(false);
     // Hardcore's three next pieces, two fewer.
     expect(w.manual.rules.nextCount).toBe(1);
-    expect((w as unknown as { fx(t: string, b: number): number }).fx('garbage_interval', 1)).toBeCloseTo(0.5, 9);
+    expect((w as unknown as { fx(t: string, b: number): number }).fx('buy_garbage', 1)).toBeCloseTo(2, 9);
     expect((w as unknown as { fx(t: string, b: number): number }).fx('gravity', 1)).toBe(Infinity);
   });
 

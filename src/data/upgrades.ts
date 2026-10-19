@@ -114,8 +114,6 @@ const buffs: UpgradeDef[] = [
     unlock: [{ type: 'stat', stat: 'b2bs', gte: 25 }], effects: [{ target: 'rule:b2b_shield', op: 'flag', value: 1 }] },
   { id: 'next_plus', name: 'NEXT +1', label: 'NEXT+1', group: 'buff', rule: true, price: 4_000,
     unlock: [{ type: 'stat', stat: 'manualPieces', gte: 500 }], effects: [{ target: 'rule:next_plus', op: 'flag', value: 1 }] },
-  { id: 'hold2', name: 'HOLD ×2', label: 'HOLD2', group: 'buff', rule: true, price: 20_000,
-    unlock: [{ type: 'stat', stat: 'manualPieces', gte: 2_000 }], effects: [{ target: 'rule:hold2', op: 'flag', value: 1 }] },
 ];
 
 // Wrath: harder lives for more Lines. I starts every life at level 4, II

@@ -13,6 +13,8 @@ export class Economy implements EffectContext {
   readonly upgrades = new Set<string>();
   stats: Stats = emptyStats();
   meta: Meta = emptyMeta();
+  // Garbage rows on the manual board, capped, as the world last counted them.
+  boardGarbage = 0;
   readonly effects: Effect[];
   private readonly upgradeDefs: Map<string, UpgradeDef>;
 
@@ -43,6 +45,7 @@ export class Economy implements EffectContext {
   // are readable the same way so effects can stack on them.
   stat(name: string): number {
     if (name === 'achievementCount') return this.meta.achievements.size;
+    if (name === 'boardGarbage') return this.boardGarbage;
     const run = (this.stats as unknown as Record<string, number>)[name];
     if (run !== undefined) return run;
     const meta = (this.meta as unknown as Record<string, unknown>)[name];

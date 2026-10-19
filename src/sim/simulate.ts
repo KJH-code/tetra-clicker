@@ -8,6 +8,7 @@ import { upgradeEffects } from '../data/index';
 import { UPGRADES } from '../data/upgrades';
 import { SYNERGIES } from '../data/synergies';
 import { HARDCORE_EFFECTS } from '../data/hardcore';
+import { GARBAGE } from '../data/garbage';
 import { WRATH } from '../data/golden';
 import { averageVault, goldenMeanSeconds, goldenValue, wrathValue, eventValue, eventMeanSeconds } from './luck';
 
@@ -143,7 +144,8 @@ export function simulate(params: SimParams): SimResult {
   // Hardcore lives start three levels up; the model's average moves with them.
   const levelBonus = params.hardcore ? 3 : 0;
   const botTags = (id: string) => [tag.board('auto'), tag.building(id), tag.clear(1)];
-  const manualTags = [tag.board('manual')];
+  // The model player clears plain singles: hardcore pays those half.
+  const manualTags = [tag.board('manual'), tag.tech('none')];
   const botIncome = (): number =>
     buildings.reduce((sum, b) => sum + (eco.owned(b.id) > 0 ? b.pps * b.linesPerPiece * eco.incomeMultiplier(botTags(b.id)) : 0), 0);
   // The model player clears singles, worth two Lines a row; each row also
@@ -258,6 +260,15 @@ export function simulate(params: SimParams): SimResult {
     // small to move t at all, and an absolute one never closes the gap.
     if (balance >= price * (1 - 1e-9)) {
       balance = Math.max(0, balance - price);
+      // Purchase garbage: rows by price over a minute of income; while they
+      // sit on the board, dug out at the player's row rate, each slows the
+      // bots 5%. r rows cost about 5% of bot income over r²/2 rows' digging.
+      const perSecond = botIncome() + manualIncome(t);
+      if (perSecond > 0) {
+        const rows = Math.min(GARBAGE.maxRowsPerBuy, Math.floor((price / (perSecond * GARBAGE.secondsPerRow)) * multiplierOf(eco, 'buy_garbage') + 1e-9));
+        const lost = (GARBAGE.penaltyPctPerRow / 100) * botIncome() * (rows * rows) / (2 * rowsPerSecond);
+        balance = Math.max(0, balance - lost);
+      }
       if (best.kind === 'building') {
         eco.setOwned(best.id, eco.owned(best.id) + 1);
         const n = eco.owned(best.id);

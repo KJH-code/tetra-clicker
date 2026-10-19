@@ -75,8 +75,9 @@ export const BUILDINGS: BuildingDef[] = [
   // ones measured above (COMBO, DOWNSTACK, stock Cold Clear paid for B2B);
   // what they do to the manual board is in their effects and in world.ts.
   // HELPER lifts a garbage row every few combo or back-to-back clears of
-  // yours (fewer the more you own: HELPER_EVERY); INVADER speeds your
-  // garbage 5% a copy and pays your hands 10% a copy more; RIVAL's board
+  // yours (fewer the more you own: HELPER_EVERY); INVADER makes every
+  // purchase send 5% more garbage a copy and pays your hands 10% a copy
+  // more; RIVAL's board
   // trades garbage with yours for as long as a life runs.
   tier('helper', 'HELPER', 46_000_000, 4, 1.18, 'opener', { tech: 'combo', pps: 3.05 }),
   tier('invader', 'INVADER', 160_000_000, 4, 2.40, 'helper', {
@@ -91,7 +92,7 @@ export const helperEvery = (owned: number): number => HELPER_EVERY.find(([n]) =>
 
 // INVADER's reach into the manual board, per copy.
 const INVADER_EFFECTS: Effect[] = [
-  { target: 'garbage_speed', op: 'mul_pct', value: 5, stack: { type: 'owned', id: 'invader', offset: 0 } },
+  { target: 'buy_garbage', op: 'mul_pct', value: 5, stack: { type: 'owned', id: 'invader', offset: 0 } },
   { target: 'income', filter: ['board:manual'], op: 'add_pct', value: 10, stack: { type: 'owned', id: 'invader', offset: 0 } },
 ];
 BUILDINGS.find((b) => b.id === 'invader')!.effects.push(...INVADER_EFFECTS);

@@ -32,7 +32,7 @@ describe('save v10', () => {
     delete v9.world.meta.rivalBest;
     const data = migrate(v9)!;
     expect(data.version).toBe(SAVE_VERSION);
-    expect(SAVE_VERSION).toBe(10);
+    expect(SAVE_VERSION).toBeGreaterThanOrEqual(10);
     const meta = data.world.meta as unknown as Record<string, number>;
     expect(meta['rivalStreak']).toBe(0);
     expect(meta['rivalBest']).toBe(0);

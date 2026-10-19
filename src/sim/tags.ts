@@ -7,7 +7,7 @@ export const tag = {
   building: (id: string): Tag => `building:${id}`,
   clear: (lines: number): Tag => `clear:${CLEAR_NAMES[lines] ?? String(lines)}`,
   piece: (p: string): Tag => `piece:${p}`,
-  tech: (t: 'spin' | 'mini' | 'b2b' | 'combo' | 'pc'): Tag => `tech:${t}`,
+  tech: (t: 'spin' | 'mini' | 'b2b' | 'combo' | 'pc' | 'none'): Tag => `tech:${t}`,
 };
 
 const CLEAR_NAMES: Record<number, string> = { 1: 'single', 2: 'double', 3: 'triple', 4: 'tetris' };

@@ -38,6 +38,8 @@ export interface Stats {
   rivalWins: number;
   invadersSurvived: number;
   helperRows: number;
+  // Garbage rows cleared by a technique (each paid a bonus).
+  garbageBonusRows: number;
   // Game time played, in seconds (stepped time; a hidden tab's formula
   // stretch does not count).
   playSeconds: number;
@@ -47,7 +49,7 @@ export const emptyStats = (): Stats => ({
   manualLines: 0, linesEarned: 0, manualPieces: 0, spins: 0, combo5: 0, b2bs: 0, pcs: 0, riskLines: 0, rounds: 0, checkpoints: 0, deaths: 0, maxLevel: 0, goldens: 0,
   tss: 0, tsd: 0, tst: 0, combo10: 0, b2b5: 0, tetrises: 0, maxLifeRows: 0, maxLifeSeconds: 0,
   wraths: 0, ruins: 0, goldensLost: 0, clotTetrises: 0,
-  rivalWins: 0, invadersSurvived: 0, helperRows: 0, playSeconds: 0,
+  rivalWins: 0, invadersSurvived: 0, helperRows: 0, garbageBonusRows: 0, playSeconds: 0,
 });
 
 // Add one run's counters into lifetime totals; a "max" counter keeps the larger.

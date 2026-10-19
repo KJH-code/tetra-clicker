@@ -222,7 +222,7 @@ describe('prestige shop', () => {
     expect(v.economy.incomeMultiplier(['board:manual'])).toBeCloseTo(12, 12);
   });
 
-  it('survival: gravity ×0.8, keep 25% then 50% of the vault, garbage gaps ×1.25', () => {
+  it('survival: gravity ×0.8, keep 25% then 50% of the vault, purchase garbage ×0.8', () => {
     const a = new World(1);
     ascendTo(a, ['survival_1', 'survival_2']);
     expect(a['fx']('gravity', 1)).toBeCloseTo(0.8, 12);
@@ -238,7 +238,7 @@ describe('prestige shop', () => {
     b['endRound']();
     expect(Number(b.economy.balance)).toBe(500);
     expect(b.economy.stats.riskLines).toBeCloseTo(2000, 9); // the kept half counts as banked
-    expect(b['fx']('garbage_interval', 1)).toBeCloseTo(1.25, 12);
+    expect(b['fx']('buy_garbage', 1)).toBeCloseTo(0.8, 12);
   });
 
   it('START LEVEL +2 raises every life’s starting level', () => {

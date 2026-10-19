@@ -53,12 +53,13 @@ describe('a hardcore run', () => {
     n.startRound();
     expect(n.round.level).toBe(LEVELS.startLevel);
     expect(n.manual.rules.nextCount).toBe(5);
-    // Level 4 is past normal's garbage start too; check level 1 directly.
+    // Timed cheese is hardcore's alone now, a third as often as it was:
+    // a row in the first 72 s at level 1; a normal life has none at all.
     w.round.startLevel = 1;
-    let t = run(w, 30_000);
+    let t = run(w, 80_000);
     expect(w.manual.grid.some((c) => c === 8)).toBe(true);
     n.round.startLevel = 1;
-    t = run(n, 30_000);
+    t = run(n, 80_000);
     expect(n.manual.grid.some((c) => c === 8)).toBe(false);
     expect(t).toBeGreaterThan(0);
   });
