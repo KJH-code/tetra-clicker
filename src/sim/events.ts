@@ -15,8 +15,13 @@ export interface RivalEvent {
   kind: 'rival';
   game: Game;
   level: number;
-  // Pieces per second, fixed for the fight at the level it began.
+  // Pieces per second, fixed for the fight at the level it began; the
+  // search and how often it slips, likewise.
   pps: number;
+  nodes: number;
+  slipChance: number;
+  slips: Rng;
+  msLeft: number;
   timerMs: number;
   // Garbage rows waiting for each side, and the part of a row not sent yet.
   toMe: number;
@@ -92,7 +97,8 @@ export function startEvent(kind: EventKind, level: number, seed: number, rivalPa
   switch (kind) {
     case 'rival': {
       const pps = EVENTS.rival.pps(level, rivalPace);
-      return { kind, game: new Game(seed), level, pps, timerMs: 1000 / pps, toMe: 0, toRival: 0, myCarry: 0, rivalCarry: 0, holes: createRng(seed ^ 0x2545f491) };
+      return { kind, game: new Game(seed), level, pps, nodes: EVENTS.rival.nodes(level, rivalPace), slipChance: EVENTS.rival.slipChance(rivalPace),
+        slips: createRng(seed ^ 0x1b873593), msLeft: EVENTS.rival.seconds * 1000, timerMs: 1000 / pps, toMe: 0, toRival: 0, myCarry: 0, rivalCarry: 0, holes: createRng(seed ^ 0x2545f491) };
     }
     case 'invader':
       return { kind, msLeft: EVENTS.invader.seconds * 1000, earned: 0, shield: 0, carry: 0 };

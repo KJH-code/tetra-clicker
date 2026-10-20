@@ -87,7 +87,7 @@ describe('life events', () => {
     expect(w.drainEvents().some((e) => e.type === 'lifeEvent' && e.phase === 'lost')).toBe(true);
   });
 
-  it('invader: garbage three times as fast, attack blocks rows, surviving pays three times the hand Lines', () => {
+  it('invader: attack blocks rows, surviving pays four times the hand Lines', () => {
     const w = world(10);
     w.beginEvent('invader');
     const ev = w.lifeEvent!;
@@ -105,8 +105,8 @@ describe('life events', () => {
     const vault = w.round.vault;
     w.step(STEP);
     const won = w.drainEvents().find((e) => e.type === 'lifeEvent' && e.phase === 'won');
-    expect(won && won.type === 'lifeEvent' && Number(won.amount)).toBe(Math.floor(earned * 3));
-    expect(w.round.vault - vault).toBe(Math.floor(earned * 3));
+    expect(won && won.type === 'lifeEvent' && Number(won.amount)).toBe(Math.floor(earned * EVENTS.invader.payout));
+    expect(w.round.vault - vault).toBe(Math.floor(earned * EVENTS.invader.payout));
     expect(w.economy.stats.invadersSurvived).toBe(1);
   });
 
@@ -204,5 +204,40 @@ describe('new life events', () => {
     w2.drainEvents();
     for (let t = 0; t < 60_100; t += 100) (w2 as unknown as { stepEvent(dt: number): boolean }).stepEvent(100);
     expect(w2.drainEvents().some((e) => e.type === 'lifeEvent' && e.phase === 'lost')).toBe(true);
+  });
+});
+
+describe('rival, softened for normal runs', () => {
+  it('normal: 200 + 30 × level nodes, 800 at most, a slip one piece in ten; hardcore unchanged', () => {
+    expect(EVENTS.rival.nodes(10, 0.5)).toBe(500);
+    expect(EVENTS.rival.nodes(40, 0.5)).toBe(800);
+    expect(EVENTS.rival.nodes(10, 1)).toBe(1_700);
+    expect(EVENTS.rival.slipChance(0.5)).toBe(0.1);
+    expect(EVENTS.rival.slipChance(1)).toBe(0);
+    const w = world(20);
+    w.beginEvent('rival');
+    const ev = w.lifeEvent!;
+    expect(ev.kind === 'rival' && [ev.nodes, ev.slipChance]).toEqual([800, 0.1]);
+  });
+
+  it('90 s at most: the lower stack wins half the reward, else it leaves', () => {
+    const fight = (mineHigher: boolean) => {
+      const w = world(10);
+      w.beginEvent('rival');
+      const ev = w.lifeEvent!;
+      if (ev.kind !== 'rival') throw new Error('rival expected');
+      for (let i = 0; i < 4; i++) (mineHigher ? w.manual : ev.game).addGarbage(i);
+      ev.msLeft = 1;
+      ev.timerMs = 1e9; // it does not move again
+      w.drainEvents();
+      (w as unknown as { stepEvent(dt: number): boolean }).stepEvent(5);
+      expect(w.lifeEvent).toBeNull();
+      return w.drainEvents().find((e) => e.type === 'lifeEvent')!;
+    };
+    const won = fight(false);
+    expect(won.type === 'lifeEvent' && won.phase).toBe('won');
+    expect(won.type === 'lifeEvent' && Number(won.amount)).toBeGreaterThan(0);
+    const left = fight(true);
+    expect(left.type === 'lifeEvent' && left.phase).toBe('over');
   });
 });

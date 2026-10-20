@@ -34,7 +34,7 @@ export function drawEventHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ev
   ctx.textBaseline = 'top';
   ctx.fillStyle = COLORS[ev.kind];
   ctx.font = font(800, c * 0.5 * VIEW.textScale);
-  const time = ev.kind === 'rival' ? t('UNTIL ONE TOPS OUT') : `${Math.ceil(ev.msLeft / 1000)}s`;
+  const time = `${Math.ceil(ev.msLeft / 1000)}s`;
   const extra = ev.kind === 'bonus' ? ` · ×${EVENTS.bonus.incomeMul}` : ev.kind === 'mystery' ? ` · ×${EVENTS.mystery.incomeMul}`
     : ev.kind === 'tech' ? ` · ${ev.label} ${ev.done}/${ev.need}` : '';
   const title = `${eventName(ev.kind)} · ${time}${extra}`;

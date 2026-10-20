@@ -383,12 +383,17 @@ Attack is the table value ÷ 2 in garbage rows.
   nothing takes what is waiting (up to 6 rows). Stronger with the level:
   0.5 + 0.06 × level × pace PPS, up to 2 × pace, where pace (the
   `rival_pace` effect) is 0.5 in normal runs (a 1-PPS cap, so it does not
-  outrun the player the game is pitched at) and 1 in hardcore; beating it pays 120 s of PER SECOND per
-  level into the vault.
-- **Invader**: 45 s of timed cheese, a row every 3 seconds whatever the
-  level (the one time a normal life sees timed garbage). Your attack is banked
-  and blocks rows before they land. Outlasting it adds three times the Lines
-  made by hand meanwhile.
+  outrun the player the game is pitched at) and 1 in hardcore. At normal pace
+  it also searches less (200 + 30 × level nodes, 800 at most, against
+  hardcore's up to 4,000) and one piece in ten plays a quick shallow move
+  instead, so a high-level rival can be outplayed. Beating it pays 120 s of
+  PER SECOND per level into the vault. A fight lasts 90 s at most: then the
+  lower stack (or a tie) wins half that, and a higher one sends the rival away.
+- **Invader**: 45 s of timed cheese (the one time a normal life sees timed
+  garbage), a row every 3 s at level 3 and 0.09 s sooner each level after,
+  never under 1.5 s (from level 20). Your attack is banked and blocks rows
+  before they land. Outlasting it adds four times the Lines made by hand
+  meanwhile.
 - **Helper**: for 60 s, each clear that keeps a combo or back-to-back going
   lifts the lowest garbage row out and pays it like a single.
 - **Bonus round**: 30 s of manual income ×4.5; the total shows at the end.

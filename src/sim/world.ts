@@ -24,7 +24,7 @@ import { ACHIEVEMENTS } from '../data/achievements';
 import { challengePoints, CHALLENGE, BUILDING_KINDS_ANY } from '../data/challenges';
 import { EVENTS, RIVAL_DUEL, type EventKind } from '../data/events';
 import { startEvent, attackRows, cancel, randomHole, techGoalMet, type LifeEvent } from './events';
-import { ccWasmBot, CC_DEFAULT } from './bot/ccWasm';
+import { ccWasmBot, CC_DEFAULT, stackHeight } from './bot/ccWasm';
 import { tag as tagOf } from './tags';
 import { createRng, type Rng } from './rng';
 import { MISSIONS, MISSIONS_PER_LIFE, missionById, type MissionDef } from '../data/missions';
@@ -613,7 +613,7 @@ export class World {
     const timed = invader || flagCount(this.economy.effects, 'timed_garbage', this.economy) > 0;
     const { garbage: rows, golden } = this.round.advance(dtMs, { ready: !this.manual.hasGolden, scale: this.goldenScale() },
       invader ? 1 : this.fx('garbage_interval', 1), timed ? this.fx('garbage_from_level', LEVELS.garbageFromLevel) : Infinity,
-      invader ? EVENTS.invader.rowSeconds : undefined);
+      invader ? EVENTS.invader.rowSeconds(this.round.level) : undefined);
     // Attack banked against an invader blocks rows before they land.
     let garbage = rows;
     if (ev?.kind === 'invader' && ev.shield > 0) {
@@ -1169,11 +1169,24 @@ export class World {
       }
       return false;
     }
+    // Time up: the lower stack takes the fight, for part of the reward.
+    ev.msLeft -= dtMs;
+    if (ev.msLeft <= 0) {
+      if (stackHeight(this.manual.grid) <= stackHeight(ev.game.grid)) {
+        this.economy.stats.rivalWins += 1;
+        const reward = toNumber(this.incomePerSecond()) * EVENTS.rival.rewardSecondsPerLevel * ev.level * this.fx('event_reward', 1) * EVENTS.rival.timeoutShare;
+        this.endEvent('won', this.payVault(reward));
+      } else {
+        this.endEvent('over', num(0));
+      }
+      return false;
+    }
     // The rival plays its own pieces at its own pace.
     ev.timerMs -= dtMs;
     while (ev.timerMs <= 0 && this.lifeEvent === ev) {
       ev.timerMs += 1000 / ev.pps;
-      const move = playOne(ev.game, this.rivalPolicy(ev.level));
+      const slip = ev.slipChance > 0 && ev.slips.next() < ev.slipChance;
+      const move = playOne(ev.game, this.rivalPolicy(slip ? EVENTS.rival.slipNodes : ev.nodes));
       if (!move) break;
       const r = move.result;
       if (r.topped) {
@@ -1204,8 +1217,7 @@ export class World {
   }
 
   private rivalPolicies = new Map<number, BotPolicy>();
-  private rivalPolicy(level: number): BotPolicy {
-    const nodes = EVENTS.rival.nodes(level);
+  private rivalPolicy(nodes: number): BotPolicy {
     let p = this.rivalPolicies.get(nodes);
     if (!p) { p = ccWasmBot({ weights: CC_DEFAULT, nodes }); this.rivalPolicies.set(nodes, p); }
     return p;

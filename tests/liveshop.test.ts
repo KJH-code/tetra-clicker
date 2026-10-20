@@ -3,6 +3,7 @@ import { World } from '../src/sim/world';
 import { num } from '../src/sim/num';
 import { PIECES } from '../src/sim/pieces';
 import type { LockResult } from '../src/sim/game';
+import { EVENTS } from '../src/data/events';
 
 const STEP = 1000 / 60;
 const lock = (over: Partial<LockResult>): LockResult => ({ piece: 'I', lines: 0, spin: 'none', perfectClear: false, comboIndex: -1, b2bExtended: false, topped: false, clearedRows: [], ...over });
@@ -60,8 +61,9 @@ describe('a fresh bag every life', () => {
 });
 
 describe('the invader', () => {
-  it('sends a cheese row every three seconds, whatever the level', () => {
-    for (const level of [5, 15]) {
+  it('sends a cheese row every 3 s at level 3, sooner as levels climb, never under 1.5 s', () => {
+    expect([3, 13, 20, 40].map((l) => EVENTS.invader.rowSeconds(l))).toEqual([3, 2.1, 1.5, 1.5]);
+    for (const [level, gaps] of [[3, 10], [13, 14]] as const) {
       const w = new World(1);
       w.advance(0);
       w.startRound();
@@ -69,12 +71,12 @@ describe('the invader', () => {
       w.beginEvent('invader');
       w.drainEvents();
       let rows = 0;
-      for (let t = 1; t <= 31_000; t += STEP) { // ten gaps and a little
+      for (let t = 1; t <= 31_000; t += STEP) {
         w.advance(t);
         if (w.manual.active) w.manual.active = { ...w.manual.active, y: 20 };
         for (const e of w.drainEvents()) if (e.type === 'garbage') rows += e.rows;
       }
-      expect(rows).toBe(10);
+      expect(rows).toBe(gaps);
     }
   });
 });

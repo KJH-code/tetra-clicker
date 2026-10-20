@@ -53,7 +53,8 @@ html, body {
 /* ---- layout ----------------------------------------------------------- */
 #backdrop, #coins { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; }
 #backdrop { z-index: 0; }
-#coins { z-index: 50; }
+/* Over the panes, under the settings, achievements and prestige windows (10+). */
+#coins { z-index: 9; }
 #app { position: relative; z-index: 1; }
 /* A new unit (1K, 1M, …) of balance: a banner across the top for a moment. */
 #milestone {

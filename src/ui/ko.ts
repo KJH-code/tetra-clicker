@@ -206,7 +206,6 @@ export const KO: Record<string, string> = {
   'READY': '준비',
   'ANY KEY': '아무 키',
   'PAUSED': '일시정지',
-  'UNTIL ONE TOPS OUT': '한쪽이 탑아웃할 때까지',
   'GO · LEVEL {n}': 'GO · 레벨 {n}',
   'LEVEL {n}': '레벨 {n}',
   'CHECKPOINT +{v}': '체크포인트 +{v}',
