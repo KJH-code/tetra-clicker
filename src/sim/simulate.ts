@@ -11,6 +11,7 @@ import { HARDCORE_EFFECTS } from '../data/hardcore';
 import { GARBAGE } from '../data/garbage';
 import { WRATH } from '../data/golden';
 import { averageVault, goldenMeanSeconds, goldenValue, wrathValue, eventValue, eventMeanSeconds, missionMinutesPerLife } from './luck';
+import { levelPay } from '../data/levels';
 
 // Economy simulator: how fast a player climbs the building ladder under a
 // given set of numbers. Bots are not run; each board earns at the same rate
@@ -122,16 +123,16 @@ class LadderEconomy extends Economy {
 }
 
 // Share of the time the player is at the board.
-// How long the model player's lives last, for mission pay: a guess until
-// play-testing measures it.
-const MODEL_LIFE_SECONDS = 300;
+// How long the model player's lives last, for mission pay: the average of
+// 14 measured lives (2026-10-20; 3:42).
+const MODEL_LIFE_SECONDS = 222;
 
 function playShare(p: PlayerParams, t: number): number {
   return t < p.focusMinutes * 60 ? 1 : p.dailyMinutes / 1440;
 }
 
 function manualRate(p: PlayerParams, t: number, levelBonus = 0): number {
-  return p.pps * p.linesPerPiece * playShare(p, t) * ((p.avgLevel ?? 1) + levelBonus);
+  return p.pps * p.linesPerPiece * playShare(p, t) * levelPay((p.avgLevel ?? 1) + levelBonus);
 }
 
 const multiplierOf = (eco: Economy, target: string): number => evaluate(eco.effects, target, [], eco, 1);
@@ -169,8 +170,8 @@ export function simulate(params: SimParams): SimResult {
     const ev = (1 - wrathChance) * goldenValue(state) + wrathChance * wrathValue(state);
     const level = (player.avgLevel ?? 1) + levelBonus;
     const events = eventValue(state, Math.round(level), params.eventWin ?? 0.5) / eventMeanSeconds;
-    // Missions pay minutes of PER SECOND (bots plus the hand) per life.
-    const missions = (missionMinutesPerLife(player.pps, rowsPerSecond, MODEL_LIFE_SECONDS) * 60 * (state.bots + manual)) / MODEL_LIFE_SECONDS;
+    // Missions pay minutes of PER SECOND per life (bots only, as for events).
+    const missions = (missionMinutesPerLife(player.pps, rowsPerSecond, MODEL_LIFE_SECONDS) * 60 * state.bots) / MODEL_LIFE_SECONDS;
     return playShare(player, at) * (ev / goldenMeanSeconds + events + missions);
   };
   const income = (at: number): number => botIncome() + manualIncome(at) + luckIncome(at);

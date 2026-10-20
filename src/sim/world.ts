@@ -18,7 +18,7 @@ import { Payout } from './payout';
 import { BUFFS, WRATH, type GoldenOutcome } from '../data/golden';
 import { PRESTIGE, TECH_CHECKS, prestigeById, prestigeRequires } from '../data/prestige';
 import { crownGain, crownFraction, metaFrom, metaSnapshot, type MetaSnapshot } from './prestige';
-import { LEVELS, lockAt } from '../data/levels';
+import { LEVELS, levelPay, lockAt } from '../data/levels';
 import { GARBAGE } from '../data/garbage';
 import { ACHIEVEMENTS } from '../data/achievements';
 import { challengePoints, CHALLENGE, BUILDING_KINDS_ANY } from '../data/challenges';
@@ -288,7 +288,7 @@ export class World {
     const share = result.lines * this.economy.manualShare() * toNumber(this.incomePerSecond());
     const buff = this.buffs.multiplier(earned.tags, this.economy);
     // A bonus round or a mystery multiplies what the hand makes meanwhile.
-    const exact = (base + share) * level * buff * this.eventIncomeMul();
+    const exact = (base + share) * levelPay(level) * buff * this.eventIncomeMul();
     let final: Num;
     if (this.round.active) {
       final = num(this.toVault.take(exact));
@@ -385,8 +385,7 @@ export class World {
       m.done = true;
       this.economy.stats.missionsDone += 1;
       this.economy.lifeMissions += 1;
-      const perSecond = toNumber(this.incomePerSecond()) + this.manualRate;
-      const amount = this.payVault(perSecond * def.minutes * 60 * this.fx('mission_pay', 1));
+      const amount = this.payVault(this.rewardPerSecond() * def.minutes * 60 * this.fx('mission_pay', 1));
       this.missionPay += toNumber(amount);
       this.events.push({ type: 'missionDone', id: m.id, amount });
     }
@@ -1031,7 +1030,7 @@ export class World {
     if (!this.manual.removeGarbageRow()) return false;
     this.economy.stats.helperRows += 1;
     const single = evaluate(this.economy.effects, 'income', [tagOf.board('manual'), tagOf.clear(1)], this.economy, ATTACK.normal[1]);
-    const amount = this.payVault(single * this.round.level * this.buffs.multiplier([tagOf.board('manual')], this.economy));
+    const amount = this.payVault(single * levelPay(this.round.level) * this.buffs.multiplier([tagOf.board('manual')], this.economy));
     this.events.push({ type: 'helperRow', amount });
     return false;
   }
@@ -1050,9 +1049,16 @@ export class World {
     this.events.push({ type: 'lifeEvent', kind: ev.kind, phase, amount });
   }
 
-  // What event rewards are sized on: PER SECOND plus the hand's recent rate.
+  // What event and mission rewards are sized on: PER SECOND, the bots'
+  // income. Before the first bot there is none, so the hand's recent rate
+  // stands in; after it the hand is left out, or a high-level life (the
+  // level multiplies the hand) made one mission worth hours of bots.
+  rewardPerSecond(): number {
+    return this.autoBoards.length > 0 ? toNumber(this.incomePerSecond()) : this.manualRate;
+  }
+
   private eventPerSecond(): number {
-    return toNumber(this.incomePerSecond()) + this.manualRate;
+    return this.rewardPerSecond();
   }
 
   // Manual income while a bonus round or a mystery is on.
@@ -1086,7 +1092,7 @@ export class World {
         this.economy.stats.helperRows += 1;
         // Paid like a single by hand, at the level.
         const single = evaluate(this.economy.effects, 'income', [tagOf.board('manual'), tagOf.clear(1)], this.economy, ATTACK.normal[1]);
-        this.payVault(single * this.round.level * this.buffs.multiplier([tagOf.board('manual')], this.economy));
+        this.payVault(single * levelPay(this.round.level) * this.buffs.multiplier([tagOf.board('manual')], this.economy));
       }
       return false;
     }

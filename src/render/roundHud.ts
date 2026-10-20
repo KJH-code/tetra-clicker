@@ -3,7 +3,7 @@ import type { BoardRenderer } from './boardRenderer';
 import { format } from '../sim/num';
 import { HEIGHT, TOP_VISIBLE_ROW, WIDTH } from '../sim/board';
 import { FONT, GOLD, THEME, VIEW, font as fontOf } from './theme';
-import { LEVELS } from '../data/levels';
+import { LEVELS, levelPay } from '../data/levels';
 import { t } from '../ui/i18n';
 
 // Life readout drawn on the manual board, in the hold column under the hold
@@ -56,8 +56,9 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
   ctx.fillStyle = color;
   ctx.shadowColor = color;
   ctx.shadowBlur = 10;
-  font(c * 0.7, `${level}  ×${level}`, '700');
-  ctx.fillText(`${level}  ×${level}`, x0, y);
+  const pay = `${level}  ×${+levelPay(level).toFixed(2)}`;
+  font(c * 0.7, pay, '700');
+  ctx.fillText(pay, x0, y);
   ctx.shadowBlur = 0;
   y += c * 0.85 * s;
   const w = colW - x0 * 2;

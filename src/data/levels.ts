@@ -31,12 +31,23 @@ export const LEVELS = {
   lockDelayMinMs: 200,
   lockResetMin: 8,
   lockResetEveryLevels: 2,
+  // Manual Lines are multiplied by the level up to `payFullUntil`, then by
+  // `payPerLevel` more a level: ×10 at level 10, ×12.5 at 20, ×17.5 at 40.
+  // A plain ×level let a strong player's hand dwarf every bot (×40 at 40);
+  // a gentler slope from level 1 slowed the early ladder for everyone.
+  payFullUntil: 10,
+  payPerLevel: 0.25,
   // Share of the unbanked vault kept on a top-out (prestige raises it).
   retain: 0,
 } as const;
 
 // Between two table entries the cells per second are interpolated, so a
 // half pace still speeds up every level.
+export function levelPay(level: number): number {
+  const l = Math.max(1, Math.floor(level));
+  return l <= LEVELS.payFullUntil ? l : LEVELS.payFullUntil + LEVELS.payPerLevel * (l - LEVELS.payFullUntil);
+}
+
 export function gravityAt(level: number, pace = 1): number {
   const at = (Math.max(1, Math.floor(level)) - 1) * pace;
   const i = Math.floor(at);

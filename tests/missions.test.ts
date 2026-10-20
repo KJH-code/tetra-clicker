@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { World } from '../src/sim/world';
+import { num } from '../src/sim/num';
 import { MISSIONS, MISSIONS_PER_LIFE, missionById } from '../src/data/missions';
 import type { LockResult } from '../src/sim/game';
 import { missionMinutesPerLife } from '../src/sim/luck';
@@ -76,5 +77,16 @@ describe('life log', () => {
     expect(w.lifeLog).toHaveLength(20);
     const back = new World(5, JSON.parse(JSON.stringify(w.snapshot())));
     expect(back.lifeLog).toEqual(w.lifeLog);
+  });
+});
+
+describe('reward size', () => {
+  it('the hand\'s rate before the first bot, PER SECOND alone after it', () => {
+    const w = life(2);
+    (w as unknown as { manualRate: number }).manualRate = 500;
+    expect(w.rewardPerSecond()).toBe(500);
+    w.economy.balance = num(1e6);
+    w.buy('single');
+    expect(w.rewardPerSecond()).toBeCloseTo(Number(w.incomePerSecond()), 9);
   });
 });

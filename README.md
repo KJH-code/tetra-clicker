@@ -118,7 +118,9 @@ way out of a life but topping out, so every life ends; how far it gets is the
 skill.
 
 - **Level**: marathon style, +1 every 10 rows cleared. Manual Lines are
-  multiplied by the level.
+  multiplied by the level up to level 10, then by 0.25 more a level (×12.5
+  at 20, ×17.5 at 40; `levelPay` in `src/data/levels.ts`): a plain ×level
+  let a strong player's hand dwarf every bot.
 - **Gravity** is always on and follows the level. Normal runs climb the
   table at half pace (`gravityPace` 0.5, interpolated between entries):
   0.5 cells/s at level 1, 1.5 at 9, 4 at 19, 10 at 29, and at level 39
@@ -134,9 +136,10 @@ skill.
   (TETRIS ×3, T-SPIN ×2, T-SPIN DOUBLE, B2B ×4, 5 COMBO, LEVEL +5,
   CHECKPOINT, GARBAGE ×4 BY TECHNIQUE, SURVIVE 3 MIN, 100 PIECES) from a
   stream keyed on the life's number. Meeting one pays 1–3 minutes of PER
-  SECOND plus the hand's recent rate into the vault, once; a top-out ends
-  them. The simulator counts them with luck: a singles player meets only
-  the time, level, piece and checkpoint ones, in a life guessed at 5 minutes.
+  SECOND into the vault, once (before the first bot, the hand's recent rate
+  stands in); a top-out ends them. The simulator counts them with luck: a
+  singles player meets only the time, level, piece and checkpoint ones, in a
+  life of 3:42, the average of 14 measured lives.
 - **Garbage comes from spending, not from the clock** (`src/data/garbage.ts`).
   Buying a building or an upgrade sends rows: its price over a minute of
   what the game earns (PER SECOND plus the hand's recent rate), rounded down,
@@ -343,7 +346,7 @@ N/92 under the shop opens the list. Its STATS tab shows this run beside all
 runs (Lines, lives, top-outs, checkpoints, play time, techniques by hand,
 records, the best RIVAL streak), the last 20 lives (time, level reached,
 missions met, what they paid, and the average: saved with the world, so a
-save export carries them, for checking the simulator's guessed 5-minute life)
+save export carries them; the simulator's life length came from here)
 and two charts: PER SECOND through the run (a point every 30 s of
 play, the gap doubling past 240 points) and each building's PER SECOND now.
 
@@ -407,8 +410,9 @@ Attack is the table value ÷ 2 in garbage rows.
 - **Mystery**: NEXT is hidden for 20 s (hold still shows); manual income ×3
   meanwhile.
 
-Rewards here are sized on PER SECOND plus the hand's recent rate. The
-simulator prices every event with luck.
+Rewards here are sized on PER SECOND (the hand's recent rate only before the
+first bot: sized on the hand, a high-level life made one reward worth hours
+of bots). The simulator prices every event with luck.
 
 A top-out or an ascension ends an event, and a save does not keep one. Once
 the HELPER, INVADER or RIVAL building is owned, its event no longer turns up:

@@ -55,3 +55,10 @@ describe('normal rivals are slower', () => {
     expect(EVENTS.rival.pps(10, 1)).toBeCloseTo(1.1, 9);
   });
 });
+
+describe('manual pay by level', () => {
+  it('×level to level 10, then 0.25 more a level', async () => {
+    const { levelPay } = await import('../src/data/levels');
+    expect([1, 4, 10, 11, 20, 40].map(levelPay)).toEqual([1, 4, 10, 10.25, 12.5, 17.5]);
+  });
+});

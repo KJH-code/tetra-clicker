@@ -66,7 +66,10 @@ export function eventValue(s: LuckState, level: number, win: number): number {
   if (level < EVENTS.fromLevel) return 0;
   const w = EVENTS.weights(level);
   const total = Object.values(w).reduce((n, v) => n + v, 0);
-  const perSecond = s.bots + s.manual;
+  // Rewards sized on PER SECOND. The game uses the hand's rate before the
+  // first bot, a minute or so; modelling that switch would make the first
+  // purchase look like a loss, so the model leaves it out.
+  const perSecond = s.bots;
   const value: Record<string, number> = {
     rival: win * s.bots * EVENTS.rival.rewardSecondsPerLevel * level,
     invader: win * EVENTS.invader.payout * s.manual * EVENTS.invader.seconds,
