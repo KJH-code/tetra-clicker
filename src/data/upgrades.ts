@@ -32,8 +32,8 @@ function chain(
 // Owning 1, 5, 25, 50, 100 of a building offers a ×2 on that building, priced
 // like Cookie Clicker's tiered upgrades. Generated for every building, so a
 // new building gets its milestones for free.
-const MILESTONE_OWNED = [1, 5, 25, 50, 100];
-const MILESTONE_PRICE = [10, 50, 500, 50_000, 5_000_000];
+const MILESTONE_OWNED = [1, 5, 25, 50, 100, 150, 200];
+const MILESTONE_PRICE = [10, 50, 500, 50_000, 5_000_000, 500_000_000, 50_000_000_000];
 
 export function milestonesFor(b: { id: string; name: string; basePrice: number }): UpgradeDef[] {
   return chain({ group: 'milestone' }, MILESTONE_OWNED.map((n, i) => ({

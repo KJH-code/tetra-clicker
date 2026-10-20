@@ -98,9 +98,9 @@ describe('buildings that reach into the manual board', () => {
     for (let seed = 0; seed < 50; seed++) {
       w.round.eventMs = 1;
       const k = w.round.tickEvent(2, false, new Set(['rival', 'invader']));
-      expect(k === null || k === 'helper').toBe(true);
+      expect(k !== 'rival' && k !== 'invader').toBe(true);
     }
     w.round.eventMs = 1;
-    expect(w.round.tickEvent(2, false, new Set(['rival', 'invader', 'helper']))).toBeNull();
+    expect(w.round.tickEvent(2, false, new Set(['rival', 'invader', 'helper', 'bonus', 'boss', 'tech', 'mystery']))).toBeNull();
   });
 });

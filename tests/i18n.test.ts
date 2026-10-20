@@ -25,7 +25,7 @@ function files(dir: string): string[] {
 // included, and the page's own labels that main.ts passes through it.
 function literalKeys(): string[] {
   const keys: string[] = [];
-  for (const f of [...files('src/ui'), ...files('src/render'), 'src/main.ts']) {
+  for (const f of [...files('src/ui'), ...files('src/render'), ...files('src/simpage'), 'src/main.ts']) {
     const src = readFileSync(f, 'utf8');
     for (const m of src.matchAll(/\b(?:t|tr)\(/g)) {
       // The first argument: up to the comma or bracket that closes it.

@@ -55,8 +55,32 @@ export function statsView(world: World): HTMLElement {
     }
     wrap.append(table);
   }
-  wrap.append(incomeChart(world), shareChart(world));
+  wrap.append(lifeTable(world), incomeChart(world), shareChart(world));
   return wrap;
+}
+
+// The last lives, newest first, with their average: how long lives run and
+// what missions pay, the numbers the simulator only guesses.
+function lifeTable(world: World): HTMLElement {
+  const log = [...world.lifeLog].reverse();
+  const table = document.createElement('table');
+  table.className = 'stat-table lives';
+  const head = table.createTHead().insertRow();
+  for (const h of [t('RECENT LIVES'), t('TIME'), t('LEVEL'), t('MISSIONS'), t('MISSION PAY')]) { const th = document.createElement('th'); th.textContent = h; head.append(th); }
+  const body = table.createTBody();
+  const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+  if (log.length) {
+    const avg = (f: (r: (typeof log)[number]) => number) => log.reduce((n, r) => n + f(r), 0) / log.length;
+    const tr = body.insertRow();
+    tr.className = 'avg';
+    for (const v of [t('AVERAGE OF {n}', { n: log.length }), mmss(avg((r) => r.seconds)), avg((r) => r.level).toFixed(1), avg((r) => r.missions).toFixed(1), format(avg((r) => r.pay))]) tr.insertCell().textContent = v;
+  }
+  log.forEach((r, i) => {
+    const tr = body.insertRow();
+    for (const v of [`#${i + 1}`, mmss(r.seconds), String(r.level), String(r.missions), format(r.pay)]) tr.insertCell().textContent = v;
+  });
+  if (!log.length) body.insertRow().insertCell().textContent = t('no lives yet');
+  return table;
 }
 
 const INK = { text: '#f2f4fa', dim: '#8d93ab', grid: '#242a3a', line: '#ffc233', surface: '#12151d' };

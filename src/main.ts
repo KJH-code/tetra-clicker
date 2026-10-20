@@ -29,7 +29,7 @@ import { GOLD, PIECE_COLORS, WRATH_RIM, THEME, VIEW, setPalette, buildingColor, 
 import { BUFFS } from './data/golden';
 import { drawRoundHud, drawLifePanel } from './render/roundHud';
 import { missionById } from './data/missions';
-import { drawEventHud, drawDuelGauge } from './render/eventHud';
+import { drawEventHud, drawDuelGauge, eventName, EVENT_COLORS } from './render/eventHud';
 import { InputHandler, type Action } from './ui/input';
 import { Shop } from './ui/shop';
 import { SettingsPanel } from './ui/settings';
@@ -79,6 +79,7 @@ function applyDisplay(): void {
   VIEW.patterns = settings.patterns || settings.palette === 'cvd';
   VIEW.reduceMotion = settings.reduceMotion;
   VIEW.hitEffects = settings.hitEffects;
+  VIEW.backdrop = settings.backdrop / 100;
   VIEW.highContrast = settings.highContrast;
   VIEW.textScale = settings.uiScale / 100;
   THEME.grid = settings.highContrast ? '#343b52' : '#161a25';
@@ -265,7 +266,7 @@ function mergeSettings(s: Partial<HandlingSettings> | undefined): HandlingSettin
     reduceMotion: s.reduceMotion ?? d.reduceMotion, hitEffects: s.hitEffects ?? d.hitEffects,
     // A save from before milestones starts at its balance's unit (set once the world loads), not at 1K again.
     milestone: s.milestone ?? -1,
-    uiScale: s.uiScale ?? d.uiScale, highContrast: s.highContrast ?? d.highContrast,
+    uiScale: s.uiScale ?? d.uiScale, highContrast: s.highContrast ?? d.highContrast, backdrop: s.backdrop ?? d.backdrop,
   };
 }
 
@@ -434,11 +435,16 @@ function handleEvent(e: WorldEvent): void {
       manualFx.float(`HELPER +${format(e.amount)}`, manual.cellX(5), manual.cellY(30), { color: '#39ff14', size: 16, dur: 1000 });
       break;
     case 'lifeEvent': {
-      const names = { rival: 'RIVAL', invader: 'INVADER', helper: 'HELPER' };
-      const name = names[e.kind];
-      const text = e.phase === 'start' ? `${name}!` : e.phase === 'won' ? t('{name} BEATEN +{v}', { name, v: format(e.amount) })
+      const name = eventName(e.kind);
+      const text = e.phase === 'start' ? `${name}!`
+        : e.kind === 'bonus' ? t('{name} +{v}', { name, v: format(e.amount) })
+        : e.kind === 'tech' ? (e.phase === 'won' ? t('{name} CLEARED +{v}', { name, v: format(e.amount) }) : t('{name} FAILED', { name }))
+        : e.kind === 'boss' && e.phase === 'lost' ? t('{name} ESCAPED', { name })
+        : e.phase === 'won' ? t('{name} BEATEN +{v}', { name, v: format(e.amount) })
         : e.phase === 'lost' ? t('{name} WINS', { name }) : t('{name} LEAVES', { name });
-      manualFx.float(text, manual.cellX(5), manual.cellY(24), { color: e.phase === 'lost' ? '#7a7aa0' : '#ff8c1a', size: e.phase === 'start' ? 30 : 24, dur: 2200 });
+      const color = e.phase === 'lost' ? '#7a7aa0' : EVENT_COLORS[e.kind];
+      if (e.phase === 'start' || e.phase === 'won') manualFx.popup(text, manual.cellX(5), manual.cellY(24), { color, size: e.phase === 'start' ? 28 : 22, dur: 2200, maxWidth: manual.layout.cell * 9.6 });
+      else manualFx.float(text, manual.cellX(5), manual.cellY(24), { color, size: 22, dur: 2200, maxWidth: manual.layout.cell * 9.6 });
       if (e.phase === 'start') manualFx.shakeBoard(4);
       break;
     }
@@ -570,7 +576,8 @@ function render(): void {
   const g = world.manual;
   const view: BoardView = {
     grid: g.grid, active: g.active, ghostY: g.active ? g.ghostY() : null,
-    holds: g.holds, holdUsed: g.holdUsed, next: g.next(),
+    // A mystery hides what is coming.
+    holds: g.holds, holdUsed: g.holdUsed, next: world.lifeEvent?.kind === 'mystery' ? [] : g.next(),
     golden: { active: g.golden.active, holds: g.golden.holds, next: g.golden.queue, wrath: !!g.golden.wrath },
   };
   const buffs = world.buffs.active.map((b) => ({ label: BUFFS[b.id]?.label ?? b.id, msLeft: b.msLeft }));

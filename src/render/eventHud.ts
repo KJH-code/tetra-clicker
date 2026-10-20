@@ -4,9 +4,22 @@ import { HEIGHT, WIDTH, TOP_VISIBLE_ROW, occupiedCells } from '../sim/board';
 import { pieceFromId } from '../sim/pieces';
 import { PIECE_COLORS, THEME, VIEW, font } from './theme';
 import { t } from '../ui/i18n';
+import { EVENTS } from '../data/events';
 
-const NAMES = { rival: 'RIVAL', invader: 'INVADER', helper: 'HELPER' } as const;
-const COLORS = { rival: '#ff5050', invader: '#ff8c1a', helper: '#39ff14' } as const;
+export const EVENT_NAMES = { rival: 'RIVAL', invader: 'INVADER', helper: 'HELPER', bonus: 'BONUS ROUND', boss: 'BOSS', tech: 'TECH CHALLENGE', mystery: 'MYSTERY' } as const;
+export const EVENT_COLORS = { rival: '#ff5050', invader: '#ff8c1a', helper: '#39ff14', bonus: '#ffc233', boss: '#c03bff', tech: '#00f0ff', mystery: '#a77bff' } as const;
+const COLORS = EVENT_COLORS;
+
+// The event's name in the player's language (RIVAL, INVADER and HELPER stay as they are).
+export function eventName(kind: keyof typeof EVENT_NAMES): string {
+  switch (kind) {
+    case 'bonus': return t('BONUS ROUND');
+    case 'boss': return t('BOSS');
+    case 'tech': return t('TECH CHALLENGE');
+    case 'mystery': return t('MYSTERY');
+    default: return EVENT_NAMES[kind];
+  }
+}
 
 // A life event on the manual board: a banner over the well with the time
 // left, garbage gauges (rows waiting for each side), and in a rival fight
@@ -22,11 +35,33 @@ export function drawEventHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ev
   ctx.fillStyle = COLORS[ev.kind];
   ctx.font = font(800, c * 0.5 * VIEW.textScale);
   const time = ev.kind === 'rival' ? t('UNTIL ONE TOPS OUT') : `${Math.ceil(ev.msLeft / 1000)}s`;
-  ctx.fillText(`${NAMES[ev.kind]} · ${time}`, left + (WIDTH * c) / 2, top + c * 0.2);
+  const extra = ev.kind === 'bonus' ? ` · ×${EVENTS.bonus.incomeMul}` : ev.kind === 'mystery' ? ` · ×${EVENTS.mystery.incomeMul}`
+    : ev.kind === 'tech' ? ` · ${ev.label} ${ev.done}/${ev.need}` : '';
+  const title = `${eventName(ev.kind)} · ${time}${extra}`;
+  const size = c * 0.5 * VIEW.textScale;
+  ctx.font = font(800, size);
+  const tw = ctx.measureText(title).width;
+  if (tw > WIDTH * c - 8) ctx.font = font(800, (size * (WIDTH * c - 8)) / tw);
+  ctx.fillText(title, left + (WIDTH * c) / 2, top + c * 0.2);
+  // The boss's health, a bar under the banner.
+  if (ev.kind === 'boss') {
+    const w = WIDTH * c - 16;
+    const y = top + c * 0.95;
+    ctx.fillStyle = THEME.boxHead;
+    ctx.fillRect(left + 8, y, w, c * 0.28);
+    ctx.fillStyle = COLORS.boss;
+    ctx.shadowColor = COLORS.boss;
+    ctx.shadowBlur = 10;
+    ctx.fillRect(left + 8, y, w * Math.max(0, ev.hp / ev.maxHp), c * 0.28);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = THEME.text;
+    ctx.font = font(700, c * 0.3 * VIEW.textScale);
+    ctx.fillText(`${Math.max(0, ev.hp)} / ${ev.maxHp}`, left + (WIDTH * c) / 2, y + c * 0.35);
+  }
   ctx.restore();
 
   // Rows waiting for me: a red bar up the well's left edge.
-  const mine = ev.kind === 'rival' ? ev.toMe : 0;
+  const mine = ev.kind === 'rival' || ev.kind === 'boss' ? ev.toMe : 0;
   if (mine > 0) gauge(ctx, left - 5, r.cellY(HEIGHT), Math.min(20, mine) * c, '#ff3b3b');
   if (ev.kind === 'invader' && ev.shield > 0) gauge(ctx, left - 5, r.cellY(HEIGHT), Math.min(20, ev.shield) * c, '#00f0ff');
 

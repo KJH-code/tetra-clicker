@@ -68,8 +68,10 @@ dull shove. All of it is render-side: the sim does not wait for a hit-stop.
 Around the boards:
 
 - **Backdrop**: faint tetrominoes drift down behind the (slightly
-  see-through) panes; more and faster the richer the run (log10 of PER
-  SECOND), up to 40 (`src/render/backdrop.ts`). LESS MOTION stops them.
+  see-through) panes and through the bot pane, which draws only its frame;
+  more and faster the richer the run (log10 of PER SECOND), up to 40
+  (`src/render/backdrop.ts`). SETTINGS → BACKDROP sets how strongly they
+  show (50% by default, 0 turns them off); LESS MOTION stops them.
 - **Level theme**: the manual well's frame, grid and floor change colour
   every ten levels (cyan, violet, orange, red) and turn white at 20G.
 - **Life readout**: under the hold column, PPS over the last 10 s, life
@@ -127,7 +129,8 @@ skill.
   that up to 15 times. Past the first 20G level gravity has nowhere to go,
   so the lock delay shrinks instead: −15 ms a level to 200 ms, and one reset
   fewer every two levels down to 8 (`lockAt` in `src/data/levels.ts`).
-- **Missions** (`src/data/missions.ts`): each life draws three of ten
+- **Missions** (`src/data/missions.ts`): each life draws three of ten (four,
+  and three hard ones more, with the MISSION prestige chain)
   (TETRIS ×3, T-SPIN ×2, T-SPIN DOUBLE, B2B ×4, 5 COMBO, LEVEL +5,
   CHECKPOINT, GARBAGE ×4 BY TECHNIQUE, SURVIVE 3 MIN, 100 PIECES) from a
   stream keyed on the life's number. Meeting one pays 1–3 minutes of PER
@@ -241,19 +244,22 @@ many short ones. K is set so the first crown comes after about 2.5 hours.
 
 ASCEND (under the shop, locked during a round) shows the crowns on offer and
 the checklist; ascending opens the prestige shop, which a reload returns to
-until NEW RUN. Four chains, 1 / 3 / 9 / 27 crowns, each step needing the one
-before:
+until NEW RUN. The shop is a tree (`src/ui/prestigeTree.ts`): a CROWN root in
+the middle and a ray per chain, each step on a line from the one before;
+bought steps glow in their chain's colour, the next buyable one is outlined,
+the rest are faint. Drag to move it, wheel or pinch to zoom; it opens on the
+first three steps of every chain. Six chains of five, 1 / 3 / 9 / 27 / 81
+crowns, each step needing the one before:
 
-| production | survival | proportion |
-|---|---|---|
-| all income ×2 | gravity ×0.8 | risk weight ×1.5 |
-| start with 2K Lines | keep 25% of the vault on a top-out | tech cap +0.5 |
-| manual ×3 | purchase garbage ×0.8 | risk weight ×2 |
-| all income ×2 | keep 50% of the vault on a top-out | start level +2 |
+| production | survival | proportion | mission | event | wrath |
+|---|---|---|---|---|---|
+| all income ×2 | gravity ×0.8 | risk weight ×1.5 | mission pay ×1.5 | events 25% more often | wrath pieces appear |
+| start with 2K Lines | keep 25% of the vault on a top-out | tech cap +0.5 | four missions a life | good events twice as likely | ELDER FRENZY lasts 12 s |
+| manual ×3 | purchase garbage ×0.8 | risk weight ×2 | hard missions (TETRIS ×6, PERFECT CLEAR, 10 COMBO, 5 min each) | event rewards ×1.5 | RUIN takes 10% |
+| all income ×2 | keep 50% of the vault on a top-out | start level +2 | mission pay ×2 | boss HP ×0.75 | CLOT half as likely |
+| all income ×3 | keep 75% of the vault on a top-out | risk weight ×3 | each mission met: +10% income for the rest of the life | events 50% more often in all, rewards ×2 | no RUIN |
 
-The fourth, WRATH (ids `elder_1..4`, clear of the run upgrades
-`wrath_1..3`): wrath pieces appear at all → ELDER FRENZY lasts 12 s → RUIN
-takes 10% → CLOT half as likely.
+WRATH's ids are `elder_1..5`, clear of the run upgrades `wrath_1..3`.
 
 A fifth chain, SYNERGY, is research: 1, 2, 3 … 8 crowns up the ladder, each
 opening one synergy for every later run (below).
@@ -333,9 +339,12 @@ ascension, and adds 1% to all income (the same shape as crowns). Their
 conditions are the effect engine's own, plus `career`, which reads a stat as
 every finished run plus this one. The world checks them after a manual lock,
 a purchase, an ascension and once a second; a toast announces each, and ★
-N/91 under the shop opens the list. Its STATS tab shows this run beside all
+N/92 under the shop opens the list. Its STATS tab shows this run beside all
 runs (Lines, lives, top-outs, checkpoints, play time, techniques by hand,
-records, the best RIVAL streak) and two charts: PER SECOND through the run (a point every 30 s of
+records, the best RIVAL streak), the last 20 lives (time, level reached,
+missions met, what they paid, and the average: saved with the world, so a
+save export carries them, for checking the simulator's guessed 5-minute life)
+and two charts: PER SECOND through the run (a point every 30 s of
 play, the gap doubling past 240 points) and each building's PER SECOND now.
 
 ### Challenge runs
@@ -362,9 +371,11 @@ step }` condition, so a harder step replaces the one below it.
 
 ### Life events
 
-From level 5, every 3–8 minutes of life time (a timer of their own), one of
-three turns up; the higher the level, the likelier the first two
-(`src/data/events.ts`). Attack is the table value ÷ 2 in garbage rows.
+From level 3, every 2–5 minutes of life time (a timer of their own), one of
+seven turns up (`src/data/events.ts`). At level 3 half the draw is the kind
+ones (helper, bonus round, mystery); the ones that fight back (rival,
+invader, boss) and the tech challenge grow 25% a level up to level 15.
+Attack is the table value ÷ 2 in garbage rows.
 
 - **Rival**: a Cold Clear bot on a board of its own, drawn small under NEXT,
   trading garbage with you until one of you tops out. Your attack cancels the
@@ -380,6 +391,19 @@ three turns up; the higher the level, the likelier the first two
   made by hand meanwhile.
 - **Helper**: for 60 s, each clear that keeps a combo or back-to-back going
   lifts the lowest garbage row out and pays it like a single.
+- **Bonus round**: 30 s of manual income ×4.5; the total shows at the end.
+- **Boss**: level × 10 HP, worn down by your attack after it cancels what
+  the boss has queued; every 6 s it queues 2 rows, which rise under a piece
+  that clears nothing (up to 4). Killing it inside 90 s pays PER SECOND ×
+  level × 4.5 minutes into the vault; otherwise it escapes. Its HP shows as a
+  bar under the banner.
+- **Tech challenge**: one of TETRIS ×2, T-SPIN ×2, B2B ×3 or 5 COMBO ×1 in
+  60 s pays 4.5 minutes of PER SECOND; otherwise it fails.
+- **Mystery**: NEXT is hidden for 20 s (hold still shows); manual income ×3
+  meanwhile.
+
+Rewards here are sized on PER SECOND plus the hand's recent rate. The
+simulator prices every event with luck.
 
 A top-out or an ascension ends an event, and a save does not keep one. Once
 the HELPER, INVADER or RIVAL building is owned, its event no longer turns up:
@@ -549,7 +573,7 @@ unlock. All of them are data in `src/data/upgrades.ts`.
 
 | group | unlock | effect |
 |---|---|---|
-| milestone ×2 (generated per building) | own 1 / 5 / 25 / 50 / 100 | that building's income ×2 |
+| milestone ×2 (generated per building) | own 1 / 5 / 25 / 50 / 100 / 150 / 200 | that building's income ×2 |
 | manual ×2 | 200 / 2K / 20K / 200K / 2M Lines earned by hand | manual income ×2 |
 | SPIN / B2B / PC | that technique done 10 / 50 / 200 times (PC 1 / 5 / 20) | ×1.5, ×2, ×2 on clears with that tag |
 | COMBO | 5 / 25 / 100 runs reaching a 5 combo | combo step 0.1 → 0.15 → 0.2 → 0.25 |
@@ -578,7 +602,7 @@ needs; a new rule flag needs the manual game to read it.
 
 ## Economy simulator
 
-https://kjh-code.github.io/tetra-clicker/sim.html (dev: `/sim.html`)
+https://kjh-code.github.io/tetra-clicker/sim.html (dev: `/sim.html`), in the game's language (read from its save)
 
 A second page that runs the whole building ladder through the catch-up
 formula (`PPS × lines per piece × multiplier`) with the game's own pricing

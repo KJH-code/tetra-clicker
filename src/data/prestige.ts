@@ -52,7 +52,7 @@ export const TECH_CHECKS: TechCheck[] = [
 ];
 
 // Prestige upgrades: chains, bought only on the ascension screen.
-export type Branch = 'production' | 'survival' | 'proportion' | 'synergy' | 'elder' | 'opener';
+export type Branch = 'production' | 'survival' | 'proportion' | 'synergy' | 'elder' | 'opener' | 'mission' | 'event';
 
 export interface PrestigeDef {
   id: string;
@@ -62,7 +62,7 @@ export interface PrestigeDef {
   effects: Effect[];
 }
 
-const PRICES = [1, 3, 9, 27];
+const PRICES = [1, 3, 9, 27, 81];
 
 function branch(id: Branch, steps: { name: string; effects: Effect[] }[]): PrestigeDef[] {
   return steps.map((s, i) => ({ id: `${id}_${i + 1}`, branch: id, price: PRICES[i]!, ...s }));
@@ -74,18 +74,21 @@ export const PRESTIGE_UPGRADES: PrestigeDef[] = [
     { name: 'START WITH 2K LINES', effects: [{ target: 'start_lines', op: 'add', value: 2_000 }] },
     { name: 'MANUAL ×3', effects: [{ target: 'income', filter: ['board:manual'], op: 'mul', value: 3 }] },
     { name: 'ALL INCOME ×2', effects: [{ target: 'income', op: 'mul', value: 2 }] },
+    { name: 'ALL INCOME ×3', effects: [{ target: 'income', op: 'mul', value: 3 }] },
   ]),
   ...branch('survival', [
     { name: 'GRAVITY ×0.8', effects: [{ target: 'gravity', op: 'mul', value: 0.8 }] },
     { name: 'KEEP 25% OF THE VAULT ON A TOP-OUT', effects: [{ target: 'retain', op: 'add', value: 0.25 }] },
     { name: 'PURCHASE GARBAGE ×0.8', effects: [{ target: 'buy_garbage', op: 'mul', value: 0.8 }] },
     { name: 'KEEP 50% OF THE VAULT ON A TOP-OUT', effects: [{ target: 'retain', op: 'add', value: 0.25 }] },
+    { name: 'KEEP 75% OF THE VAULT ON A TOP-OUT', effects: [{ target: 'retain', op: 'add', value: 0.25 }] },
   ]),
   ...branch('proportion', [
     { name: 'RISK WEIGHT ×1.5', effects: [{ target: 'risk_weight', op: 'mul', value: 1.5 }] },
     { name: 'TECH CAP +0.5', effects: [{ target: 'tech_cap', op: 'add', value: 0.5 }] },
     { name: 'RISK WEIGHT ×2', effects: [{ target: 'risk_weight', op: 'mul', value: 2 }] },
     { name: 'START LEVEL +2', effects: [{ target: 'start_level', op: 'add', value: 2 }] },
+    { name: 'RISK WEIGHT ×3', effects: [{ target: 'risk_weight', op: 'mul', value: 3 }] },
   ]),
   // Wrath pieces (shown as WRATH; the id keeps clear of the run upgrades
   // wrath_1..3): the first step lets them appear at all, the rest soften them.
@@ -94,6 +97,23 @@ export const PRESTIGE_UPGRADES: PrestigeDef[] = [
     { name: 'ELDER FRENZY LASTS 12 S', effects: [{ target: 'buff_duration', filter: ['buff:elder_frenzy'], op: 'mul', value: 2 }] },
     { name: 'RUIN TAKES 10%', effects: [{ target: 'ruin_share', op: 'mul', value: 0.5 }] },
     { name: 'CLOT HALF AS LIKELY', effects: [{ target: 'wrath_weight', filter: ['wrath:clot'], op: 'mul', value: 0.5 }] },
+    { name: 'NO RUIN', effects: [{ target: 'wrath_weight', filter: ['wrath:ruin'], op: 'mul', value: 0 }] },
+  ]),
+  // Life missions (src/data/missions.ts): more of them, harder ones, more pay.
+  ...branch('mission', [
+    { name: 'MISSION PAY ×1.5', effects: [{ target: 'mission_pay', op: 'mul', value: 1.5 }] },
+    { name: 'FOUR MISSIONS A LIFE', effects: [{ target: 'mission_count', op: 'add', value: 1 }] },
+    { name: 'HARD MISSIONS: TETRIS ×6, PERFECT CLEAR, 10 COMBO', effects: [{ target: 'hard_missions', op: 'flag', value: 1 }] },
+    { name: 'MISSION PAY ×2', effects: [{ target: 'mission_pay', op: 'mul', value: 2 }] },
+    { name: 'EACH MISSION DONE: +10% INCOME FOR THE REST OF THE LIFE', effects: [{ target: 'income', op: 'mul_pct', value: 10, stack: { type: 'stat', stat: 'lifeMissions' } }] },
+  ]),
+  // Life events (src/data/events.ts): more often, kinder, better paid.
+  ...branch('event', [
+    { name: 'EVENTS 25% MORE OFTEN', effects: [{ target: 'event_rate', op: 'mul', value: 1.25 }] },
+    { name: 'GOOD EVENTS TWICE AS LIKELY', effects: [{ target: 'good_event_weight', op: 'mul', value: 2 }] },
+    { name: 'EVENT REWARDS ×1.5', effects: [{ target: 'event_reward', op: 'mul', value: 1.5 }] },
+    { name: 'BOSS HP ×0.75', effects: [{ target: 'boss_hp', op: 'mul', value: 0.75 }] },
+    { name: 'EVENTS 50% MORE OFTEN · REWARDS ×2', effects: [{ target: 'event_rate', op: 'mul', value: 1.2 }, { target: 'event_reward', op: 'mul', value: 2 }] },
   ]),
   // Research: each opens one synergy for every later run (bought there with
   // Lines). Up the ladder, a crown dearer each step, so they come a few per

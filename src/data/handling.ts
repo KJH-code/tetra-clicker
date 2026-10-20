@@ -17,6 +17,8 @@ export interface HandlingSettings {
   patterns: boolean;
   reduceMotion: boolean;
   hitEffects: boolean;
+  // Strength of the drifting pieces behind the panes, percent (100 = four times the old look).
+  backdrop: number;
   // Thousands-steps of balance already announced (1 = 1K, 2 = 1M, …).
   milestone: number;
   // Percent, 90..150.
@@ -44,6 +46,7 @@ export const HANDLING_LIMITS = {
   sdf: { min: 1, max: SDF_INSTANT, step: 1 },
   volume: { min: 0, max: 100, step: 1 },
   uiScale: { min: 90, max: 150, step: 10 },
+  backdrop: { min: 0, max: 100, step: 5 },
 } as const;
 
 // With no gravity SDF has nothing to multiply, so it is read as cells per
@@ -75,6 +78,7 @@ export const DEFAULT_HANDLING: HandlingSettings = {
   reduceMotion: false,
   hitEffects: true,
   milestone: 0,
+  backdrop: 50,
   uiScale: 100,
   highContrast: false,
 };

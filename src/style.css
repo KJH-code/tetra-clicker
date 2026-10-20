@@ -85,6 +85,8 @@ html, body {
   position: relative;
 }
 #manual-pane { --zone: var(--play); display: flex; align-items: center; justify-content: center; padding: 12px; }
+/* The bot pane shows the room behind it: only its frame is drawn. */
+#auto-pane { background: transparent; box-shadow: none; }
 #auto-pane { --zone: var(--faint); display: flex; align-items: center; justify-content: center; padding: 12px; overflow-y: auto; }
 #shop-pane { --zone: var(--shop); }
 
@@ -366,6 +368,24 @@ canvas { display: block; image-rendering: pixelated; }
 .ascend .branches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 8px; align-items: start; }
 .ascend .branch { display: flex; flex-direction: column; gap: 6px; background: var(--surface-2); border-radius: var(--radius); padding: 8px; border-top: 3px solid var(--ascend); }
 .ascend .branch .title { font-size: 12px; font-weight: 800; letter-spacing: 0.18em; color: #cdb2ff; padding: 2px 2px 4px; }
+/* The prestige tree: dragged and zoomed inside a fixed window. */
+.ptree { position: relative; height: min(56vh, 560px); margin-top: 8px; overflow: hidden; border-radius: var(--radius);
+  background: radial-gradient(circle at 50% 50%, #2a1d4a55, transparent 60%), var(--surface-2); touch-action: none; cursor: grab; }
+.ptree:active { cursor: grabbing; }
+.ptree-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.ptree-lines { position: absolute; left: 0; top: 0; pointer-events: none; }
+.ptree-lines line { stroke-width: 3; opacity: 0.18; }
+.ptree-lines line.next { opacity: 0.55; stroke-dasharray: 6 5; }
+.ptree-lines line.owned { opacity: 1; filter: drop-shadow(0 0 4px currentColor); }
+.ptree-root { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 30px; color: #d9c2ff; background: #1c1430; border: 2px solid #a77bff; box-shadow: 0 0 24px #a77bff88; }
+.ptree-branch { position: absolute; transform: translate(-50%, -50%); font-size: 11px; font-weight: 800; letter-spacing: 0.16em; white-space: nowrap; pointer-events: none; text-shadow: 0 0 8px #000; }
+.ptree .pcard { position: absolute; width: 150px; height: 54px; overflow: hidden; border-left-color: var(--branch); }
+.ptree .pcard .name { font-size: 11px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ptree .pcard:hover:not(:disabled) { transform: none; }
+.ptree .pcard.owned { border-left-color: var(--branch); background: linear-gradient(90deg, color-mix(in srgb, var(--branch) 22%, transparent), transparent), var(--surface-3); box-shadow: 0 0 14px color-mix(in srgb, var(--branch) 40%, transparent); }
+.ptree .pcard.next:not(:disabled) { outline: 2px solid var(--branch); outline-offset: 1px; }
+.ptree .pcard.locked { opacity: 0.3; }
 .pcard {
   background: var(--surface-3); color: var(--text); border: 0; border-left: 3px solid #a46bff80; border-radius: 3px;
   padding: 8px 10px; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 3px; font-family: inherit;

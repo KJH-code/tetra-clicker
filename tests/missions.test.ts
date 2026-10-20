@@ -65,3 +65,16 @@ describe('the simulator prices missions', () => {
     expect(missionMinutesPerLife(0.5, 0.25, 170)).toBeCloseTo(0.6, 9);
   });
 });
+
+describe('life log', () => {
+  it('a top-out records the life; twenty kept, saved with the world', () => {
+    const w = life(5);
+    w.round.elapsedMs = 95_000;
+    (w as unknown as { endRound(): void }).endRound();
+    expect(w.lifeLog).toEqual([{ seconds: 95, level: 1, missions: 0, pay: 0 }]);
+    for (let i = 0; i < 25; i++) { w.startRound(); (w as unknown as { endRound(): void }).endRound(); }
+    expect(w.lifeLog).toHaveLength(20);
+    const back = new World(5, JSON.parse(JSON.stringify(w.snapshot())));
+    expect(back.lifeLog).toEqual(w.lifeLog);
+  });
+});

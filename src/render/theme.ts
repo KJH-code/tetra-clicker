@@ -44,6 +44,8 @@ export const VIEW = {
   reduceMotion: false,
   // Hit-stop, shards, technique popups and the garbage jolt.
   hitEffects: true,
+  // 0..1: how strongly the drifting pieces behind the panes show.
+  backdrop: 0.5,
   highContrast: false,
   // Multiplies text drawn on the boards.
   textScale: 1,

@@ -1,21 +1,28 @@
 import type { World } from '../sim/world';
 import { PRESTIGE_UPGRADES, prestigeRequires, type Branch } from '../data/prestige';
 import { CHALLENGE, CHALLENGE_RULES, challengePoints } from '../data/challenges';
+import { buildTree, type TreeView } from './prestigeTree';
 import { t } from './i18n';
 
-export const BRANCHES: { id: Branch; title: string }[] = [
-  { id: 'production', title: 'PRODUCTION' },
-  { id: 'survival', title: 'SURVIVAL' },
-  { id: 'proportion', title: 'PROPORTION' },
-  { id: 'synergy', title: 'SYNERGY' },
-  { id: 'elder', title: 'WRATH' },
-  { id: 'opener', title: 'OPENER' },
+// In order round the tree from the long synergy ray at the bottom.
+export const BRANCHES: { id: Branch; title: string; color: string }[] = [
+  { id: 'production', title: 'PRODUCTION', color: '#3fd17a' },
+  { id: 'survival', title: 'SURVIVAL', color: '#00c8d8' },
+  { id: 'proportion', title: 'PROPORTION', color: '#a77bff' },
+  { id: 'mission', title: 'MISSION', color: '#39ff14' },
+  { id: 'event', title: 'EVENT', color: '#ff8c1a' },
+  { id: 'elder', title: 'WRATH', color: '#ff3b3b' },
+  { id: 'opener', title: 'OPENER', color: '#ff2ed2' },
+  { id: 'synergy', title: 'SYNERGY', color: '#ffc233' },
 ];
 
 // The ascension screen: a confirmation that shows what the run is worth,
 // then the prestige shop that stays up until NEW RUN. While the world is
 // ascending this overlay is the whole game.
 export class AscendPanel {
+  // Where the tree was dragged and zoomed to, kept while the shop is open.
+  private treeView: TreeView = { x: 0, y: 0, scale: 1, fitted: false };
+
   constructor(
     private overlay: HTMLElement,
     private world: World,
@@ -76,14 +83,10 @@ export class AscendPanel {
     box.classList.add('wide');
     if (note) box.append(line('over', note));
     box.append(line('big crown', `${meta.crowns} CROWN`), line('dim', t('{n} earned · +{n}% income', { n: meta.crownsEarned })));
-    const cols = document.createElement('div');
-    cols.className = 'branches';
-    // A chain with no steps yet (OPENER before its builds are in) shows no column.
-    for (const b of BRANCHES.filter((x) => PRESTIGE_UPGRADES.some((u) => u.branch === x.id))) {
-      const col = document.createElement('div');
-      col.className = 'branch';
-      col.append(line('title', t(b.title)));
-      for (const u of PRESTIGE_UPGRADES.filter((x) => x.branch === b.id)) {
+    // A chain with no steps yet (OPENER before its builds are in) shows no ray.
+    const branches = BRANCHES.filter((x) => PRESTIGE_UPGRADES.some((u) => u.branch === x.id)).map((b) => ({
+      id: b.id, title: t(b.title), color: b.color,
+      cards: PRESTIGE_UPGRADES.filter((x) => x.branch === b.id).map((u, index) => {
         const owned = meta.prestige.has(u.id);
         const req = prestigeRequires(u.id);
         const reachable = !req || meta.prestige.has(req);
@@ -91,14 +94,15 @@ export class AscendPanel {
           if (this.world.buyPrestige(u.id)) this.showShop();
         });
         card.dataset['prestige'] = u.id;
+        card.title = t(u.name);
         card.classList.toggle('owned', owned);
         card.classList.toggle('locked', !owned && !reachable);
         card.disabled = owned || !this.world.canBuyPrestige(u.id);
         card.append(line('name', t(u.name)), line('price', owned ? t('OWNED') : `${u.price} CROWN`));
-        col.append(card);
-      }
-      cols.append(col);
-    }
+        return { branch: b.id, index, el: card, owned, next: !owned && reachable };
+      }),
+    }));
+    const cols = buildTree(branches, this.treeView);
     const row = document.createElement('div');
     row.className = 'row';
     // The next run's mode: a pick here, kept from the last run otherwise.
@@ -192,6 +196,7 @@ export class AscendPanel {
   }
 
   private close(): void {
+    this.treeView.fitted = false;
     this.overlay.hidden = true;
     this.overlay.replaceChildren();
     this.onOpenChange(false);

@@ -191,7 +191,7 @@ export class SettingsPanel {
     pl.textContent = t('PIECE COLOURS');
     paletteRow.style.gridTemplateColumns = '64px 1fr';
     paletteRow.append(pl, palette);
-    return [h2(t('ACCESSIBILITY')), paletteRow, switches, this.slider(t('TEXT'), 'uiScale', '%')];
+    return [h2(t('ACCESSIBILITY')), paletteRow, switches, this.slider(t('TEXT'), 'uiScale', '%'), this.slider(t('BACKDROP'), 'backdrop', '%')];
   }
 
   // EXPORT copies the save as text and downloads it as a file; IMPORT takes
@@ -243,7 +243,7 @@ export class SettingsPanel {
     return out;
   }
 
-  private slider(label: string, key: 'das' | 'arr' | 'sdf' | 'volume' | 'uiScale', unit: string): HTMLElement {
+  private slider(label: string, key: 'das' | 'arr' | 'sdf' | 'volume' | 'uiScale' | 'backdrop', unit: string): HTMLElement {
     const row = document.createElement('div');
     row.className = 'slider';
     const l = document.createElement('span');

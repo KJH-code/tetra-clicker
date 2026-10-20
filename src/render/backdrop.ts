@@ -41,7 +41,7 @@ export class Backdrop {
     this.acc = 0;
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const target = VIEW.reduceMotion ? 0 : Math.min(MAX_PIECES, 6 + Math.round(this.wealth * 3));
+    const target = VIEW.reduceMotion || VIEW.backdrop <= 0 ? 0 : Math.min(MAX_PIECES, 6 + Math.round(this.wealth * 3));
     while (this.drifters.length < target) this.drifters.push(this.spawn(w, h, this.drifters.length < target / 2));
     const speed = 1 + this.wealth * 0.15;
     for (const d of this.drifters) {
@@ -67,7 +67,8 @@ export class Backdrop {
     ctx.clearRect(0, 0, w, h);
     for (const d of this.drifters) {
       ctx.save();
-      ctx.globalAlpha = d.alpha;
+      // 50% (the default) is twice the first look, 100% four times.
+      ctx.globalAlpha = Math.min(1, d.alpha * VIEW.backdrop * 4);
       ctx.translate(d.x, d.y);
       ctx.rotate(d.rot);
       ctx.fillStyle = PIECE_COLORS[d.piece];

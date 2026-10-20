@@ -11,16 +11,16 @@ const lock = (over: Partial<LockResult>): LockResult => ({
 });
 
 describe('upgrade data', () => {
-  it('generates five milestones for every building', () => {
+  it('generates seven milestones for every building', () => {
     const ms = UPGRADES.filter((u) => u.group === 'milestone');
-    expect(ms).toHaveLength(BUILDINGS.length * 5);
+    expect(ms).toHaveLength(BUILDINGS.length * 7);
     expect(new Set(UPGRADES.map((u) => u.id)).size).toBe(UPGRADES.length);
   });
 
   it('a new building gets its milestones from the template', () => {
     const ms = milestonesFor({ id: 'tspin', name: 'T-SPIN', basePrice: 3000 });
-    expect(ms.map((u) => u.id)).toEqual(['ms_tspin_1', 'ms_tspin_5', 'ms_tspin_25', 'ms_tspin_50', 'ms_tspin_100']);
-    expect(ms.map((u) => u.price)).toEqual([30_000, 150_000, 1_500_000, 150_000_000, 15_000_000_000]);
+    expect(ms.map((u) => u.id)).toEqual(['ms_tspin_1', 'ms_tspin_5', 'ms_tspin_25', 'ms_tspin_50', 'ms_tspin_100', 'ms_tspin_150', 'ms_tspin_200']);
+    expect(ms.map((u) => u.price)).toEqual([30_000, 150_000, 1_500_000, 150_000_000, 15_000_000_000, 1_500_000_000_000, 150_000_000_000_000]);
     expect(ms[0]!.effects[0]).toEqual({ target: 'income', filter: ['building:tspin'], op: 'mul', value: 2 });
   });
 });
@@ -111,6 +111,6 @@ describe('manual stats', () => {
     recordManual(s, lock({ piece: 'T', spin: 'mini', lines: 1, comboIndex: 0 }), 1);
     expect(s).toEqual({ linesEarned: 0, manualPieces: 5, manualLines: 23.4, spins: 1, combo5: 1, b2bs: 1, pcs: 1, riskLines: 0, rounds: 0, checkpoints: 0, deaths: 0, maxLevel: 0, goldens: 0,
       tss: 0, tsd: 1, tst: 0, combo10: 0, b2b5: 0, tetrises: 1, maxLifeRows: 0, maxLifeSeconds: 0,
-      wraths: 0, ruins: 0, goldensLost: 0, clotTetrises: 0, rivalWins: 0, invadersSurvived: 0, helperRows: 0, garbageBonusRows: 0, missionsDone: 0, playSeconds: 0 });
+      wraths: 0, ruins: 0, goldensLost: 0, clotTetrises: 0, rivalWins: 0, invadersSurvived: 0, helperRows: 0, garbageBonusRows: 0, missionsDone: 0, bossesBeaten: 0, techChallenges: 0, playSeconds: 0 });
   });
 });

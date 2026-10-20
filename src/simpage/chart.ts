@@ -1,3 +1,4 @@
+import { t } from '../ui/i18n';
 import type { SimResult } from '../sim/simulate';
 import type { LadderEntry } from '../data/ladder';
 import { formatDuration, formatLines } from './format';
@@ -170,7 +171,7 @@ export class IncomeChart {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillStyle = DIM;
-    ctx.fillText('— income /s   ┈ needed for target', this.pad.l + 4, this.pad.t);
+    ctx.fillText(`— ${t('income /s')}   ┈ ${t('needed for target')}`, this.pad.l + 4, this.pad.t);
 
     if (hoverT !== undefined) {
       const x = this.x(hoverT);
@@ -193,17 +194,17 @@ export class IncomeChart {
     if (px < this.pad.l || px > this.w - this.pad.r) { this.tooltip.hidden = true; this.draw(); return; }
     const s = this.state;
     const k = (px - this.pad.l) / (this.w - this.pad.l - this.pad.r);
-    const t = Math.pow(10, Math.log10(this.tMin) + k * (Math.log10(s.horizonSeconds) - Math.log10(this.tMin)));
-    const sample = s.result.series.reduce((best, p) => (p.t <= t ? p : best), s.result.series[0]!);
-    const owned = s.result.purchases.filter((p) => p.t <= t).length;
+    const at = Math.pow(10, Math.log10(this.tMin) + k * (Math.log10(s.horizonSeconds) - Math.log10(this.tMin)));
+    const sample = s.result.series.reduce((best, p) => (p.t <= at ? p : best), s.result.series[0]!);
+    const owned = s.result.purchases.filter((p) => p.t <= at).length;
     this.tooltip.innerHTML =
-      `<span class="k">t</span>${formatDuration(t)} ` +
-      `<span class="k">income</span>${formatLines(sample.income)}/s ` +
-      `<span class="k">balance</span>${formatLines(sample.balance)} ` +
-      `<span class="k">bought</span>${owned}`;
+      `<span class="k">t</span>${formatDuration(at)} ` +
+      `<span class="k">${t('income')}</span>${formatLines(sample.income)}/s ` +
+      `<span class="k">${t('balance')}</span>${formatLines(sample.balance)} ` +
+      `<span class="k">${t('bought')}</span>${owned}`;
     this.tooltip.hidden = false;
     this.tooltip.style.left = `${Math.min(px + 12, this.w - 260)}px`;
     this.tooltip.style.top = `${e.clientY - rect.top + 12}px`;
-    this.draw(t);
+    this.draw(at);
   }
 }

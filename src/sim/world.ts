@@ -23,7 +23,7 @@ import { GARBAGE } from '../data/garbage';
 import { ACHIEVEMENTS } from '../data/achievements';
 import { challengePoints, CHALLENGE, BUILDING_KINDS_ANY } from '../data/challenges';
 import { EVENTS, RIVAL_DUEL, type EventKind } from '../data/events';
-import { startEvent, attackRows, cancel, randomHole, type LifeEvent } from './events';
+import { startEvent, attackRows, cancel, randomHole, techGoalMet, type LifeEvent } from './events';
 import { ccWasmBot, CC_DEFAULT } from './bot/ccWasm';
 import { tag as tagOf } from './tags';
 import { createRng, type Rng } from './rng';
@@ -63,7 +63,13 @@ export interface WorldSnapshot {
   // Purchase garbage still to rise, and what sizes the next purchase's rows.
   garbage?: { queue: number; carry: number; manualRate: number; holes: number };
   missions?: MissionState[];
+  lifeLog?: LifeRecord[];
+  missionPay?: number;
 }
+
+// One finished life, for measuring how long lives run and what missions pay.
+export interface LifeRecord { seconds: number; level: number; missions: number; pay: number }
+export const LIFE_LOG_SIZE = 20;
 
 // A life mission: where its count stood when the life began, and whether it paid.
 export interface MissionState { id: string; base: number; done: boolean }
@@ -156,6 +162,9 @@ export class World {
   private garbageHoles: Rng;
   // This life's missions (none between lives).
   missions: MissionState[] = [];
+  // The last LIFE_LOG_SIZE lives, newest last, and what missions paid in this one.
+  lifeLog: LifeRecord[] = [];
+  private missionPay = 0;
   // PER SECOND (without buffs) through the run, for the stats graph.
   samples: number[] = [];
   sampleEvery = SAMPLE_SECONDS;
@@ -196,6 +205,8 @@ export class World {
     this.manualRate = snapshot?.garbage?.manualRate ?? 0;
     this.garbageHoles = createRng(snapshot?.garbage?.holes ?? (seed * 2654435761 + 97) >>> 0);
     this.missions = (snapshot?.missions ?? []).filter((m) => missionById(m.id)).map((m) => ({ ...m }));
+    this.lifeLog = (snapshot?.lifeLog ?? []).slice(-LIFE_LOG_SIZE).map((r) => ({ ...r }));
+    this.missionPay = snapshot?.missionPay ?? 0;
     this.applyRules();
     this.countBoardGarbage();
     this.syncLive();
@@ -257,6 +268,8 @@ export class World {
       sampleEvery: this.sampleEvery,
       garbage: { queue: this.garbageQueue, carry: this.garbageCarry, manualRate: this.manualRate, holes: this.garbageHoles.state() },
       missions: this.missions.map((m) => ({ ...m })),
+      lifeLog: this.lifeLog.map((r) => ({ ...r })),
+      missionPay: this.missionPay,
     };
   }
 
@@ -274,7 +287,8 @@ export class World {
     const base = evaluate(this.economy.effects, 'income', earned.tags, this.economy, Number(earned.amount));
     const share = result.lines * this.economy.manualShare() * toNumber(this.incomePerSecond());
     const buff = this.buffs.multiplier(earned.tags, this.economy);
-    const exact = (base + share) * level * buff;
+    // A bonus round or a mystery multiplies what the hand makes meanwhile.
+    const exact = (base + share) * level * buff * this.eventIncomeMul();
     let final: Num;
     if (this.round.active) {
       final = num(this.toVault.take(exact));
@@ -339,9 +353,12 @@ export class World {
   // golden or event draws.
   private drawMissions(): void {
     const rng = createRng((this.seed ^ Math.imul(this.economy.stats.rounds + this.economy.meta.lifetime.rounds, 0x9e3779b1)) >>> 0);
-    const pool = [...MISSIONS];
+    const hard = flagCount(this.economy.effects, 'hard_missions', this.economy) > 0;
+    const pool = MISSIONS.filter((m) => hard || !m.hard);
+    const count = Math.round(this.fx('mission_count', MISSIONS_PER_LIFE));
     this.missions = [];
-    while (this.missions.length < MISSIONS_PER_LIFE && pool.length > 0) {
+    this.economy.lifeMissions = 0;
+    while (this.missions.length < count && pool.length > 0) {
       const def = pool.splice(rng.nextInt(pool.length), 1)[0]!;
       this.missions.push({ id: def.id, base: this.missionCount(def), done: false });
     }
@@ -367,8 +384,11 @@ export class World {
       if (this.missionProgress(m) < def.goal) continue;
       m.done = true;
       this.economy.stats.missionsDone += 1;
+      this.economy.lifeMissions += 1;
       const perSecond = toNumber(this.incomePerSecond()) + this.manualRate;
-      this.events.push({ type: 'missionDone', id: m.id, amount: this.payVault(perSecond * def.minutes * 60) });
+      const amount = this.payVault(perSecond * def.minutes * 60 * this.fx('mission_pay', 1));
+      this.missionPay += toNumber(amount);
+      this.events.push({ type: 'missionDone', id: m.id, amount });
     }
   }
 
@@ -559,8 +579,12 @@ export class World {
     this.economy.balance = add(this.economy.balance, num(kept));
     if (vault > 0) this.economy.stats.riskLines += this.round.vaultRisk * (kept / vault) * this.riskWeight();
     this.economy.stats.deaths += 1;
+    this.lifeLog.push({ seconds: Math.floor(this.round.elapsedMs / 1000), level, missions: this.missions.filter((m) => m.done).length, pay: Math.floor(this.missionPay) });
+    if (this.lifeLog.length > LIFE_LOG_SIZE) this.lifeLog.shift();
+    this.missionPay = 0;
     this.round.end();
     this.missions = [];
+    this.economy.lifeMissions = 0;
     this.syncLive();
     // Under a Line of carry belongs to the finished round.
     this.toVault.carry = 0;
@@ -601,7 +625,7 @@ export class World {
     // A rival building on the board starts its fight with the life.
     if (!this.duel && this.economy.owned('rival') > 0) this.duel = { toMe: 0, toRival: 0, myCarry: 0, rivalCarry: 0, holes: createRng(this.round.eventSeed()) };
     const owned = new Set((['rival', 'invader', 'helper'] as const).filter((k) => this.economy.owned(k) > 0));
-    const due = this.round.tickEvent(dtMs, this.lifeEvent !== null, owned);
+    const due = this.round.tickEvent(dtMs, this.lifeEvent !== null, owned, this.fx('event_rate', 1), this.fx('good_event_weight', 1));
     if (due) this.beginEvent(due);
     const stats = this.economy.stats;
     stats.maxLifeSeconds = Math.max(stats.maxLifeSeconds, Math.floor(this.round.elapsedMs / 1000));
@@ -1015,7 +1039,7 @@ export class World {
   // --- life events -------------------------------------------------------
 
   beginEvent(kind: EventKind): void {
-    this.lifeEvent = startEvent(kind, this.round.level, this.round.eventSeed(), this.fx('rival_pace', EVENTS.rival.pace));
+    this.lifeEvent = startEvent(kind, this.round.level, this.round.eventSeed(), this.fx('rival_pace', EVENTS.rival.pace), this.fx('boss_hp', 1));
     this.events.push({ type: 'lifeEvent', kind, phase: 'start', amount: num(0) });
   }
 
@@ -1024,6 +1048,17 @@ export class World {
     if (!ev) return;
     this.lifeEvent = null;
     this.events.push({ type: 'lifeEvent', kind: ev.kind, phase, amount });
+  }
+
+  // What event rewards are sized on: PER SECOND plus the hand's recent rate.
+  private eventPerSecond(): number {
+    return toNumber(this.incomePerSecond()) + this.manualRate;
+  }
+
+  // Manual income while a bonus round or a mystery is on.
+  private eventIncomeMul(): number {
+    const k = this.lifeEvent?.kind;
+    return k === 'bonus' ? EVENTS.bonus.incomeMul : k === 'mystery' ? EVENTS.mystery.incomeMul : 1;
   }
 
   // Lines into the vault at the life's level, like lucky Lines.
@@ -1055,6 +1090,39 @@ export class World {
       }
       return false;
     }
+    if (ev.kind === 'bonus') {
+      ev.earned += earned;
+      return false;
+    }
+    if (ev.kind === 'mystery') return false;
+    if (ev.kind === 'tech') {
+      if (techGoalMet(ev.goal, result)) ev.done += 1;
+      if (ev.done >= ev.need) {
+        this.economy.stats.techChallenges += 1;
+        this.endEvent('won', this.payVault(this.eventPerSecond() * EVENTS.tech.rewardMinutes * 60 * this.fx('event_reward', 1)));
+      }
+      return false;
+    }
+    if (ev.kind === 'boss') {
+      // Attack cancels what the boss has queued first; the rest is damage.
+      const a = attackRows(result, ev.carry);
+      ev.carry = a.carry;
+      const c = cancel(ev.toMe, a.rows);
+      ev.toMe = c.incoming;
+      ev.hp -= c.over;
+      if (ev.hp <= 0) {
+        this.economy.stats.bossesBeaten += 1;
+        this.endEvent('won', this.payVault(this.eventPerSecond() * ev.level * EVENTS.boss.rewardMinutes * 60 * this.fx('event_reward', 1)));
+        return false;
+      }
+      if (result.lines === 0 && ev.toMe > 0) {
+        const n = Math.min(ev.toMe, EVENTS.boss.maxRowsPerLock);
+        ev.toMe -= n;
+        for (let i = 0; i < n; i++) if (this.manual.addGarbage(randomHole(ev.holes))) return true;
+        this.events.push({ type: 'garbage', rows: n });
+      }
+      return false;
+    }
     // Rival: attack cancels what is coming first, the rest goes across; a
     // piece that clears nothing takes the rows still waiting.
     const a = attackRows(result, ev.myCarry);
@@ -1074,14 +1142,30 @@ export class World {
   private stepEvent(dtMs: number): boolean {
     const ev = this.lifeEvent;
     if (!ev) return false;
-    if (ev.kind === 'invader' || ev.kind === 'helper') {
+    if (ev.kind === 'invader' || ev.kind === 'helper' || ev.kind === 'bonus' || ev.kind === 'mystery' || ev.kind === 'tech') {
       ev.msLeft -= dtMs;
       if (ev.msLeft > 0) return false;
       if (ev.kind === 'invader') {
         this.economy.stats.invadersSurvived += 1;
-        this.endEvent('won', this.payVault(ev.earned * EVENTS.invader.payout));
+        this.endEvent('won', this.payVault(ev.earned * EVENTS.invader.payout * this.fx('event_reward', 1)));
+      } else if (ev.kind === 'bonus') {
+        // Already paid as it was earned; the event reports the total.
+        this.endEvent('over', num(Math.floor(ev.earned)));
       } else {
-        this.endEvent('over', num(0));
+        this.endEvent(ev.kind === 'tech' ? 'lost' : 'over', num(0));
+      }
+      return false;
+    }
+    if (ev.kind === 'boss') {
+      ev.msLeft -= dtMs;
+      if (ev.msLeft <= 0) {
+        this.endEvent('lost', num(0));
+        return false;
+      }
+      ev.attackMs -= dtMs;
+      while (ev.attackMs <= 0) {
+        ev.attackMs += EVENTS.boss.attackSeconds * 1000;
+        ev.toMe += EVENTS.boss.attackRows;
       }
       return false;
     }
@@ -1094,7 +1178,7 @@ export class World {
       const r = move.result;
       if (r.topped) {
         this.economy.stats.rivalWins += 1;
-        const reward = toNumber(this.incomePerSecond()) * EVENTS.rival.rewardSecondsPerLevel * ev.level;
+        const reward = toNumber(this.incomePerSecond()) * EVENTS.rival.rewardSecondsPerLevel * ev.level * this.fx('event_reward', 1);
         this.endEvent('won', this.payVault(reward));
         return false;
       }
@@ -1109,7 +1193,7 @@ export class World {
         for (let i = 0; i < n; i++) {
           if (ev.game.addGarbage(randomHole(ev.holes))) {
             this.economy.stats.rivalWins += 1;
-            const reward = toNumber(this.incomePerSecond()) * EVENTS.rival.rewardSecondsPerLevel * ev.level;
+            const reward = toNumber(this.incomePerSecond()) * EVENTS.rival.rewardSecondsPerLevel * ev.level * this.fx('event_reward', 1);
             this.endEvent('won', this.payVault(reward));
             return false;
           }

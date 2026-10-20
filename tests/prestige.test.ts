@@ -194,9 +194,9 @@ describe('ascension', () => {
 });
 
 describe('prestige shop', () => {
-  it('chains of four at 1 / 3 / 9 / 27, only while ascending, in order', () => {
-    for (const b of ['production', 'survival', 'proportion']) {
-      expect(PRESTIGE_UPGRADES.filter((u) => u.branch === b).map((u) => u.price)).toEqual([1, 3, 9, 27]);
+  it('chains of five at 1 / 3 / 9 / 27 / 81, only while ascending, in order', () => {
+    for (const b of ['production', 'survival', 'proportion', 'elder', 'mission', 'event']) {
+      expect(PRESTIGE_UPGRADES.filter((u) => u.branch === b).map((u) => u.price)).toEqual([1, 3, 9, 27, 81]);
     }
     expect(prestigeRequires('survival_2')).toBe('survival_1');
     const w = new World(1);

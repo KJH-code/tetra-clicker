@@ -1,18 +1,21 @@
 // Life events: something turns up on the manual board for a while. From
-// level 5, every 3–8 minutes of life time (its own timer, apart from golden
-// pieces); the higher the level, the likelier the two that fight back.
+// level 3, every 2–5 minutes of life time (its own timer, apart from golden
+// pieces). Half the draw at level 3 is the kind ones (helper, bonus round,
+// mystery); the ones that fight back (rival, invader, boss) and the tech
+// challenge grow with the level up to level 15.
 // Attack between boards is the attack table in garbage rows: table value
 // ÷ 2, so a single is one row and a tetris seven.
-export type EventKind = 'rival' | 'invader' | 'helper';
+export type EventKind = 'rival' | 'invader' | 'helper' | 'bonus' | 'boss' | 'tech' | 'mystery';
+export const GOOD_EVENTS: readonly EventKind[] = ['helper', 'bonus', 'mystery'];
 
 export const EVENTS = {
-  fromLevel: 5,
-  minSeconds: 180,
-  maxSeconds: 480,
+  fromLevel: 3,
+  minSeconds: 120,
+  maxSeconds: 300,
   // Draw weights at a level.
   weights: (level: number): Record<EventKind, number> => {
-    const up = Math.max(0, level - 5);
-    return { rival: 1 + up * 0.25, invader: 1 + up * 0.25, helper: 2 };
+    const up = 1 + Math.min(12, Math.max(0, level - 3)) * 0.25;
+    return { rival: up, invader: up, boss: up, tech: 0.5 * up, helper: 1, bonus: 1.5, mystery: 1 };
   },
   // A bot on a board of its own beside yours, trading garbage until one of
   // you tops out. Stronger at higher levels; beating it pays this many
@@ -35,6 +38,26 @@ export const EVENTS = {
   // For 60 s each clear that keeps a combo or back-to-back going lifts one
   // garbage row off the bottom, paid like a single.
   helper: { seconds: 60 },
+  // Manual income ×incomeMul for 30 s.
+  bonus: { seconds: 30, incomeMul: 4.5 },
+  // HP in garbage rows of attack (table value ÷ 2), level × hpPerLevel;
+  // every attackSeconds it queues attackRows at you, which your attack
+  // cancels first, as against a rival. Gone after `seconds` if alive.
+  // Killing it pays PER SECOND × level × rewardMinutes into the vault.
+  boss: { seconds: 90, hpPerLevel: 10, attackSeconds: 6, attackRows: 2, maxRowsPerLock: 4, rewardMinutes: 4.5 },
+  // A technique so many times in 60 s pays rewardMinutes of PER SECOND.
+  tech: {
+    seconds: 60,
+    rewardMinutes: 4.5,
+    goals: [
+      { id: 'tetris', label: 'TETRIS', count: 2 },
+      { id: 'tspin', label: 'T-SPIN', count: 2 },
+      { id: 'b2b', label: 'B2B', count: 3 },
+      { id: 'combo5', label: '5 COMBO', count: 1 },
+    ] as const,
+  },
+  // NEXT hidden behind ? for 20 s; manual income ×incomeMul meanwhile.
+  mystery: { seconds: 20, incomeMul: 3 },
 };
 
 // The RIVAL building: its board fights yours for as long as a life runs.

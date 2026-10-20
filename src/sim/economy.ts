@@ -17,6 +17,8 @@ export class Economy implements EffectContext {
   boardGarbage = 0;
   // 1 while a life runs unpaused (purchases are cheaper then), else 0.
   lifeLive = 0;
+  // Missions met this life, for the MISSION branch's last step.
+  lifeMissions = 0;
   readonly effects: Effect[];
   private readonly upgradeDefs: Map<string, UpgradeDef>;
 
@@ -49,6 +51,7 @@ export class Economy implements EffectContext {
     if (name === 'achievementCount') return this.meta.achievements.size;
     if (name === 'boardGarbage') return this.boardGarbage;
     if (name === 'lifeLive') return this.lifeLive;
+    if (name === 'lifeMissions') return this.lifeMissions;
     const run = (this.stats as unknown as Record<string, number>)[name];
     if (run !== undefined) return run;
     const meta = (this.meta as unknown as Record<string, unknown>)[name];

@@ -65,10 +65,18 @@ export const wrathValue = (s: LuckState, mods?: LuckMods): number => expectedVal
 export function eventValue(s: LuckState, level: number, win: number): number {
   if (level < EVENTS.fromLevel) return 0;
   const w = EVENTS.weights(level);
-  const total = w.rival + w.invader + w.helper;
-  const rival = win * s.bots * EVENTS.rival.rewardSecondsPerLevel * level;
-  const invader = win * EVENTS.invader.payout * s.manual * EVENTS.invader.seconds;
-  return (w.rival * rival + w.invader * invader) / total;
+  const total = Object.values(w).reduce((n, v) => n + v, 0);
+  const perSecond = s.bots + s.manual;
+  const value: Record<string, number> = {
+    rival: win * s.bots * EVENTS.rival.rewardSecondsPerLevel * level,
+    invader: win * EVENTS.invader.payout * s.manual * EVENTS.invader.seconds,
+    // Kind ones pay by the multiplier on what the hand makes anyway.
+    bonus: (EVENTS.bonus.incomeMul - 1) * s.manual * EVENTS.bonus.seconds,
+    mystery: (EVENTS.mystery.incomeMul - 1) * s.manual * EVENTS.mystery.seconds,
+    boss: win * perSecond * level * EVENTS.boss.rewardMinutes * 60,
+    tech: win * perSecond * EVENTS.tech.rewardMinutes * 60,
+  };
+  return (Object.keys(w) as (keyof typeof w)[]).reduce((sum, k) => sum + w[k] * (value[k] ?? 0), 0) / total;
 }
 export const eventMeanSeconds = (EVENTS.minSeconds + EVENTS.maxSeconds) / 2;
 
@@ -94,6 +102,8 @@ export function missionMinutesPerLife(pps: number, rowsPerSecond: number, lifeSe
     if (m.stat === 'checkpoints') return rowsPerSecond > 0 ? (m.goal * LEVELS.checkpointRows) / rowsPerSecond : Infinity;
     return Infinity;
   };
-  const met = MISSIONS.filter((m) => secondsFor(m) <= lifeSeconds);
-  return (MISSIONS_PER_LIFE / MISSIONS.length) * met.reduce((sum, m) => sum + m.minutes, 0);
+  // Hard missions need a prestige upgrade the model does not buy.
+  const pool = MISSIONS.filter((m) => !m.hard);
+  const met = pool.filter((m) => secondsFor(m) <= lifeSeconds);
+  return (MISSIONS_PER_LIFE / pool.length) * met.reduce((sum, m) => sum + m.minutes, 0);
 }

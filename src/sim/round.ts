@@ -1,6 +1,6 @@
 import { LEVELS, garbageSecondsAt, gravityAt } from '../data/levels';
 import { GOLDEN, type GoldenOutcome } from '../data/golden';
-import { EVENTS, type EventKind } from '../data/events';
+import { EVENTS, GOOD_EVENTS, type EventKind } from '../data/events';
 import { createRng, restoreRng, type Rng } from './rng';
 
 // A round is one life on the manual board. Lines earned during it go into
@@ -125,14 +125,17 @@ export class Round {
   // Count down to the next event while none is on and the level allows
   // one; returns the kind when it is due.
   // Kinds in `owned` have become buildings and no longer turn up as events.
-  tickEvent(dtMs: number, busy: boolean, owned: ReadonlySet<EventKind> = new Set()): EventKind | null {
+  // `rate` speeds the countdown (event_rate); `good` weights the kind ones
+  // (good_event_weight).
+  tickEvent(dtMs: number, busy: boolean, owned: ReadonlySet<EventKind> = new Set(), rate = 1, good = 1): EventKind | null {
     if (!this.live || busy || this.level < EVENTS.fromLevel) return null;
-    this.eventMs -= dtMs;
+    this.eventMs -= dtMs * rate;
     if (this.eventMs > 0) return null;
     this.eventMs = this.drawEventMs();
     const w = EVENTS.weights(this.level);
+    for (const k of GOOD_EVENTS) w[k] *= good;
     for (const k of owned) w[k] = 0;
-    if (w.rival + w.invader + w.helper <= 0) return null;
+    if (Object.values(w).every((v) => v <= 0)) return null;
     const kinds = Object.keys(w) as EventKind[];
     let r = this.eventRng.next() * kinds.reduce((n, k) => n + w[k], 0);
     for (const k of kinds) { r -= w[k]; if (r < 0) return k; }

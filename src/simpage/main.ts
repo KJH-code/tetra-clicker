@@ -2,6 +2,18 @@ import { simulate, DEFAULT_PLAYER, DEFAULT_TARGET, DEFAULT_HORIZON_SECONDS, type
 import { LADDER, type LadderEntry } from '../data/ladder';
 import { IncomeChart } from './chart';
 import { formatDuration, formatLines } from './format';
+import { resolveLanguage, setLanguage, t } from '../ui/i18n';
+import { SAVE_KEY } from '../save/localStorageStore';
+
+// The game's language setting, read from its save (AUTO follows the browser).
+try {
+  const choice = JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null')?.settings?.language ?? 'auto';
+  const lang = resolveLanguage(choice, navigator.languages ?? [navigator.language]);
+  setLanguage(lang);
+  document.documentElement.lang = lang;
+} catch {
+  // No save, or storage blocked: English.
+}
 
 const STORE_KEY = 'tetra-clicker/sim';
 
@@ -57,10 +69,10 @@ function run(): void {
   renderUnlocks(result.firstUnlock, result.target);
   const upgradesBought = result.purchases.filter((p) => p.kind === 'upgrade').length;
   summary.innerHTML =
-    `<span>FINAL INCOME <b>${formatLines(result.finalIncome)}/s</b></span>` +
-    `<span>FINAL BALANCE <b>${formatLines(result.finalBalance)}</b></span>` +
-    `<span>BUILDINGS <b>${result.purchases.length - upgradesBought}</b></span>` +
-    `<span>UPGRADES <b>${upgradesBought}</b></span>`;
+    `<span>${t('FINAL INCOME')} <b>${formatLines(result.finalIncome)}/s</b></span>` +
+    `<span>${t('FINAL BALANCE')} <b>${formatLines(result.finalBalance)}</b></span>` +
+    `<span>${t('BUILDINGS')} <b>${result.purchases.length - upgradesBought}</b></span>` +
+    `<span>${t('UPGRADES')} <b>${upgradesBought}</b></span>`;
   save();
 }
 
@@ -72,7 +84,7 @@ function renderUnlocks(actual: Record<string, number>, target: Record<string, nu
     const cls = ratio === null ? 'none' : ratio > 0.6 && ratio < 1.6 ? 'good' : 'off';
     return `<tr><td>${b.name}</td><td>${a === undefined ? '—' : formatDuration(a)}</td><td>${formatDuration(t)}</td><td class="ratio ${cls}">${ratio === null ? '—' : `×${ratio.toFixed(2)}`}</td></tr>`;
   });
-  unlocks.innerHTML = `<tr><th>BUILDING</th><th>UNLOCK</th><th>TARGET</th><th>ACTUAL / TARGET</th></tr>${rows.join('')}`;
+  unlocks.innerHTML = `<tr><th>${t('BUILDING')}</th><th>${t('UNLOCK')}</th><th>${t('TARGET')}</th><th>${t('ACTUAL / TARGET')}</th></tr>${rows.join('')}`;
 }
 
 // --- controls ---------------------------------------------------------------
@@ -105,10 +117,10 @@ function h2(text: string): HTMLElement {
 function ladderTable(): HTMLElement {
   const table = document.createElement('table');
   const cols: { key: keyof LadderEntry; label: string; step: number }[] = [
-    { key: 'basePrice', label: 'PRICE', step: 1 },
-    { key: 'growth', label: 'GROWTH', step: 0.01 },
+    { key: 'basePrice', label: t('PRICE'), step: 1 },
+    { key: 'growth', label: t('GROWTH'), step: 0.01 },
     { key: 'pps', label: 'PPS', step: 0.1 },
-    { key: 'linesPerPiece', label: 'L/PIECE', step: 0.05 },
+    { key: 'linesPerPiece', label: t('L/PIECE'), step: 0.05 },
     { key: 'bonusPct', label: '+%', step: 1 },
   ];
   table.innerHTML = `<tr><th>ID</th>${cols.map((c) => `<th>${c.label}</th>`).join('')}</tr>`;
@@ -148,34 +160,34 @@ function toggle(label: string, get: () => boolean, set: (v: boolean) => void): H
 
 function buildControls(): void {
   controls.innerHTML = '';
-  controls.append(h2('PLAYER'));
+  controls.append(h2(t('PLAYER')));
   controls.append(slider('PPS', () => state.player.pps, (v) => { state.player.pps = v; }, 0.1, 3, 0.05));
-  controls.append(slider('LINES / PIECE', () => state.player.linesPerPiece, (v) => { state.player.linesPerPiece = v; }, 0.2, 3, 0.05));
-  controls.append(slider('AVG LEVEL', () => state.player.avgLevel ?? 1, (v) => { state.player.avgLevel = v; }, 1, 15, 0.5));
-  controls.append(slider('FOCUS MIN', () => state.player.focusMinutes, (v) => { state.player.focusMinutes = v; }, 0, 180, 1));
-  controls.append(slider('DAILY MIN', () => state.player.dailyMinutes, (v) => { state.player.dailyMinutes = v; }, 0, 480, 5));
-  controls.append(h2('TARGET'));
-  controls.append(slider('FIRST (S)', () => state.target.firstSeconds, (v) => { state.target.firstSeconds = v; }, 10, 600, 5));
-  controls.append(slider('RATIO', () => state.target.ratio, (v) => { state.target.ratio = v; }, 1.2, 5, 0.1));
-  controls.append(slider('HORIZON (D)', () => state.horizonDays, (v) => { state.horizonDays = v; }, 1, 90, 1));
+  controls.append(slider(t('LINES / PIECE'), () => state.player.linesPerPiece, (v) => { state.player.linesPerPiece = v; }, 0.2, 3, 0.05));
+  controls.append(slider(t('AVG LEVEL'), () => state.player.avgLevel ?? 1, (v) => { state.player.avgLevel = v; }, 1, 15, 0.5));
+  controls.append(slider(t('FOCUS MIN'), () => state.player.focusMinutes, (v) => { state.player.focusMinutes = v; }, 0, 180, 1));
+  controls.append(slider(t('DAILY MIN'), () => state.player.dailyMinutes, (v) => { state.player.dailyMinutes = v; }, 0, 480, 5));
+  controls.append(h2(t('TARGET')));
+  controls.append(slider(t('FIRST (S)'), () => state.target.firstSeconds, (v) => { state.target.firstSeconds = v; }, 10, 600, 5));
+  controls.append(slider(t('RATIO'), () => state.target.ratio, (v) => { state.target.ratio = v; }, 1.2, 5, 0.1));
+  controls.append(slider(t('HORIZON (D)'), () => state.horizonDays, (v) => { state.horizonDays = v; }, 1, 90, 1));
   // Milestone and manual ×2 upgrades bought by the same payback rule;
   // synergies the same way, researched in advance.
-  controls.append(toggle('UPGRADES', () => state.upgrades, (v) => { state.upgrades = v; }));
-  controls.append(toggle('SYNERGIES', () => state.synergies, (v) => { state.synergies = v; }));
+  controls.append(toggle(t('UPGRADES'), () => state.upgrades, (v) => { state.upgrades = v; }));
+  controls.append(toggle(t('SYNERGIES'), () => state.synergies, (v) => { state.synergies = v; }));
   controls.append(toggle('HARDCORE', () => state.hardcore, (v) => { state.hardcore = v; }));
-  controls.append(toggle('LUCK (GOLDEN PIECES)', () => state.wrath >= 0, (v) => { state.wrath = v ? Math.max(0, state.wrath) : -1; buildControls(); }));
+  controls.append(toggle(t('LUCK (GOLDEN PIECES, EVENTS, MISSIONS)'), () => state.wrath >= 0, (v) => { state.wrath = v ? Math.max(0, state.wrath) : -1; buildControls(); }));
   if (state.wrath >= 0) controls.append(slider('WRATH', () => state.wrath, (v) => { state.wrath = v; }, 0, 3, 1));
-  controls.append(h2('LADDER'));
+  controls.append(h2(t('LADDER')));
   controls.append(ladderTable());
   const row = document.createElement('div');
   row.className = 'row';
   const reset = document.createElement('button');
   reset.className = 'btn';
-  reset.textContent = 'RESET';
+  reset.textContent = t('RESET');
   reset.addEventListener('click', () => { Object.assign(state, defaults()); buildControls(); run(); });
   const copy = document.createElement('button');
   copy.className = 'btn';
-  copy.textContent = 'COPY JSON';
+  copy.textContent = t('COPY JSON');
   copy.addEventListener('click', async () => {
     const text = exportJson();
     try { await navigator.clipboard.writeText(text); } catch { /* fall through to the textarea */ }

@@ -9,7 +9,7 @@ import { WIDTH } from './board';
 // The life event in progress (src/data/events.ts). It belongs to the life:
 // a top-out or an ascension ends it, and a save does not keep it (a reload
 // starts the life paused, and an event is not worth fighting cold).
-export type LifeEvent = RivalEvent | InvaderEvent | HelperEvent;
+export type LifeEvent = RivalEvent | InvaderEvent | HelperEvent | BonusEvent | BossEvent | TechEvent | MysteryEvent;
 
 export interface RivalEvent {
   kind: 'rival';
@@ -42,7 +42,53 @@ export interface HelperEvent {
   rows: number;
 }
 
-export function startEvent(kind: EventKind, level: number, seed: number, rivalPace = 1): LifeEvent {
+export interface BonusEvent {
+  kind: 'bonus';
+  msLeft: number;
+  // Lines made by hand while it lasts, for the closing total.
+  earned: number;
+}
+
+export interface MysteryEvent {
+  kind: 'mystery';
+  msLeft: number;
+}
+
+export interface BossEvent {
+  kind: 'boss';
+  msLeft: number;
+  level: number;
+  hp: number;
+  maxHp: number;
+  attackMs: number;
+  toMe: number;
+  carry: number;
+  holes: Rng;
+}
+
+export type TechGoal = (typeof EVENTS.tech.goals)[number];
+
+export interface TechEvent {
+  kind: 'tech';
+  msLeft: number;
+  goal: TechGoal['id'];
+  label: string;
+  need: number;
+  done: number;
+}
+
+// Whether a placement counts toward a tech challenge's goal.
+export function techGoalMet(goal: TechGoal['id'], r: LockResult): boolean {
+  switch (goal) {
+    case 'tetris': return r.lines === 4;
+    case 'tspin': return r.piece === 'T' && r.spin === 'full' && r.lines > 0;
+    case 'b2b': return r.b2bExtended;
+    case 'combo5': return r.comboIndex === 5;
+  }
+}
+
+// `bossHp` is the boss_hp effect's multiplier.
+export function startEvent(kind: EventKind, level: number, seed: number, rivalPace = 1, bossHp = 1): LifeEvent {
   switch (kind) {
     case 'rival': {
       const pps = EVENTS.rival.pps(level, rivalPace);
@@ -52,6 +98,19 @@ export function startEvent(kind: EventKind, level: number, seed: number, rivalPa
       return { kind, msLeft: EVENTS.invader.seconds * 1000, earned: 0, shield: 0, carry: 0 };
     case 'helper':
       return { kind, msLeft: EVENTS.helper.seconds * 1000, rows: 0 };
+    case 'bonus':
+      return { kind, msLeft: EVENTS.bonus.seconds * 1000, earned: 0 };
+    case 'mystery':
+      return { kind, msLeft: EVENTS.mystery.seconds * 1000 };
+    case 'boss': {
+      const hp = Math.max(1, Math.round(level * EVENTS.boss.hpPerLevel * bossHp));
+      return { kind, msLeft: EVENTS.boss.seconds * 1000, level, hp, maxHp: hp, attackMs: EVENTS.boss.attackSeconds * 1000, toMe: 0, carry: 0, holes: createRng(seed ^ 0x51ed270b) };
+    }
+    case 'tech': {
+      const goals = EVENTS.tech.goals;
+      const g = goals[createRng(seed).nextInt(goals.length)]!;
+      return { kind, msLeft: EVENTS.tech.seconds * 1000, goal: g.id, label: g.label, need: g.count, done: 0 };
+    }
   }
 }
 
