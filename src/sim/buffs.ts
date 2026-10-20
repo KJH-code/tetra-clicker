@@ -24,6 +24,13 @@ export class Buffs {
     else this.active.push({ id, msLeft: durationMs });
   }
 
+  // Links stack time instead, up to a cap: each technique by hand adds more.
+  extend(id: string, addMs: number, capMs: number): void {
+    const cur = this.active.find((b) => b.id === id);
+    if (cur) cur.msLeft = Math.min(capMs, cur.msLeft + addMs);
+    else this.active.push({ id, msLeft: Math.min(capMs, addMs) });
+  }
+
   tick(dtMs: number): void {
     for (const b of this.active) b.msLeft -= dtMs;
     this.active = this.active.filter((b) => b.msLeft > 0);

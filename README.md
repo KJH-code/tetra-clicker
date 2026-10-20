@@ -372,6 +372,39 @@ fails it. The best cleared total is kept, and each of its points adds 2% to
 all income for good. The rules are effects on a `{ type: 'challenge', id,
 step }` condition, so a harder step replaces the one below it.
 
+### Bots and the hand
+
+The bots and the manual board pull on each other (`src/data/botlinks.ts`):
+
+- **Links**: a clear by hand doubles the bot built on it for 30 s, 30 s
+  more for each repeat, 90 s at most: a single, double, triple or tetris its
+  clear-size bot, a T-spin T-SPIN, any other spin ALL-SPIN, a combo COMBO, a
+  back-to-back B2B, a perfect clear PERFECT (only bots owned). Links stack
+  with golden and synergy buffs. The bot's label shows the multiplier.
+- **Low stack**: while a life runs, a manual stack of four rows or fewer
+  speeds every bot 20%, falling to nothing at ten rows (BOTS +n% under the
+  level bar). Garbage still slows them as before.
+- **Bot levels**: each building's bot levels up on its own technique (its
+  clear size for the plain ones): level n at 50 × n(n+1)/2 of them, +5% to
+  that building a level, 20 at most. A run's levels go with an ascension.
+  The simulator counts them, taking a quarter of a bot's pieces as its
+  technique (a guess).
+- **Abilities**: TETRIS cancels a queued garbage row on your board with
+  each tetris; PERFECT doubles every bot for 5 s with each perfect clear;
+  COMBO pays 10% more per combo step and B2B 2% more per chain step;
+  DOWNSTACK lifts a garbage row off your board when it clears garbage (at
+  most every 20 s); OPENER doubles the first 10 pieces of each life by hand;
+  ALL-SPIN takes 2 s off the hint cooldown with each spin.
+- **HINT** (H, or the touch button): the bots' pick for the piece in play
+  shows as a dashed ghost for 4 s ("HOLD FIRST" when it uses the hold).
+  Cooldown 30 s ÷ (1 + bots owned / 50), 5 s at least; needs a bot and a
+  live life. It is worked out on a copy of the board, so asking never
+  changes the life.
+- **The bot pane**: each board's label carries its stars, level and
+  multiplier, its PER SECOND sits under the hold column, a technique bursts
+  and stamps its name, and clicking a board opens it large with what it
+  owns, earns, its level and XP bar, its link and its ability.
+
 ### Life events
 
 From level 3, every 2–5 minutes of life time (a timer of their own), one of

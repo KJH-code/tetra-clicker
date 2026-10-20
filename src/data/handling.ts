@@ -37,6 +37,8 @@ export interface KeyBindings {
   rotateCCW: string[];
   rotate180: string[];
   hold: string[];
+  // The bots' suggested placement (src/data/botlinks.ts).
+  hint: string[];
 }
 
 export const SDF_INSTANT = 41;
@@ -67,6 +69,7 @@ export const DEFAULT_HANDLING: HandlingSettings = {
     rotateCCW: ['KeyZ', 'ControlLeft'],
     rotate180: ['KeyA'],
     hold: ['ShiftLeft', 'KeyC'],
+    hint: ['KeyH'],
   },
   volume: 50,
   muted: false,
@@ -92,4 +95,5 @@ export const ACTION_LABELS: Record<keyof KeyBindings, string> = {
   rotateCCW: 'CCW',
   rotate180: '180',
   hold: 'HOLD',
+  hint: 'HINT',
 };

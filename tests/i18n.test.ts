@@ -13,6 +13,7 @@ import { TUTORIAL } from '../src/ui/tutorial';
 import { BRANCHES } from '../src/ui/ascend';
 import { durationParts } from '../src/ui/goal';
 import { MISSIONS } from '../src/data/missions';
+import { ABILITY } from '../src/ui/botZoom';
 
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((f) => {
@@ -61,6 +62,7 @@ function dataStrings(): string[] {
     ...TUTORIAL.map((s) => s.text),
     ...BRANCHES.map((b) => b.title),
     ...MISSIONS.map((m) => m.label),
+    ...Object.values(ABILITY),
     ...[5, 120, 4_000, 200_000].map((s) => durationParts(s).key),
   ];
 }

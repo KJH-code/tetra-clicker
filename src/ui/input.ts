@@ -14,6 +14,7 @@ export interface InputHost {
   gate?(): InputGate;
   start?(): void;
   resume?(): void;
+  onHint?(): void;
 }
 
 // Keyboard → game actions with guideline handling. Horizontal movement
@@ -102,6 +103,7 @@ export class InputHandler {
       case 'rotateCCW': game.rotateCCW(); break;
       case 'rotate180': game.rotate180(); break;
       case 'hold': game.swapHold(); break;
+      case 'hint': this.host.onHint?.(); break;
     }
   }
 

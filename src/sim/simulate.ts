@@ -12,6 +12,7 @@ import { GARBAGE } from '../data/garbage';
 import { WRATH } from '../data/golden';
 import { averageVault, goldenMeanSeconds, goldenValue, wrathValue, eventValue, eventMeanSeconds, missionMinutesPerLife } from './luck';
 import { levelPay } from '../data/levels';
+import { BOT_LINKS, botLevelFor } from '../data/botlinks';
 
 // Economy simulator: how fast a player climbs the building ladder under a
 // given set of numbers. Bots are not run; each board earns at the same rate
@@ -122,6 +123,10 @@ class LadderEconomy extends Economy {
   }
 }
 
+// Share of a bot's pieces that are its own technique, for its level: a
+// guess (the bot tests measure each board's technique rate, not this).
+const BOT_TECH_SHARE = 0.25;
+
 // Share of the time the player is at the board.
 // How long the model player's lives last, for mission pay: the average of
 // 14 measured lives (2026-10-20; 3:42).
@@ -151,8 +156,15 @@ export function simulate(params: SimParams): SimResult {
   const botTags = (id: string) => [tag.board('auto'), tag.building(id), tag.clear(1)];
   // The model player clears plain singles: hardcore pays those half.
   const manualTags = [tag.board('manual'), tag.tech('none')];
+  // Bot levels: each bot's own technique, at a share of its pieces, since
+  // its building was first bought; 5% a level.
+  const levelMul = (b: BuildingParams): number => {
+    const since = firstUnlock[b.id];
+    if (since === undefined) return 1;
+    return 1 + (BOT_LINKS.levelPct / 100) * botLevelFor(Math.max(0, t - since) * b.pps * BOT_TECH_SHARE);
+  };
   const botIncome = (): number =>
-    buildings.reduce((sum, b) => sum + (eco.owned(b.id) > 0 ? b.pps * b.linesPerPiece * eco.incomeMultiplier(botTags(b.id)) : 0), 0);
+    buildings.reduce((sum, b) => sum + (eco.owned(b.id) > 0 ? b.pps * b.linesPerPiece * eco.incomeMultiplier(botTags(b.id)) * levelMul(b) : 0), 0);
   // The model player clears singles, worth two Lines a row; each row also
   // pays the share of bot income, and the level multiplies both.
   const manualIncome = (at: number): number => {

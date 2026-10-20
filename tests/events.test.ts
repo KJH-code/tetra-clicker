@@ -71,7 +71,8 @@ describe('life events', () => {
     ev.toRival = 40;
     runFor(w, 20_000);
     const won = w.drainEvents().find((e) => e.type === 'lifeEvent' && e.phase === 'won');
-    expect(won && won.type === 'lifeEvent' && Number(won.amount)).toBe(0.8 * 120 * 10);
+    // PER SECOND here includes the bots' 20% for an empty manual stack.
+    expect(won && won.type === 'lifeEvent' && Number(won.amount)).toBe(0.8 * 1.2 * 120 * 10);
     expect(w.lifeEvent).toBeNull();
     expect(w.economy.stats.rivalWins).toBe(1);
   });

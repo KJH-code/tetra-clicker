@@ -19,6 +19,9 @@ export class Economy implements EffectContext {
   lifeLive = 0;
   // Missions met this life, for the MISSION branch's last step.
   lifeMissions = 0;
+  // Bots' bonus percent from a low manual stack, and each building's bot level.
+  stackBonus = 0;
+  botLevels: Record<string, number> = {};
   readonly effects: Effect[];
   private readonly upgradeDefs: Map<string, UpgradeDef>;
 
@@ -52,6 +55,8 @@ export class Economy implements EffectContext {
     if (name === 'boardGarbage') return this.boardGarbage;
     if (name === 'lifeLive') return this.lifeLive;
     if (name === 'lifeMissions') return this.lifeMissions;
+    if (name === 'stackBonus') return this.stackBonus;
+    if (name.startsWith('botLevel:')) return this.botLevels[name.slice(9)] ?? 0;
     const run = (this.stats as unknown as Record<string, number>)[name];
     if (run !== undefined) return run;
     const meta = (this.meta as unknown as Record<string, unknown>)[name];

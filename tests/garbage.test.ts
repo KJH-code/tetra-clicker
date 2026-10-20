@@ -95,7 +95,8 @@ describe('purchase garbage', () => {
     expect(hand()).toBe(clean.hand);
     for (let i = 0; i < 9; i++) w.manual.addGarbage(i % 10);
     inner(w).countBoardGarbage();
-    expect(bots() / clean.bots).toBeCloseTo(0.5, 9);
+    // Twelve rows also cost the bots their 20% for a low stack.
+    expect(bots() / clean.bots).toBeCloseTo(0.5 / 1.2, 9);
   });
 
   it('garbage rows cleared by a technique pay ten seconds of PER SECOND each', () => {

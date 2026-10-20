@@ -28,6 +28,7 @@ import { ccWasmBot, CC_DEFAULT, stackHeight } from './bot/ccWasm';
 import { tag as tagOf } from './tags';
 import { createRng, type Rng } from './rng';
 import { MISSIONS, MISSIONS_PER_LIFE, missionById, type MissionDef } from '../data/missions';
+import { BOT_LINKS, botLevelFor, botTechHit, linkBuffId, linkedBuildings, stackBonusPct } from '../data/botlinks';
 import { add, mul, num, toNumber, type Num } from './num';
 import type { Placement } from './board';
 
@@ -65,6 +66,7 @@ export interface WorldSnapshot {
   missions?: MissionState[];
   lifeLog?: LifeRecord[];
   missionPay?: number;
+  bots?: { xp: Record<string, number>; hintMs: number; downstackMs: number; openerLeft: number; links?: BuffState[] };
 }
 
 // One finished life, for measuring how long lives run and what missions pay.
@@ -93,6 +95,10 @@ export type WorldEvent =
   // Queued purchase garbage a clear's attack wiped out.
   | { type: 'garbageCancel'; rows: number }
   | { type: 'missionDone'; id: string; amount: Num }
+  // A technique by hand doubling its bot; a bot reaching a level; a bot's ability firing.
+  | { type: 'botLink'; building: string; msLeft: number }
+  | { type: 'botLevel'; building: string; level: number }
+  | { type: 'botAbility'; building: string; board: number }
   // A purchase sent rows to the queue.
   | { type: 'garbageQueued'; rows: number }
   // Garbage rows cleared with a technique paid this much.
@@ -162,6 +168,15 @@ export class World {
   private garbageHoles: Rng;
   // This life's missions (none between lives).
   missions: MissionState[] = [];
+  // Each building's bot technique count this run (its level comes from it),
+  // the hint's cooldown, DOWNSTACK's cooldown and OPENER's pieces left.
+  botXp: Record<string, number> = {};
+  // Bots lent a hand by techniques (and PERFECT's burst): kept apart from
+  // the golden and synergy buffs, which they stack with.
+  links: Buffs;
+  hintMs = 0;
+  private downstackMs = 0;
+  private openerLeft = 0;
   // The last LIFE_LOG_SIZE lives, newest last, and what missions paid in this one.
   lifeLog: LifeRecord[] = [];
   private missionPay = 0;
@@ -174,6 +189,7 @@ export class World {
     this.seed = seed;
     this.round = new Round(seed, snapshot?.round ?? null);
     this.buffs = new Buffs(snapshot?.buffs ?? []);
+    this.links = new Buffs(snapshot?.bots?.links ?? []);
     if (snapshot) {
       this.manual = new Game(seed, snapshot.manual);
       this.economy = new Economy();
@@ -206,6 +222,11 @@ export class World {
     this.garbageHoles = createRng(snapshot?.garbage?.holes ?? (seed * 2654435761 + 97) >>> 0);
     this.missions = (snapshot?.missions ?? []).filter((m) => missionById(m.id)).map((m) => ({ ...m }));
     this.lifeLog = (snapshot?.lifeLog ?? []).slice(-LIFE_LOG_SIZE).map((r) => ({ ...r }));
+    this.botXp = { ...(snapshot?.bots?.xp ?? {}) };
+    this.hintMs = snapshot?.bots?.hintMs ?? 0;
+    this.downstackMs = snapshot?.bots?.downstackMs ?? 0;
+    this.openerLeft = snapshot?.bots?.openerLeft ?? 0;
+    for (const [id, xp] of Object.entries(this.botXp)) this.economy.botLevels[id] = botLevelFor(xp);
     this.missionPay = snapshot?.missionPay ?? 0;
     this.applyRules();
     this.countBoardGarbage();
@@ -269,6 +290,7 @@ export class World {
       garbage: { queue: this.garbageQueue, carry: this.garbageCarry, manualRate: this.manualRate, holes: this.garbageHoles.state() },
       missions: this.missions.map((m) => ({ ...m })),
       lifeLog: this.lifeLog.map((r) => ({ ...r })),
+      bots: { xp: { ...this.botXp }, hintMs: this.hintMs, downstackMs: this.downstackMs, openerLeft: this.openerLeft, links: this.links.snapshot() },
       missionPay: this.missionPay,
     };
   }
@@ -288,7 +310,10 @@ export class World {
     const share = result.lines * this.economy.manualShare() * toNumber(this.incomePerSecond());
     const buff = this.buffs.multiplier(earned.tags, this.economy);
     // A bonus round or a mystery multiplies what the hand makes meanwhile.
-    const exact = (base + share) * levelPay(level) * buff * this.eventIncomeMul();
+    // OPENER: the first pieces of a life pay double by hand.
+    const opener = this.round.active && this.openerLeft > 0 ? 2 : 1;
+    if (this.round.active && this.openerLeft > 0) this.openerLeft -= 1;
+    const exact = (base + share) * levelPay(level) * buff * this.eventIncomeMul() * opener;
     let final: Num;
     if (this.round.active) {
       final = num(this.toVault.take(exact));
@@ -330,6 +355,7 @@ export class World {
       }
     }
     this.triggerSynergies(result);
+    this.lendBots(result);
     if (result.topped && this.round.active) {
       this.endRound();
     } else if (this.round.active && result.lines > 0) {
@@ -440,6 +466,51 @@ export class World {
   // The penalty reads this count; refreshed whenever the board can change.
   private countBoardGarbage(): void {
     this.economy.boardGarbage = Math.min(GARBAGE.penaltyMaxRows, this.manual.garbageRows());
+    this.economy.stackBonus = this.round.live ? stackBonusPct(stackHeight(this.manual.grid)) : 0;
+  }
+
+  // HINT: true if the bots will suggest a placement now (and the cooldown starts).
+  requestHint(): boolean {
+    if (this.hintMs > 0 || this.autoBoards.length === 0 || !this.round.live) return false;
+    const bots = BUILDINGS.reduce((n, b) => n + this.economy.owned(b.id), 0);
+    this.hintMs = Math.max(BOT_LINKS.hintMinMs, BOT_LINKS.hintBaseMs / (1 + bots / BOT_LINKS.hintPerBots));
+    return true;
+  }
+
+  botLevel(id: string): number {
+    return this.economy.botLevels[id] ?? 0;
+  }
+
+  // A bot's move: its technique counts toward its level, and some
+  // buildings reach into the manual board when theirs lands.
+  private botAbilities(board: AutoBoard, index: number, r: LockResult): void {
+    const id = board.buildingId;
+    const def = buildingById(id);
+    if (!def) return;
+    if (botTechHit(def.clearSize, def.tech, r)) {
+      this.botXp[id] = (this.botXp[id] ?? 0) + 1;
+      const level = botLevelFor(this.botXp[id]!);
+      if (level > (this.economy.botLevels[id] ?? 0)) {
+        this.economy.botLevels[id] = level;
+        this.events.push({ type: 'botLevel', building: id, level });
+      }
+    }
+    let fired = false;
+    if (id === 'tetris' && r.lines === 4 && this.garbageQueue > 0) {
+      this.garbageQueue -= 1;
+      fired = true;
+    } else if (id === 'pc' && r.perfectClear) {
+      this.links.grant('pc_burst', BOT_LINKS.pcBurstMs);
+      fired = true;
+    } else if (id === 'downstack' && r.garbageCleared && this.round.active && this.downstackMs <= 0 && this.manual.removeGarbageRow()) {
+      this.downstackMs = BOT_LINKS.downstackCooldownMs;
+      this.countBoardGarbage();
+      fired = true;
+    } else if (id === 'allspin' && r.spin === 'full' && this.hintMs > 0) {
+      this.hintMs = Math.max(0, this.hintMs - BOT_LINKS.allspinHintMs);
+      fired = true;
+    }
+    if (fired) this.events.push({ type: 'botAbility', building: id, board: index });
   }
 
   // Bank the vault: its Lines go to the balance and its risk weight counts
@@ -452,6 +523,15 @@ export class World {
     this.round.vault = 0;
     this.round.vaultRisk = 0;
     this.events.push({ type: 'checkpoint', banked });
+  }
+
+  // A technique by hand doubles the bot built on it, if one is owned.
+  private lendBots(result: LockResult): void {
+    for (const id of linkedBuildings(result)) {
+      if (this.economy.owned(id) <= 0) continue;
+      this.links.extend(linkBuffId(id), BOT_LINKS.linkMs, BOT_LINKS.linkMaxMs);
+      this.events.push({ type: 'botLink', building: id, msLeft: this.links.active.find((b) => b.id === linkBuffId(id))!.msLeft });
+    }
   }
 
   // Link synergies: a tetris or perfect clear by hand starts a bot buff.
@@ -544,8 +624,10 @@ export class World {
     this.economy.stats.rounds += 1;
     this.economy.stats.maxLevel = Math.max(this.economy.stats.maxLevel, this.round.level);
     this.events.push({ type: 'roundStart', level: this.round.level });
+    this.openerLeft = this.economy.owned('opener') > 0 ? BOT_LINKS.openerPieces : 0;
     this.drawMissions();
     this.syncLive();
+    this.countBoardGarbage();
     return true;
   }
 
@@ -755,6 +837,10 @@ export class World {
     this.manual = new Game(this.seed + meta.ascensions * 7_777);
     this.round = new Round(this.seed + meta.ascensions);
     this.buffs = new Buffs();
+    this.links = new Buffs();
+    // Bot levels belong to the run.
+    this.botXp = {};
+    this.economy.botLevels = {};
     this.toBalance.carry = 0;
     this.toVault.carry = 0;
     this.applyRules();
@@ -855,14 +941,26 @@ export class World {
 
   private botEarn(board: AutoBoard, move: BotMove): Num {
     const def = buildingById(board.buildingId);
-    const amount = botAttack(move.result, def?.tech, def?.garbageBonus);
+    const r = move.result;
+    // COMBO pays more the longer its combo, B2B the longer its chain.
+    const chain = board.buildingId === 'combo' ? 1 + (BOT_LINKS.comboPctPerStep / 100) * Math.max(0, r.comboIndex)
+      : board.buildingId === 'b2b' ? 1 + (BOT_LINKS.b2bPctPerStep / 100) * Math.max(0, board.game.b2b) : 1;
+    const amount = botAttack(r, def?.tech, def?.garbageBonus) * chain;
     if (amount === 0) return num(0);
     const tags = this.botTags(board.buildingId, move.result.lines);
-    const exact = evaluate(this.economy.effects, 'income', tags, this.economy, amount * this.buffs.multiplier(tags, this.economy));
+    const exact = evaluate(this.economy.effects, 'income', tags, this.economy, amount * this.buffs.multiplier(tags, this.economy) * this.links.multiplier(tags, this.economy));
     const paid = num(this.toBalance.take(exact));
     this.economy.balance = add(this.economy.balance, paid);
     this.economy.stats.linesEarned += toNumber(paid);
     return paid;
+  }
+
+  // One building's bots per second now, buffs and links included (the bot panel shows it).
+  boardIncome(buildingId: string): number {
+    const def = buildingById(buildingId);
+    if (!def || this.economy.owned(buildingId) <= 0) return 0;
+    const tags = this.botTags(buildingId, def.clearSize);
+    return def.pps * def.linesPerPiece * this.economy.incomeMultiplier(tags) * this.buffs.multiplier(tags, this.economy) * this.links.multiplier(tags, this.economy);
   }
 
   // Expected Lines per second from every auto board, as the catch-up formula
@@ -876,7 +974,7 @@ export class World {
       // The multiplier is read for the building's own clear size, which is
       // the tag its purchases' bonus filters on.
       const tags = this.botTags(b.buildingId, def.clearSize);
-      const buff = withBuffs ? this.buffs.multiplier(tags, this.economy) : 1;
+      const buff = withBuffs ? this.buffs.multiplier(tags, this.economy) * this.links.multiplier(tags, this.economy) : 1;
       const rate = def.pps * def.linesPerPiece * this.economy.incomeMultiplier(tags) * buff;
       total = add(total, num(rate));
     }
@@ -937,10 +1035,14 @@ export class World {
         board.lastMove = move;
         const earned = this.botEarn(board, move);
         this.events.push({ type: 'botMove', board: i, move, earned });
+        this.botAbilities(board, i, move.result);
         if (board.buildingId === 'rival') this.duelOnRivalMove(board, move.result);
       }
     }
     this.buffs.tick(dtMs);
+    this.links.tick(dtMs);
+    if (this.hintMs > 0) this.hintMs = Math.max(0, this.hintMs - dtMs);
+    if (this.downstackMs > 0) this.downstackMs = Math.max(0, this.downstackMs - dtMs);
     // Bot Lines add up between the events that check; a sweep a second
     // catches thresholds they cross.
     this.economy.stats.playSeconds += dtMs / 1000;

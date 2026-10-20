@@ -21,7 +21,7 @@ import { GARBAGE } from './data/garbage';
 import { SYNERGIES } from './data/synergies';
 import { tag } from './sim/tags';
 import { BoardRenderer, type BoardView } from './render/boardRenderer';
-import { WIDTH } from './sim/board';
+import { WIDTH, occupiedCells } from './sim/board';
 import { Fx } from './render/fx';
 import { hitStrength } from './render/hit';
 import { animatedPlacement, isLanded, type BotAnimation } from './render/botAnim';
@@ -38,7 +38,10 @@ import { achievementById } from './data/achievements';
 import { AscendPanel } from './ui/ascend';
 import { Sound, type Cue } from './ui/sound';
 import { TutorialBubble, advance as tutorialAdvance, currentStep as tutorialStep } from './ui/tutorial';
-import { installEngine } from './sim/bot/ccWasm';
+import { installEngine, ccWasmBot, CC_DEFAULT } from './sim/bot/ccWasm';
+import { Game } from './sim/game';
+import { BotZoom } from './ui/botZoom';
+import { BOT_LINKS } from './data/botlinks';
 import engineUrl from './engine/cold-clear.wasm?url';
 import { BotPrefetch } from './engine/botPrefetch';
 import { resolveLanguage, setLanguage, t } from './ui/i18n';
@@ -129,6 +132,8 @@ const milestoneEl = document.getElementById('milestone')!;
 interface AutoView { renderer: BoardRenderer; fx: Fx; anim: BotAnimation | null; lastEarned: number }
 const autoViews: AutoView[] = [];
 const autoRoot = document.getElementById('auto-boards')!;
+// A bot board clicked opens large, with its numbers.
+const botZoom = new BotZoom(document.getElementById('bot-overlay')!, world, (open) => input.setActive(!open));
 
 // Bot boards shrink as more of them share the middle pane: the largest cell
 // at which every board fits without scrolling. When the size changes every
@@ -156,9 +161,55 @@ function ensureAutoViews(): void {
   }
   while (autoViews.length < world.autoBoards.length) {
     const canvas = document.createElement('canvas');
+    const index = autoViews.length;
+    canvas.title = t('Click to look closer');
+    canvas.addEventListener('click', () => botZoom.show(index));
     autoRoot.append(canvas);
     autoViews.push({ renderer: new BoardRenderer(canvas, { cell, leftCells: 4, rightCells: 0 }), fx: new Fx(), anim: null, lastEarned: 0 });
   }
+}
+
+// --- hint -------------------------------------------------------------------
+// The bots' pick for the piece in play, drawn as a dashed ghost for a few
+// seconds. Worked out on a copy, so asking never touches the life.
+let hint: { cells: readonly (readonly [number, number])[]; color: string; hold: boolean; until: number } | null = null;
+const hintPolicy = ccWasmBot({ weights: CC_DEFAULT, nodes: 1_500 });
+
+function showHint(): void {
+  if (!world.requestHint()) {
+    if (world.autoBoards.length > 0 && world.hintMs > 0) manualFx.float(t('HINT IN {n}s', { n: Math.ceil(world.hintMs / 1000) }), manual.cellX(5), manual.cellY(33), { color: '#8d93ab', size: 13, dur: 900 });
+    return;
+  }
+  const copy = new Game(1, world.manual.snapshot());
+  const choice = hintPolicy.choose(copy);
+  if (!choice) return;
+  if (choice.useHold) copy.swapHold();
+  if (!copy.setActive(choice.placement)) return;
+  const landed = { ...choice.placement, y: copy.ghostY() };
+  hint = { cells: occupiedCells(landed), color: PIECE_COLORS[landed.piece], hold: choice.useHold, until: performance.now() + BOT_LINKS.hintShowMs };
+  sound.play('buy');
+}
+
+function drawHint(ctx: CanvasRenderingContext2D): void {
+  if (!hint) return;
+  const left = hint.until - performance.now();
+  if (left <= 0 || !world.round.live) { hint = null; return; }
+  const c = manual.layout.cell;
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, left / 600) * (0.6 + 0.4 * Math.sin(performance.now() / 120) ** 2);
+  ctx.strokeStyle = hint.color;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 3]);
+  for (const [x, y] of hint.cells) ctx.strokeRect(manual.cellX(x) + 2, manual.cellY(y) + 2, c - 4, c - 4);
+  if (hint.hold) {
+    ctx.setLineDash([]);
+    ctx.fillStyle = hint.color;
+    ctx.font = font(800, c * 0.45);
+    ctx.textAlign = 'center';
+    const [x, y] = hint.cells[0]!;
+    ctx.fillText(t('HOLD FIRST'), manual.cellX(x) + c / 2, manual.cellY(y) - 6);
+  }
+  ctx.restore();
 }
 
 // --- input / shop / settings -----------------------------------------------
@@ -169,6 +220,7 @@ const input = new InputHandler({
   gate: () => (!world.round.active ? 'start' : world.round.paused ? 'resume' : 'play'),
   start: () => { world.startRound(); },
   resume: () => { world.resumeRound(); },
+  onHint: () => { showHint(); },
 }, settings);
 // A life cannot be played from another tab or window: pause it.
 document.addEventListener('visibilitychange', () => { if (document.hidden) world.pauseRound(); });
@@ -329,6 +381,23 @@ function handleEvent(e: WorldEvent): void {
           manualFx.popup(label, cx, manual.cellY(26), { color: r.perfectClear ? GOLD : r.spin === 'full' ? PIECE_COLORS.T : '#ffffff', size: 18 + strength * 2.5, dur: 1000 + strength * 80, maxWidth: manual.layout.cell * 9.6 });
         } else if (label) manualFx.float(label, cx, cy - 26, { color: '#ffffff', size: 13, dur: 1100 });
       }
+      break;
+    }
+    case 'botLink': {
+      const i = world.autoBoards.findIndex((b) => b.buildingId === e.building);
+      const v = autoViews[i];
+      if (v) v.fx.popup(`×2 · ${Math.ceil(e.msLeft / 1000)}s`, v.renderer.cellX(5), v.renderer.cellY(26), { color: '#39ff14', size: Math.max(10, Math.round(v.renderer.layout.cell)), dur: 900, maxWidth: WIDTH * v.renderer.layout.cell - 4 });
+      break;
+    }
+    case 'botLevel':
+      toast(t('{name} BOT · LEVEL {n}', { name: buildingById(e.building)?.name ?? e.building, n: e.level }), 'achievement');
+      break;
+    case 'botAbility': {
+      const text = { tetris: t('−1 GARBAGE'), pc: t('BOTS ×2'), downstack: t('−1 ROW'), allspin: t('HINT −2s') }[e.building as 'tetris'];
+      const v = autoViews[e.board];
+      if (v && text) v.fx.popup(text, v.renderer.cellX(5), v.renderer.cellY(30), { color: '#00f0ff', size: Math.max(10, Math.round(v.renderer.layout.cell)), dur: 1100, maxWidth: WIDTH * v.renderer.layout.cell - 4 });
+      // What lands on your own board shows there too.
+      if (text && (e.building === 'tetris' || e.building === 'downstack')) manualFx.float(`${buildingById(e.building)?.name} ${text}`, manual.cellX(5), manual.cellY(36), { color: '#00f0ff', size: 13, dur: 1100 });
       break;
     }
     case 'botMove': {
@@ -535,9 +604,11 @@ function tick(): void {
           const tech = buildingById(world.autoBoards[autoViews.indexOf(v)]?.buildingId ?? '')?.tech;
           const label = tech ? techLabel(r, tech) : null;
           if (label) {
-            // A bot's technique bursts too, at half the hand's strength.
+            // A bot's technique bursts too, at about half the hand's strength,
+            // its name stamped across its well.
             v.fx.shatter(v.renderer, r.clearedRows, PIECE_COLORS[r.piece], Math.ceil(hitStrength(r) / 2));
-            v.fx.float(label, v.renderer.cellX(5), v.renderer.cellY((r.clearedRows[0] ?? 30) - 2), { color: '#ffffff', size: Math.max(8, Math.round(v.renderer.layout.cell * 0.8)), dur: 900,
+            v.fx.hit(Math.min(3, Math.ceil(hitStrength(r) / 2)));
+            v.fx.popup(label, v.renderer.cellX(5), v.renderer.cellY((r.clearedRows[0] ?? 30) - 2), { color: '#ffffff', size: Math.max(9, Math.round(v.renderer.layout.cell * 0.95)), dur: 1000,
               maxWidth: WIDTH * v.renderer.layout.cell - 4 });
           }
         }
@@ -588,10 +659,11 @@ function render(): void {
   manual.wellBackground = theme.background;
   manual.wellGrid = settings.highContrast ? undefined : theme.grid;
   manual.render(view, manualFx, (ctx) => {
-    drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore, world.economy.boardGarbage * GARBAGE.penaltyPctPerRow);
+    drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore, world.economy.boardGarbage * GARBAGE.penaltyPctPerRow, world.economy.stackBonus);
     drawEventHud(ctx, manual, world.lifeEvent, view.next.length);
     // Rows waiting for the board: the rival's and what purchases sent.
     drawDuelGauge(ctx, manual, (world.duel?.toMe ?? 0) + world.garbageQueue);
+    drawHint(ctx);
     if (world.round.active) {
       const seconds = world.round.elapsedMs / 1000;
       const window = Math.min(PPS_WINDOW_S, seconds);
@@ -634,7 +706,10 @@ function boardLabel(id: string, name: string | undefined): string {
   // The rival names its fight: the streak while a life runs.
   const duel = id === 'rival' && world.duel ? ` · ${t('WIN {n}', { n: world.economy.meta.rivalStreak })}` : '';
   const tier = buildingTier(world.economy.owned(id));
-  return `${name ?? id}${tier > 0 ? ` ${'★'.repeat(tier)}` : ''}${syn}${duel}${buff > 1 ? ` ×${buff}` : ''}`;
+  const level = world.botLevel(id);
+  const link = world.links.multiplier([tag.board('auto'), tag.building(id)], world.economy);
+  const mul = buff * link;
+  return `${name ?? id}${tier > 0 ? ` ${'★'.repeat(tier)}` : ''}${level > 0 ? ` LV${level}` : ''}${syn}${duel}${mul > 1 ? ` ×${+mul.toFixed(2)}` : ''}`;
 }
 
 // The board's name over the buffer rows, after a bar in the building's
@@ -654,11 +729,22 @@ function label(ctx: CanvasRenderingContext2D, r: BoardRenderer, text: string, id
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, r.cellX(0) + 12, 2 + h / 2);
+  // What this building earns now, at the foot of the hold column.
+  const perSecond = `${format(world.boardIncome(id))}/s`;
+  ctx.fillStyle = THEME.dim;
+  let small = Math.max(8, Math.round(c * 0.55));
+  ctx.font = font(700, small);
+  const colW = r.layout.leftCells * c - 6;
+  while (small > 7 && ctx.measureText(perSecond).width > colW) ctx.font = font(700, --small);
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(perSecond, r.cellX(0) - 4, r.height - 4);
   ctx.restore();
 }
 
 function frame(): void {
   tick();
+  if (botZoom.open) botZoom.refresh();
   prefetch.sync();
   requestAnimationFrame(frame);
 }

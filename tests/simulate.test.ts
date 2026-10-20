@@ -32,6 +32,8 @@ describe('economy simulator', () => {
     // The third copy costs what the game charges after two are owned.
     expect(third.price).toBeCloseTo(Number(w.economy.price('single')), 10);
     w.buy('single');
+    // The model leaves out the bots' bonus for a low manual stack (it depends on play).
+    w.economy.stackBonus = 0;
     // Game: 1 PPS × 0.8 × (1 + 0.1 × 2)
     expect(third.incomeAfter).toBeCloseTo(Number(w.incomePerSecond()), 10);
   });

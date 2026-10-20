@@ -12,12 +12,16 @@ describe('catch-up formula vs the real bot', () => {
     w.buy('single');
     w.buy('single');
     w.buy('single'); // multiplier 1.2
+    // At the top bot level from the start, so the level (×2) holds through
+    // the run instead of climbing with its singles.
+    w.botXp['single'] = 1e9;
+    w.economy.botLevels['single'] = 20;
     w.economy.balance = 0;
     w.advance(0);
     const pieces = 10_000;
     for (let i = 1; i <= pieces; i++) w.advance(i * 1000); // one piece per second at PPS 1
     const simulated = Number(w.economy.balance);
-    const formula = pieces * 1 * 0.8 * 1.2; // 0.4 rows a piece, two Lines a single
+    const formula = pieces * 1 * 0.8 * 1.2 * 2; // 0.4 rows a piece, two Lines a single, level ×2
     expect(Math.abs(simulated - formula) / formula).toBeLessThan(0.01);
   }, 120_000);
 });
@@ -31,6 +35,9 @@ describe('catch-up formula per building', () => {
       // Only the building under test keeps its board: the others are dropped so
       // their income does not blur the comparison.
       w.autoBoards = w.autoBoards.filter((b) => b.buildingId === id);
+      // Top level from the start: the formula reads the level as it stands.
+      w.botXp[id] = 1e9;
+      w.economy.botLevels[id] = 20;
       w.economy.balance = 0;
       w.advance(0);
       const pieces = 10_000;

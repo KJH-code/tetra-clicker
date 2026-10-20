@@ -1,4 +1,5 @@
 import type { Effect } from '../sim/effects';
+import { LINK_BUFFS } from './botlinks';
 
 // Timed buffs. Their effects run through the same evaluator as upgrades, so
 // a new buff is a new entry here.
@@ -28,6 +29,8 @@ export const BUFFS: Record<string, BuffDef> = {
     effects: [{ target: 'income', filter: ['board:auto'], op: 'mul', value: 666 }] },
   clot: { id: 'clot', label: 'CLOT ×0.5', durationMs: 66_000,
     effects: [{ target: 'income', op: 'mul', value: 0.5 }] },
+  // A technique by hand lending its bot a hand (src/data/botlinks.ts).
+  ...LINK_BUFFS,
 };
 
 // What a golden piece does when it clears a line, drawn by weight at that

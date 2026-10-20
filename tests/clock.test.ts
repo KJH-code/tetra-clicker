@@ -64,11 +64,14 @@ describe('world time with a fake clock', () => {
   it('bots earn flat singles: no combo, b2b, spin or PC bonus', () => {
     const w = worldWithBoard();
     for (let t = 16; t <= 600_000; t += 16) w.advance(t);
-    const moves = w.drainEvents().filter((e) => e.type === 'botMove');
-    for (const m of moves) {
+    // Only the bot's level lifts its pay (5% a level, from its own singles).
+    let level = 0;
+    for (const m of w.drainEvents()) {
+      if (m.type === 'botLevel') level = m.level;
       if (m.type !== 'botMove') continue;
       expect(m.move.result.lines).toBeLessThanOrEqual(1);
-      expect(Number(m.earned)).toBe(m.move.result.lines * 2);
+      expect(Number(m.earned)).toBeLessThanOrEqual(Math.ceil(m.move.result.lines * 2 * (1 + 0.05 * level)));
+      expect(Number(m.earned)).toBeGreaterThanOrEqual(Math.floor(m.move.result.lines * 2 * (1 + 0.05 * level)));
     }
   });
 });
