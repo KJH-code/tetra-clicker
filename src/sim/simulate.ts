@@ -167,18 +167,18 @@ export function simulate(params: SimParams): SimResult {
     buildings.reduce((sum, b) => sum + (eco.owned(b.id) > 0 ? b.pps * b.linesPerPiece * eco.incomeMultiplier(botTags(b.id)) * levelMul(b) : 0), 0);
   // The model player clears singles, worth two Lines a row; each row also
   // pays the share of bot income, and the level multiplies both.
-  const manualIncome = (at: number): number => {
+  const manualIncome = (at: number, bots = botIncome()): number => {
     const rate = manualRate(player, at, levelBonus);
-    return rate * eco.incomeMultiplier(manualTags) + (rate / ATTACK.normal[1]) * eco.manualShare() * botIncome();
+    return rate * eco.incomeMultiplier(manualTags) + (rate / ATTACK.normal[1]) * eco.manualShare() * bots;
   };
   // Golden and wrath pieces appear only while a life runs, so at the
   // player's share of the day; each is worth its expected value.
   const rowsPerSecond = (player.pps * player.linesPerPiece) / ATTACK.normal[1];
   const wrathChance = params.wrath === undefined ? 0 : WRATH.chance[Math.min(WRATH.chance.length - 1, params.wrath)] ?? 0;
-  const luckIncome = (at: number): number => {
+  const luckIncome = (at: number, bots = botIncome()): number => {
     if (params.wrath === undefined) return 0;
-    const manual = manualIncome(0);
-    const state = { bots: botIncome(), manual, vault: averageVault(manual, rowsPerSecond) };
+    const manual = manualIncome(0, bots);
+    const state = { bots, manual, vault: averageVault(manual, rowsPerSecond) };
     const ev = (1 - wrathChance) * goldenValue(state) + wrathChance * wrathValue(state);
     const level = (player.avgLevel ?? 1) + levelBonus;
     const events = eventValue(state, Math.round(level), params.eventWin ?? 0.5) / eventMeanSeconds;
@@ -186,7 +186,11 @@ export function simulate(params: SimParams): SimResult {
     const missions = (missionMinutesPerLife(player.pps, rowsPerSecond, MODEL_LIFE_SECONDS) * 60 * state.bots) / MODEL_LIFE_SECONDS;
     return playShare(player, at) * (ev / goldenMeanSeconds + events + missions);
   };
-  const income = (at: number): number => botIncome() + manualIncome(at) + luckIncome(at);
+  // Bot income is the costly part (every building's multiplier), so once.
+  const income = (at: number): number => {
+    const bots = botIncome();
+    return bots + manualIncome(at, bots) + luckIncome(at, bots);
+  };
   const unlocked = (b: BuildingParams): boolean => !b.requires || eco.owned(b.requires) > 0;
 
   // Income a purchase would add at time `at`, measured by applying it and

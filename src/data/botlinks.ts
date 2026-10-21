@@ -76,9 +76,11 @@ export function stackBonusPct(height: number): number {
 
 // The level a bot is at with this much of its technique behind it.
 export function botLevelFor(xp: number): number {
-  let n = 0;
-  while (n < BOT_LINKS.maxLevel && xp >= (BOT_LINKS.xpPerLevel * (n + 1) * (n + 2)) / 2) n++;
-  return n;
+  // The largest n with xpPerLevel × n(n+1)/2 ≤ xp, solved rather than
+  // counted: the simulator asks this for every building at every step.
+  if (xp <= 0) return 0;
+  const n = Math.floor((Math.sqrt(1 + (8 * xp) / BOT_LINKS.xpPerLevel) - 1) / 2 + 1e-9);
+  return Math.min(BOT_LINKS.maxLevel, n);
 }
 
 export const linkBuffId = (building: string): string => `link_${building}`;
