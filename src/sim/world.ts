@@ -28,7 +28,7 @@ import { ccWasmBot, CC_DEFAULT, stackHeight } from './bot/ccWasm';
 import { tag as tagOf } from './tags';
 import { createRng, type Rng } from './rng';
 import { MISSIONS, MISSIONS_PER_LIFE, missionById, type MissionDef } from '../data/missions';
-import { BOT_LINKS, botLevelFor, botTechHit, linkBuffId, linkedBuildings, stackBonusPct } from '../data/botlinks';
+import { BOT_LINKS, botLevelFor, botLevelProgress as levelProgressFor, botTechHit, linkBuffId, linkedBuildings, stackBonusPct } from '../data/botlinks';
 import { add, mul, num, toNumber, type Num } from './num';
 import type { Placement } from './board';
 
@@ -226,7 +226,7 @@ export class World {
     this.hintMs = snapshot?.bots?.hintMs ?? 0;
     this.downstackMs = snapshot?.bots?.downstackMs ?? 0;
     this.openerLeft = snapshot?.bots?.openerLeft ?? 0;
-    for (const [id, xp] of Object.entries(this.botXp)) this.economy.botLevels[id] = botLevelFor(xp);
+    for (const [id, xp] of Object.entries(this.botXp)) this.economy.botLevels[id] = botLevelFor(xp, this.botLevelCap());
     this.missionPay = snapshot?.missionPay ?? 0;
     this.applyRules();
     this.countBoardGarbage();
@@ -481,6 +481,21 @@ export class World {
     return this.economy.botLevels[id] ?? 0;
   }
 
+  // The BOTS prestige branch raises this from 20 by tens.
+  botLevelCap(): number {
+    return Math.round(this.fx('bot_level_cap', BOT_LINKS.maxLevel));
+  }
+
+  // 0..1 of the way to the bot's next level, for its board's bar.
+  botLevelProgress(id: string): number {
+    return levelProgressFor(this.botXp[id] ?? 0, this.botLevelCap());
+  }
+
+  // How long a building's link can run at most (its second link upgrade doubles it).
+  linkCapMs(id: string): number {
+    return evaluate(this.economy.effects, 'link_cap', [tag.building(id)], this.economy, BOT_LINKS.linkMaxMs);
+  }
+
   // A bot's move: its technique counts toward its level, and some
   // buildings reach into the manual board when theirs lands.
   private botAbilities(board: AutoBoard, index: number, r: LockResult): void {
@@ -488,15 +503,15 @@ export class World {
     const def = buildingById(id);
     if (!def) return;
     if (botTechHit(def.clearSize, def.tech, r)) {
-      this.botXp[id] = (this.botXp[id] ?? 0) + 1;
-      const level = botLevelFor(this.botXp[id]!);
+      this.botXp[id] = (this.botXp[id] ?? 0) + this.fx('bot_xp', 1);
+      const level = botLevelFor(this.botXp[id]!, this.botLevelCap());
       if (level > (this.economy.botLevels[id] ?? 0)) {
         this.economy.botLevels[id] = level;
         this.events.push({ type: 'botLevel', building: id, level });
       }
     }
     let fired = false;
-    if (id === 'tetris' && r.lines === 4 && this.garbageQueue > 0) {
+    if ((id === 'tetris' || id === 'grandmaster') && r.lines === 4 && this.garbageQueue > 0) {
       this.garbageQueue -= 1;
       fired = true;
     } else if (id === 'pc' && r.perfectClear) {
@@ -529,7 +544,7 @@ export class World {
   private lendBots(result: LockResult): void {
     for (const id of linkedBuildings(result)) {
       if (this.economy.owned(id) <= 0) continue;
-      this.links.extend(linkBuffId(id), BOT_LINKS.linkMs, BOT_LINKS.linkMaxMs);
+      this.links.extend(linkBuffId(id), BOT_LINKS.linkMs, this.linkCapMs(id));
       this.events.push({ type: 'botLink', building: id, msLeft: this.links.active.find((b) => b.id === linkBuffId(id))!.msLeft });
     }
   }

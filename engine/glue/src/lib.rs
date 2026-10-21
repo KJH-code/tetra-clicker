@@ -5,6 +5,7 @@
 //        40 hold piece (-1 none)   41 back-to-back   42 combo
 //        43 queue length           44..64 queue, current piece first
 //        64 bitmask of forbidden PlacementKinds   65 all-spins on
+//        66 movement: 0 free (no gravity), 1 20G (the piece slides on the stack)
 //        100.. weights (see WEIGHT_FIELDS in ccWasm.ts)
 //   out  300 found   301 hold   302..310 four landing cells (x, y)
 //        310 spin (0 none, 1 mini, 2 full)   311 input count   312.. inputs
@@ -71,6 +72,11 @@ pub extern "C" fn suggest(nodes: u32, seed: u32) -> i32 {
     let mut opts = Options::default();
     opts.speculate = false;
     opts.max_nodes = nodes;
+    // GRANDMASTER's board: pieces land the moment they spawn, so only what
+    // can be reached sliding along the stack is a move.
+    if io[66] == 1 {
+        opts.mode = MovementMode::TwentyG;
+    }
     let mut bot: BotState<Standard> = BotState::new(board, opts);
     bot.reseed(seed as u64);
     let mut done = 0;

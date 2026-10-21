@@ -40,7 +40,7 @@ describe('synergy data', () => {
 
   it('research is a prestige chain up the ladder, a crown dearer each step', () => {
     const chain = PRESTIGE_UPGRADES.filter((u) => u.branch === 'synergy');
-    expect(chain.map((u) => u.price)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+    expect(chain.map((u) => u.price)).toEqual(SYNERGIES.map((_, i) => i + 1));
     expect(chain.map((u) => u.id)).toEqual(SYNERGIES.map((s) => s.research));
     expect(prestigeRequires('synergy_1')).toBeNull();
     expect(prestigeRequires('synergy_5')).toBe('synergy_4');

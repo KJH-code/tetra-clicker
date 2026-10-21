@@ -44,6 +44,22 @@ function tier(id: string, name: string, basePrice: number, clearSize: 1 | 2 | 3 
   return def;
 }
 
+// Measured over 3 seeds × 3,000 pieces (tests/slow/tech-master.test.ts,
+// tech-grandmaster.test.ts); PPS puts them on the 4.5 and 4.8 Lines a
+// second steps. Priced on RIVAL's ×2.5 step: the single-run simulator does
+// not model them, since only an ascension opens them (PRESTIGE_LADDER).
+const MASTER_LPP = 1.691;
+const MASTER_PPS = 2.66;
+const MASTER_PRICE = 1_000_000_000;
+const GRANDMASTER_LPP = 1.251;
+const GRANDMASTER_PPS = 3.84;
+const GRANDMASTER_PRICE = 2_500_000_000;
+
+// A building that also needs a prestige step bought.
+function prestigeGate(prestige: string, requires: string): Pick<BuildingDef, 'unlock'> {
+  return { unlock: [{ type: 'owned', id: requires, gte: 1 }, { type: 'prestige', id: prestige }] };
+}
+
 export const BUILDINGS: BuildingDef[] = [
   tier('single', 'SINGLE', 110, 1, 0.8),
   // Measured over 5 seeds × 10,000 pieces of each bot (see bots.test.ts).
@@ -84,7 +100,22 @@ export const BUILDINGS: BuildingDef[] = [
     tech: 'downstack', pps: 1.625, mode: { garbageEvery: 4, cheese: 0.5 }, garbageBonus: { clean: 2, cheese: 4 },
   }),
   tier('rival', 'RIVAL', 390_000_000, 4, 1.488, 'invader', { tech: 'b2b', pps: 2.82 }),
+  // Past RIVAL, opened by the BOTS prestige branch (src/data/prestige.ts),
+  // steps 4.5 and 4.8. MASTER mixes every technique and is paid for all of
+  // them, and links to any technique by hand; GRANDMASTER plays plain
+  // clears at 20G, cancels a queued garbage row on each tetris, and while
+  // it is owned your gravity runs 10% slower.
+  { ...tier('master', 'MASTER', MASTER_PRICE, 4, MASTER_LPP, 'rival', { tech: 'master', pps: MASTER_PPS }), ...prestigeGate('bots_2', 'rival') },
+  {
+    ...tier('grandmaster', 'GRANDMASTER', GRANDMASTER_PRICE, 4, GRANDMASTER_LPP, 'master', { pps: GRANDMASTER_PPS }),
+    ...prestigeGate('bots_4', 'master'),
+  },
 ];
+// GRANDMASTER, owned: your pieces fall 10% slower.
+BUILDINGS.find((b) => b.id === 'grandmaster')!.effects.push(
+  { target: 'gravity', op: 'mul', value: 0.9, when: [{ type: 'owned', id: 'grandmaster', gte: 1 }] },
+);
+
 
 // HELPER: your combo or back-to-back clears per garbage row lifted, by copies owned.
 export const HELPER_EVERY: [owned: number, every: number][] = [[10, 1], [3, 2], [2, 3], [1, 4]];

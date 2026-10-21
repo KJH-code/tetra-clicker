@@ -185,13 +185,27 @@ export class SettingsPanel {
       return b;
     };
     switches.append(toggle(t('HIT EFFECTS'), 'hitEffects'), toggle(t('PATTERNS'), 'patterns'), toggle(t('LESS MOTION'), 'reduceMotion'), toggle(t('HIGH CONTRAST'), 'highContrast'));
+    const style = document.createElement('div');
+    style.className = 'seg';
+    for (const [value, name] of [['pixel', t('PIXEL')], ['classic', t('CLASSIC')]] as const) {
+      const b = button(name, () => { s.style = value; this.onChange(s); this.render(); });
+      b.classList.toggle('on', s.style === value);
+      b.dataset['style'] = value;
+      style.append(b);
+    }
+    const styleRow = document.createElement('div');
+    styleRow.className = 'slider';
+    styleRow.style.gridTemplateColumns = '64px 1fr';
+    const sl = document.createElement('span');
+    sl.textContent = t('STYLE');
+    styleRow.append(sl, style);
     const paletteRow = document.createElement('div');
     paletteRow.className = 'slider';
     const pl = document.createElement('span');
     pl.textContent = t('PIECE COLOURS');
     paletteRow.style.gridTemplateColumns = '64px 1fr';
     paletteRow.append(pl, palette);
-    return [h2(t('ACCESSIBILITY')), paletteRow, switches, this.slider(t('TEXT'), 'uiScale', '%'), this.slider(t('BACKDROP'), 'backdrop', '%')];
+    return [h2(t('ACCESSIBILITY')), styleRow, paletteRow, switches, this.slider(t('TEXT'), 'uiScale', '%'), this.slider(t('BACKDROP'), 'backdrop', '%')];
   }
 
   // EXPORT copies the save as text and downloads it as a file; IMPORT takes

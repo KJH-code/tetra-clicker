@@ -62,7 +62,7 @@ SOFTWARE.
 
 ## Fonts
 
-Both are bundled from npm and served with the page, under the SIL Open Font
+All three are bundled from npm and served with the page, under the SIL Open Font
 License 1.1 (the license text ships in each package and in the built files'
 CSS headers).
 
@@ -73,3 +73,7 @@ CSS headers).
   2021 Kil Hyung-jin, with Reserved Font Name Pretendard; via `pretendard`
   (variable, dynamic subset: only the Hangul blocks a page shows are fetched).
   Korean text.
+- **Galmuri** — https://github.com/quiple/galmuri, Copyright (c) 2019–2025
+  Lee Minseo, with Reserved Font Name "Galmuri"; via `galmuri` (Galmuri11
+  regular and bold only, see `src/fonts.css`). Latin and Korean text in the
+  pixel style.

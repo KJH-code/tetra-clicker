@@ -5,6 +5,8 @@ import { UpgradeChips } from './upgradeChips';
 import { ACHIEVEMENTS } from '../data/achievements';
 import { t } from './i18n';
 import { buildingColor } from '../render/theme';
+import { drawBuildingIcon } from '../render/icons';
+import { Roller } from '../render/roll';
 import { durationParts, nextGoal, nearAchievements } from './goal';
 import { buildingTier, TIER_STEPS } from '../data/tiers';
 import { GARBAGE } from '../data/garbage';
@@ -14,8 +16,9 @@ import { GARBAGE } from '../data/garbage';
 export class Shop {
   private balanceEl: HTMLElement;
   private incomeEl: HTMLElement;
-  private buttons = new Map<string, { btn: HTMLButtonElement; owned: HTMLElement; price: HTMLElement; hint: HTMLElement; bar: HTMLElement; stars: HTMLElement }>();
+  private buttons = new Map<string, { btn: HTMLButtonElement; icon: HTMLCanvasElement; owned: HTMLElement; price: HTMLElement; hint: HTMLElement; bar: HTMLElement; stars: HTMLElement }>();
   private lastBalance = NaN;
+  private roll = new Roller();
   private chips: UpgradeChips;
   private crownEl: HTMLElement;
   private ascendBtn: HTMLButtonElement;
@@ -62,13 +65,15 @@ export class Shop {
       // A locked card fills toward its price, so the next step reads as a goal.
       const bar = el('div', 'unlock-bar', '');
       bar.append(document.createElement('i'));
-      btn.append(name, owned, hint, price, bar);
+      const icon = document.createElement('canvas');
+      icon.className = 'icon';
+      btn.append(icon, name, owned, hint, price, bar);
       btn.addEventListener('click', () => {
         if (this.world.buy(b.id)) this.refresh(true);
       });
       btn.dataset['label'] = b.name;
       list.append(btn);
-      this.buttons.set(b.id, { btn, owned, price, hint, bar, stars });
+      this.buttons.set(b.id, { btn, icon, owned, price, hint, bar, stars });
     });
 
     const goal = el('div', 'goal', '');
@@ -109,9 +114,13 @@ export class Shop {
   }
 
   refresh(force = false): void {
+    // Icons follow the palette and the style, which only change on a forced refresh.
+    if (force) for (const [id, ui] of this.buttons) drawBuildingIcon(ui.icon, id);
     const balance = Number(this.world.economy.balance);
-    if (force || balance !== this.lastBalance) {
-      this.balanceEl.textContent = format(balance);
+    // The figure rolls up to a gain rather than jumping.
+    const shown = this.roll.value(balance, performance.now());
+    if (force || balance !== this.lastBalance || shown !== balance) {
+      this.balanceEl.textContent = format(shown);
       if (balance > this.lastBalance) {
         this.balanceEl.classList.remove('bump');
         void this.balanceEl.offsetWidth; // restart the animation

@@ -1,7 +1,7 @@
 import type { BotPolicy } from './policy';
 import { singleBot } from './singleBot';
 import { sizeBot } from './sizeBot';
-import { tspinBot, allspinBot, comboBot, b2bBot, tspinTstBot, b2bComboBot, downstackBot, fourWideBot } from './techBots';
+import { tspinBot, allspinBot, comboBot, b2bBot, tspinTstBot, b2bComboBot, downstackBot, fourWideBot, masterBot, grandmasterBot } from './techBots';
 import { pcBot } from './pcBot';
 import { ccWasmBot, CC_DEFAULT } from './ccWasm';
 import { openerBot } from './openerBot';
@@ -29,6 +29,8 @@ export const POLICIES: Record<string, BotPolicy> = {
   helper: comboBot(),
   invader: downstackBot(),
   rival: ccWasmBot({ weights: CC_DEFAULT, nodes: 6_000 }),
+  master: masterBot(),
+  grandmaster: grandmasterBot(),
   // Switched to by play synergies.
   tspin_tst: tspinTstBot(),
   b2b_combo: b2bComboBot(),

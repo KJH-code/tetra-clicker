@@ -55,7 +55,7 @@ export function earnedFor(r: LockResult, origin: Tag[], comboStep: number = ATTA
   return { amount: num(attackFor(r, comboStep).total), tags: tagsFor(r, origin) };
 }
 
-export type BotTech = 'tspin' | 'allspin' | 'combo' | 'b2b' | 'pc' | 'downstack' | 'fourwide' | 'opener';
+export type BotTech = 'tspin' | 'allspin' | 'combo' | 'b2b' | 'pc' | 'downstack' | 'fourwide' | 'opener' | 'master';
 
 // Which bonuses each technique is paid. OPENER plays PC, TSD, PC with the
 // chain alive, so it is paid all three; 4-WIDE is a combo bot.
@@ -68,6 +68,8 @@ const PAID: Record<BotTech, { spin?: 'T' | 'all'; combo?: boolean; b2b?: boolean
   downstack: {},
   fourwide: { combo: true },
   opener: { spin: 'T', b2b: true, pc: true },
+  // MASTER mixes every technique and is paid for all of them.
+  master: { spin: 'all', combo: true, b2b: true, pc: true },
 };
 
 // Lines each cleared garbage row adds for a DOWNSTACK-style bot.

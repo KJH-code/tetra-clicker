@@ -49,6 +49,8 @@ export const VIEW = {
   highContrast: false,
   // Multiplies text drawn on the boards.
   textScale: 1,
+  // Arcade pixel look (settings STYLE): bevelled blocks, hard edges, a bitmap font.
+  pixel: true,
 };
 
 // Golden pieces. Brighter and warmer than the O so the two never read alike.
@@ -73,8 +75,21 @@ export const THEME = {
 };
 
 // The page's fonts, for text drawn on the boards (loaded before the first frame).
-export const FONT = "'Exo 2', 'Pretendard Variable', Pretendard, system-ui, sans-serif";
-export const font = (weight: number, px: number): string => `${weight} ${Math.round(px)}px ${FONT}`;
+const SMOOTH_FONT = "'Exo 2', 'Pretendard Variable', Pretendard, system-ui, sans-serif";
+const PIXEL_FONT = "'Galmuri11', 'Exo 2', 'Pretendard Variable', monospace";
+export const fontFamily = (): string => (VIEW.pixel ? PIXEL_FONT : SMOOTH_FONT);
+export const font = (weight: number, px: number): string => `${weight} ${Math.round(px)}px ${fontFamily()}`;
+
+// A piece colour lit (k > 0, toward white) or shaded (k < 0, toward black),
+// for the pixel blocks' bevels.
+export function shade(hex: string, k: number): string {
+  const n = parseInt(hex.slice(1, 7), 16);
+  const ch = (v: number): number => Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k));
+  const r = ch((n >> 16) & 255);
+  const g = ch((n >> 8) & 255);
+  const b = ch(n & 255);
+  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+}
 
 // Each building's colour, down the ladder through the piece colours (read
 // live, so the colour-blind palette carries over).

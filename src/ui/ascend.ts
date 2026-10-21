@@ -11,6 +11,7 @@ export const BRANCHES: { id: Branch; title: string; color: string }[] = [
   { id: 'proportion', title: 'PROPORTION', color: '#a77bff' },
   { id: 'mission', title: 'MISSION', color: '#39ff14' },
   { id: 'event', title: 'EVENT', color: '#ff8c1a' },
+  { id: 'bots', title: 'BOTS', color: '#4a8dff' },
   { id: 'elder', title: 'WRATH', color: '#ff3b3b' },
   { id: 'opener', title: 'OPENER', color: '#ff2ed2' },
   { id: 'synergy', title: 'SYNERGY', color: '#ffc233' },

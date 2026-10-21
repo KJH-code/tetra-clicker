@@ -21,6 +21,7 @@ export const BOT_LINKS = {
   // technique; each level is +levelPct% to that building, up to maxLevel.
   xpPerLevel: 50,
   levelPct: 5,
+  // The cap before the BOTS prestige branch raises it (bot_level_cap).
   maxLevel: 20,
   // HINT: the bots' suggestion for the piece in play, as a ghost. Cooldown
   // shrinks with the bots owned: base ÷ (1 + bots / perBots), at least minMs.
@@ -50,10 +51,16 @@ export function botTechHit(clearSize: number, tech: BotTech | undefined, r: Lock
     case 'pc': return r.perfectClear;
     case 'downstack': return !!r.garbageCleared;
     case 'opener': return r.perfectClear || (r.piece === 'T' && r.spin === 'full');
+    case 'master': return isTechnique(r);
   }
 }
 
-// The buildings a manual clear lends a hand to.
+// Any of the techniques: a tetris, a spin, a combo, a chain or a PC.
+function isTechnique(r: LockResult): boolean {
+  return r.lines > 0 && (r.lines === 4 || r.spin === 'full' || r.comboIndex > 0 || r.b2bExtended || r.perfectClear);
+}
+
+// The buildings a manual clear lends a hand to. MASTER answers any technique.
 export function linkedBuildings(r: LockResult): string[] {
   if (r.lines === 0) return [];
   const out: string[] = [];
@@ -63,6 +70,7 @@ export function linkedBuildings(r: LockResult): string[] {
   if (r.comboIndex > 0) out.push('combo');
   if (r.b2bExtended) out.push('b2b');
   if (r.perfectClear) out.push('pc');
+  if (isTechnique(r)) out.push('master');
   return out;
 }
 
@@ -75,20 +83,40 @@ export function stackBonusPct(height: number): number {
 }
 
 // The level a bot is at with this much of its technique behind it.
-export function botLevelFor(xp: number): number {
+export function botLevelFor(xp: number, cap: number = BOT_LINKS.maxLevel): number {
   // The largest n with xpPerLevel × n(n+1)/2 ≤ xp, solved rather than
   // counted: the simulator asks this for every building at every step.
   if (xp <= 0) return 0;
   const n = Math.floor((Math.sqrt(1 + (8 * xp) / BOT_LINKS.xpPerLevel) - 1) / 2 + 1e-9);
-  return Math.min(BOT_LINKS.maxLevel, n);
+  return Math.min(cap, n);
+}
+
+// How far a bot is from its level to the next, 0..1 (1 at the cap).
+export function botLevelProgress(xp: number, cap: number = BOT_LINKS.maxLevel): number {
+  const n = botLevelFor(xp, cap);
+  if (n >= cap) return 1;
+  const at = (k: number): number => (BOT_LINKS.xpPerLevel * k * (k + 1)) / 2;
+  return (xp - at(n)) / (at(n + 1) - at(n));
 }
 
 export const linkBuffId = (building: string): string => `link_${building}`;
+export const linkUpgradeId = (building: string, step: 1 | 2): string => `link${step}_${building}`;
+
+// Each building's two link upgrades: its link ×3 at 10 owned, then its
+// link's time cap doubled (90 s → 180 s) at 50.
+export const LINK_UPGRADE_STEPS = [
+  { owned: 10, priceMul: 1_000 },
+  { owned: 50, priceMul: 1_000_000 },
+] as const;
 
 export const LINK_BUFFS: Record<string, BuffDef> = Object.fromEntries([
   ...BUILDINGS.map((b): [string, BuffDef] => [linkBuffId(b.id), {
     id: linkBuffId(b.id), label: `${b.name} BOT ×2`, durationMs: BOT_LINKS.linkMs,
-    effects: [{ target: 'income', filter: [`building:${b.id}`], op: 'mul', value: 2 }],
+    // The first link upgrade makes it ×3 (src/data/upgrades.ts).
+    effects: [
+      { target: 'income', filter: [`building:${b.id}`], op: 'mul', value: 2 },
+      { target: 'income', filter: [`building:${b.id}`], op: 'mul', value: 1.5, when: [{ type: 'upgrade', id: linkUpgradeId(b.id, 1) }] },
+    ],
   }]),
   ['pc_burst', { id: 'pc_burst', label: 'PERFECT · BOTS ×2', durationMs: BOT_LINKS.pcBurstMs, effects: [{ target: 'income', filter: ['board:auto'], op: 'mul', value: 2 }] }],
 ]);

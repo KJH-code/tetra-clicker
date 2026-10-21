@@ -1,6 +1,7 @@
 import type { Condition, Effect } from '../sim/effects';
 import { BUILDINGS } from './buildings';
 import { SYNERGIES, synergyUnlock } from './synergies';
+import { LINK_UPGRADE_STEPS, linkUpgradeId } from './botlinks';
 
 // Run upgrades: bought once, kept until prestige. Each is data; the engine
 // only knows conditions, effects and rule flags. `label` is the short text on
@@ -9,7 +10,7 @@ export interface UpgradeDef {
   id: string;
   label: string;
   name: string;
-  group: 'milestone' | 'manual' | 'tech' | 'buff' | 'wrath' | 'golden' | 'synergy';
+  group: 'milestone' | 'manual' | 'tech' | 'buff' | 'wrath' | 'golden' | 'synergy' | 'link';
   price: number;
   unlock: Condition[];
   effects: Effect[];
@@ -143,11 +144,22 @@ const golden: UpgradeDef[] = [
     unlock: [{ type: 'stat', stat: 'goldens', gte: 27 }], effects: [{ target: 'buff_duration', op: 'mul', value: 2 }] },
 ];
 
+// Links (src/data/botlinks.ts): each building's own pair, ×3 then a longer cap.
+export function linkUpgradesFor(b: { id: string; name: string; basePrice: number }): UpgradeDef[] {
+  const [first, second] = LINK_UPGRADE_STEPS;
+  return chain({ group: 'link' }, [
+    { id: linkUpgradeId(b.id, 1), name: `${b.name} LINK ×3`, label: 'LINK×3', price: b.basePrice * first.priceMul,
+      unlock: [{ type: 'owned', id: b.id, gte: first.owned }], effects: [] },
+    { id: linkUpgradeId(b.id, 2), name: `${b.name} LINK UP TO 180 S`, label: 'LINK 180S', price: b.basePrice * second.priceMul,
+      unlock: [{ type: 'owned', id: b.id, gte: second.owned }], effects: [{ target: 'link_cap', filter: [`building:${b.id}`], op: 'mul', value: 2 }] },
+  ]);
+}
+
 // Synergies, researched with crowns and bought here (src/data/synergies.ts).
 const synergy: UpgradeDef[] = SYNERGIES.map((s) => ({
   id: s.id, name: s.name, label: 'SYN', group: 'synergy', price: s.price, unlock: synergyUnlock(s), effects: s.effects,
 }));
 
-export const UPGRADES: UpgradeDef[] = [...BUILDINGS.flatMap(milestonesFor), ...MANUAL_UPGRADES, ...MANUAL_SHARE_UPGRADES, ...tech, ...buffs, ...wrath, ...golden, ...synergy];
+export const UPGRADES: UpgradeDef[] = [...BUILDINGS.flatMap(milestonesFor), ...MANUAL_UPGRADES, ...MANUAL_SHARE_UPGRADES, ...tech, ...buffs, ...wrath, ...golden, ...synergy, ...BUILDINGS.flatMap(linkUpgradesFor)];
 
 export const upgradeById = (id: string): UpgradeDef | undefined => UPGRADES.find((u) => u.id === id);

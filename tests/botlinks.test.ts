@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { World, type WorldEvent } from '../src/sim/world';
 import { num } from '../src/sim/num';
 import type { LockResult } from '../src/sim/game';
-import { BOT_LINKS, botLevelFor, linkBuffId, linkedBuildings, stackBonusPct } from '../src/data/botlinks';
+import { BOT_LINKS, botLevelFor, botLevelProgress, linkBuffId, linkUpgradeId, linkedBuildings, stackBonusPct } from '../src/data/botlinks';
 
 const lock = (over: Partial<LockResult>): LockResult => ({ piece: 'I', lines: 0, spin: 'none', perfectClear: false, comboIndex: -1, b2bExtended: false, topped: false, clearedRows: [], ...over });
 
@@ -27,10 +27,12 @@ const fire = (w: World, building: string, r: Partial<LockResult>) => {
 
 describe('a technique by hand lends its bot a hand', () => {
   it('which bots each clear lends to', () => {
-    expect(linkedBuildings(lock({ lines: 4, b2bExtended: true }))).toEqual(['tetris', 'b2b']);
-    expect(linkedBuildings(lock({ piece: 'T', spin: 'full', lines: 2, comboIndex: 3 }))).toEqual(['tspin', 'combo']);
-    expect(linkedBuildings(lock({ piece: 'S', spin: 'full', lines: 1 }))).toEqual(['allspin']);
-    expect(linkedBuildings(lock({ lines: 2, perfectClear: true }))).toEqual(['double', 'pc']);
+    expect(linkedBuildings(lock({ lines: 4, b2bExtended: true }))).toEqual(['tetris', 'b2b', 'master']);
+    expect(linkedBuildings(lock({ piece: 'T', spin: 'full', lines: 2, comboIndex: 3 }))).toEqual(['tspin', 'combo', 'master']);
+    expect(linkedBuildings(lock({ piece: 'S', spin: 'full', lines: 1 }))).toEqual(['allspin', 'master']);
+    expect(linkedBuildings(lock({ lines: 2, perfectClear: true }))).toEqual(['double', 'pc', 'master']);
+    // A plain single is no technique: MASTER stays out of it.
+    expect(linkedBuildings(lock({ lines: 1 }))).toEqual(['single']);
     expect(linkedBuildings(lock({ lines: 0 }))).toEqual([]);
   });
 
@@ -61,7 +63,12 @@ describe('a low stack speeds the bots', () => {
 
 describe('bot levels', () => {
   it('level n at 50 × n(n+1)/2 of its technique, 5% a level, gone on ascending', () => {
-    expect([0, 49, 50, 149, 150, 10_500, 99_999].map(botLevelFor)).toEqual([0, 0, 1, 1, 2, 20, 20]);
+    expect([0, 49, 50, 149, 150, 10_500, 99_999].map((xp) => botLevelFor(xp))).toEqual([0, 0, 1, 1, 2, 20, 20]);
+    // A raised cap lets it climb on: level 30 at 50 × 30 × 31 / 2.
+    expect(botLevelFor(23_250, 30)).toBe(30);
+    expect(botLevelFor(99_999, 30)).toBe(30);
+    expect(botLevelProgress(75, 20)).toBeCloseTo(0.25, 9);
+    expect(botLevelProgress(99_999, 20)).toBe(1);
     const w = life([]);
     const before = w.economy.incomeMultiplier(['board:auto', 'building:single']);
     const events: WorldEvent[] = [];
@@ -115,5 +122,53 @@ describe('abilities', () => {
     const left = w.hintMs;
     fire(w, 'allspin', { piece: 'S', spin: 'full', lines: 1 });
     expect(w.hintMs).toBeCloseTo(left - 2_000, 6);
+  });
+});
+
+describe('link upgrades, the BOTS branch, MASTER and GRANDMASTER', () => {
+  it('a link upgrade makes its link ×3, the second lets it run to 180 s', () => {
+    const w = life(['tetris']);
+    w.economy.upgrades.add(linkUpgradeId('tetris', 1));
+    w.manualLock(lock({ lines: 4 }));
+    expect(w.links.multiplier(['board:auto', 'building:tetris'], w.economy)).toBeCloseTo(3, 9);
+    w.economy.upgrades.add(linkUpgradeId('tetris', 2));
+    for (let i = 0; i < 9; i++) w.manualLock(lock({ lines: 4 }));
+    expect(w.links.active.find((b) => b.id === linkBuffId('tetris'))?.msLeft).toBe(180_000);
+  });
+
+  it('the BOTS branch raises the level cap by tens and doubles XP at its end', () => {
+    const w = life([]);
+    expect(w.botLevelCap()).toBe(20);
+    for (const id of ['bots_1', 'bots_3']) w.economy.meta.prestige.add(id);
+    expect(w.botLevelCap()).toBe(40);
+    w.economy.meta.prestige.add('bots_5');
+    expect(w.botLevelCap()).toBe(50);
+    fire(w, 'single', { lines: 1 });
+    expect(w.botXp['single']).toBe(2);
+  });
+
+  it('MASTER and GRANDMASTER open only with their BOTS steps', () => {
+    const w = life(['rival']);
+    expect(w.isUnlocked('master')).toBe(false);
+    w.economy.meta.prestige.add('bots_2');
+    expect(w.isUnlocked('master')).toBe(true);
+    w.economy.setOwned('master', 1);
+    expect(w.isUnlocked('grandmaster')).toBe(false);
+    w.economy.meta.prestige.add('bots_4');
+    expect(w.isUnlocked('grandmaster')).toBe(true);
+  });
+
+  it('MASTER levels on any technique; GRANDMASTER cancels garbage and slows your gravity', () => {
+    const w = life(['master', 'grandmaster']);
+    fire(w, 'master', { lines: 1 });
+    fire(w, 'master', { lines: 4 });
+    fire(w, 'master', { piece: 'S', spin: 'full', lines: 1 });
+    expect(w.botXp['master']).toBe(2);
+    w.garbageQueue = 2;
+    fire(w, 'grandmaster', { lines: 4 });
+    expect(w.garbageQueue).toBe(1);
+    const fx = (owned: number) => { w.economy.setOwned('grandmaster', owned); return (w as unknown as { fx(t: string, b: number): number }).fx('gravity', 1); };
+    expect(fx(1)).toBeCloseTo(0.9, 9);
+    expect(fx(0)).toBe(1);
   });
 });

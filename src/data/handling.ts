@@ -24,6 +24,8 @@ export interface HandlingSettings {
   // Percent, 90..150.
   uiScale: number;
   highContrast: boolean;
+  // PIXEL: blocky arcade frames, a bitmap font and bevelled blocks; CLASSIC: the earlier smooth look.
+  style: 'pixel' | 'classic';
 }
 
 export const TUTORIAL_OFF = -1;
@@ -84,6 +86,7 @@ export const DEFAULT_HANDLING: HandlingSettings = {
   backdrop: 50,
   uiScale: 100,
   highContrast: false,
+  style: 'pixel',
 };
 
 export const ACTION_LABELS: Record<keyof KeyBindings, string> = {

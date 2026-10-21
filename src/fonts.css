@@ -1,0 +1,14 @@
+/* Galmuri (OFL 1.1, Lee Minseo; see THIRD_PARTY.md) for the pixel style:
+   only the 11 px family, regular and bold, so the page carries two files. */
+@font-face {
+  font-family: Galmuri11;
+  font-weight: 100 500;
+  font-display: swap;
+  src: url('galmuri/dist/Galmuri11.woff2') format('woff2');
+}
+@font-face {
+  font-family: Galmuri11;
+  font-weight: 600 900;
+  font-display: swap;
+  src: url('galmuri/dist/Galmuri11-Bold.woff2') format('woff2');
+}

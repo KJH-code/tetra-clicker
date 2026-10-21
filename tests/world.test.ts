@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { World } from '../src/sim/world';
 import { BUILDINGS } from '../src/data/buildings';
-import { LADDER } from '../src/data/ladder';
+import { LADDER, PRESTIGE_LADDER } from '../src/data/ladder';
 import { MemoryStore } from '../src/save/memoryStore';
 import { SAVE_VERSION, type SaveData } from '../src/save/schema';
 import { DEFAULT_HANDLING } from '../src/data/handling';
 
 describe('building ladder in the shop', () => {
   it('matches the simulator ladder for every shop building', () => {
+    const ladder = [...LADDER, ...PRESTIGE_LADDER];
     for (const b of BUILDINGS) {
-      const l = LADDER.find((x) => x.id === b.id)!;
+      const l = ladder.find((x) => x.id === b.id)!;
       expect(l, b.id).toBeDefined();
       expect(b.basePrice).toBe(l.basePrice);
       expect(b.priceGrowth).toBe(l.growth);
@@ -17,7 +18,7 @@ describe('building ladder in the shop', () => {
       expect(b.effects[0]?.value).toBe(l.bonusPct);
       expect(b.linesPerPiece).toBe(l.linesPerPiece);
     }
-    expect(BUILDINGS.map((b) => b.id)).toEqual(LADDER.slice(0, BUILDINGS.length).map((b) => b.id));
+    expect(BUILDINGS.map((b) => b.id)).toEqual(ladder.map((b) => b.id));
   });
 
   it('each tier unlocks only after the previous one is owned', () => {

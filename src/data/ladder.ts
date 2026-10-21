@@ -36,3 +36,11 @@ export const LADDER: LadderEntry[] = [
   { id: 'invader', name: 'INVADER', basePrice: 160_000_000, growth: 1.15, pps: 1.625, linesPerPiece: 2.40, bonusPct: 10, requires: 'helper' },
   { id: 'rival', name: 'RIVAL', basePrice: 390_000_000, growth: 1.15, pps: 2.82, linesPerPiece: 1.488, bonusPct: 10, requires: 'invader' },
 ];
+
+// Past RIVAL, opened by the BOTS prestige chain: a run that has them comes
+// after ascensions, which the single-run simulator does not model, so they
+// sit outside LADDER and its unlock schedule.
+export const PRESTIGE_LADDER: LadderEntry[] = [
+  { id: 'master', name: 'MASTER', basePrice: 1_000_000_000, growth: 1.15, pps: 2.66, linesPerPiece: 1.691, bonusPct: 10, requires: 'rival' },
+  { id: 'grandmaster', name: 'GRANDMASTER', basePrice: 2_500_000_000, growth: 1.15, pps: 3.84, linesPerPiece: 1.251, bonusPct: 10, requires: 'master' },
+];

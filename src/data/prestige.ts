@@ -52,7 +52,7 @@ export const TECH_CHECKS: TechCheck[] = [
 ];
 
 // Prestige upgrades: chains, bought only on the ascension screen.
-export type Branch = 'production' | 'survival' | 'proportion' | 'synergy' | 'elder' | 'opener' | 'mission' | 'event';
+export type Branch = 'production' | 'survival' | 'proportion' | 'synergy' | 'elder' | 'opener' | 'mission' | 'event' | 'bots';
 
 export interface PrestigeDef {
   id: string;
@@ -114,6 +114,14 @@ export const PRESTIGE_UPGRADES: PrestigeDef[] = [
     { name: 'EVENT REWARDS ×1.5', effects: [{ target: 'event_reward', op: 'mul', value: 1.5 }] },
     { name: 'BOSS HP ×0.75', effects: [{ target: 'boss_hp', op: 'mul', value: 0.75 }] },
     { name: 'EVENTS 50% MORE OFTEN · REWARDS ×2', effects: [{ target: 'event_rate', op: 'mul', value: 1.2 }, { target: 'event_reward', op: 'mul', value: 2 }] },
+  ]),
+  // Bots (src/data/botlinks.ts): higher level caps, and the two buildings past RIVAL.
+  ...branch('bots', [
+    { name: 'BOT LEVEL CAP 30', effects: [{ target: 'bot_level_cap', op: 'add', value: 10 }] },
+    { name: 'MASTER: a bot that plays every technique', effects: [] },
+    { name: 'BOT LEVEL CAP 40', effects: [{ target: 'bot_level_cap', op: 'add', value: 10 }] },
+    { name: 'GRANDMASTER: a bot that stacks at 20G', effects: [] },
+    { name: 'BOT LEVEL CAP 50 · BOT XP ×2', effects: [{ target: 'bot_level_cap', op: 'add', value: 10 }, { target: 'bot_xp', op: 'mul', value: 2 }] },
   ]),
   // Research: each opens one synergy for every later run (bought there with
   // Lines). Up the ladder, a crown dearer each step, so they come a few per

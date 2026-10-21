@@ -1,0 +1,125 @@
+/* The arcade pixel style (settings STYLE: PIXEL, on by default). Everything
+   here hangs off :root.pixel, so CLASSIC is style.css untouched.
+
+   Galmuri11 is drawn on a 12 px grid: text sits at 12, 24 or 36 px so its
+   pixels land on screen pixels instead of smearing between them. Corners
+   are notched rather than rounded, depth is a hard bevel (light top-left,
+   dark bottom-right) and shadows are solid offsets, never blurs. */
+:root.pixel {
+  --font: 'Galmuri11', 'Exo 2', 'Pretendard Variable', monospace;
+  --radius: 0;
+  --px: 3px;
+  --bevel: inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #00000070, inset var(--px) var(--px) 0 #ffffff26;
+  --bevel-in: inset var(--px) var(--px) 0 #00000070, inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #ffffff14;
+  --drop: 6px 6px 0 #000000b0;
+  --notch: polygon(0 var(--px), var(--px) var(--px), var(--px) 0, calc(100% - var(--px)) 0, calc(100% - var(--px)) var(--px), 100% var(--px),
+    100% calc(100% - var(--px)), calc(100% - var(--px)) calc(100% - var(--px)), calc(100% - var(--px)) 100%, var(--px) 100%,
+    var(--px) calc(100% - var(--px)), 0 calc(100% - var(--px)));
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+}
+:root.pixel *, :root.pixel *::before, :root.pixel *::after { letter-spacing: 0.04em !important; }
+
+/* A faint dot grid behind everything and CRT scanlines over it. */
+:root.pixel body {
+  background:
+    repeating-linear-gradient(0deg, #00000038 0 1px, transparent 1px 3px),
+    radial-gradient(circle at 1px 1px, #ffffff0a 1px, transparent 1.5px) 0 0 / 8px 8px,
+    radial-gradient(ellipse at 50% -20%, #1b2233, var(--bg) 60%);
+  background-color: var(--bg);
+}
+
+/* ---- panes ------------------------------------------------------------ */
+:root.pixel .pane {
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+  border: var(--px) solid var(--line);
+  border-top: calc(2 * var(--px)) solid var(--zone);
+  box-shadow: var(--drop), inset var(--px) var(--px) 0 #ffffff08;
+}
+:root.pixel #auto-pane { background: transparent; box-shadow: var(--drop); }
+:root.pixel #auto-boards canvas { border: var(--px) solid var(--line); border-radius: 0; box-shadow: 4px 4px 0 #000000a0; }
+
+/* ---- text ------------------------------------------------------------- */
+:root.pixel .t-label, :root.pixel .stat .label { font-size: 12px; }
+:root.pixel .t-title { font-size: 12px; }
+:root.pixel .stat .value { font-size: 36px; line-height: 1; text-shadow: 3px 3px 0 #000; }
+:root.pixel .stat.sub .value { font-size: 24px; text-shadow: 2px 2px 0 #000; }
+:root.pixel .buffed { text-shadow: 3px 3px 0 #5a3c00 !important; }
+
+/* ---- buttons, chips, cards ------------------------------------------- */
+:root.pixel .btn, :root.pixel .chip, :root.pixel .pcard, :root.pixel .keycap, :root.pixel #touch button {
+  border-radius: 0; clip-path: var(--notch); box-shadow: var(--bevel); font-size: 12px;
+}
+:root.pixel .btn { padding: 9px 14px 10px; }
+:root.pixel .btn:hover:not(:disabled) { filter: brightness(1.2); transform: none; }
+:root.pixel .btn:active:not(:disabled), :root.pixel #touch button.pressed { transform: translate(1px, 1px); box-shadow: var(--bevel-in); }
+:root.pixel .btn.on, :root.pixel .seg .btn.on, :root.pixel .btn.tab.on { box-shadow: var(--bevel-in); }
+:root.pixel .seg .btn, :root.pixel .seg .btn:first-child, :root.pixel .seg .btn:last-child { border-radius: 0; }
+:root.pixel .chip { font: 700 12px/1 var(--font); border: 0; border-top: var(--px) solid var(--k); padding: 7px 8px 6px; }
+:root.pixel .chip:hover { transform: none; }
+:root.pixel .chip-tip, :root.pixel .chart-tip { border-radius: 0; border: var(--px) solid var(--line); box-shadow: 4px 4px 0 #000; font-size: 12px; }
+
+/* Shop rows: a bevelled slab with the building's icon at the left. */
+:root.pixel .building {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "icon name owned" "icon hint price";
+  border-radius: 0; border: 0; border-left: calc(2 * var(--px)) solid var(--b);
+  clip-path: var(--notch);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--b) 16%, transparent), transparent 55%), var(--surface-2);
+  box-shadow: var(--bevel);
+  padding: 9px 12px 9px 10px;
+}
+:root.pixel .building .icon { display: block; }
+:root.pixel .building .name { font-size: 12px; }
+:root.pixel .building .owned { font-size: 24px; text-shadow: 2px 2px 0 #000; }
+:root.pixel .building .hint, :root.pixel .building .price { font-size: 12px; }
+:root.pixel .building:hover:not(:disabled) { transform: none; }
+:root.pixel .building:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: var(--bevel-in); }
+:root.pixel .building.locked { border-style: solid; }
+:root.pixel .building[data-tier] { border-left-width: calc(2 * var(--px)); }
+:root.pixel .building .unlock-bar, :root.pixel .goal .goal-bar { border-radius: 0; height: 6px; }
+:root.pixel .building:not(:disabled) { box-shadow: var(--bevel), inset 0 0 0 var(--px) color-mix(in srgb, var(--shop) 70%, transparent); }
+
+/* Stepped bars: progress fills in 6 px blocks, like an arcade gauge. */
+:root.pixel .goal .goal-bar i, :root.pixel .building .unlock-bar i, :root.pixel .botzoom .xp i {
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px);
+  mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px);
+}
+:root.pixel .goal { border-radius: 0; border: var(--px) dashed var(--line); }
+:root.pixel .goal .goal-name { font-size: 12px; }
+:root.pixel .live-band { border-radius: 0; border-left-width: calc(2 * var(--px)); font-size: 12px; }
+
+/* ---- windows: a title bar in the area's colour ------------------------ */
+:root.pixel .settings {
+  border-radius: 0; border: var(--px) solid var(--line); border-top: 0;
+  box-shadow: 10px 10px 0 #000000c0, inset var(--px) 0 0 #ffffff0a;
+  background: var(--surface-1);
+  padding-top: 0;
+}
+:root.pixel .settings > h2:first-child {
+  margin: 0 -22px 6px; padding: 9px 22px 8px; font-size: 24px; border: 0;
+  background: var(--zone); color: #0a0c12; text-shadow: 2px 2px 0 color-mix(in srgb, var(--zone) 60%, #fff);
+  box-shadow: inset 0 calc(-1 * var(--px)) 0 #00000055;
+}
+:root.pixel .settings h2 { font-size: 12px; border-bottom: var(--px) solid var(--line); }
+:root.pixel .settings, :root.pixel .slider, :root.pixel .switch, :root.pixel .keyrow { font-size: 12px; }
+:root.pixel .switch .knob { border-radius: 0; box-shadow: var(--bevel-in); }
+:root.pixel .switch .knob::after { border-radius: 0; }
+:root.pixel .save-text { border-radius: 0; }
+:root.pixel .ach-list li, :root.pixel .challenge, :root.pixel .ascend .branch, :root.pixel .botzoom .ability { border-radius: 0; }
+:root.pixel .ach-list li, :root.pixel .ach-list li b { font-size: 12px; }
+:root.pixel .stat-table, :root.pixel .stat-table th { font-size: 12px; }
+:root.pixel .ptree { border-radius: 0; }
+:root.pixel .ptree-root { border-radius: 0; clip-path: var(--notch); box-shadow: var(--bevel); }
+:root.pixel .ptree .pcard .name, :root.pixel .pcard .price, :root.pixel .ptree-branch { font-size: 12px; }
+:root.pixel .ascend .big { font-size: 36px; text-shadow: 3px 3px 0 #000; }
+
+/* ---- toasts, tutorial, milestone ------------------------------------- */
+:root.pixel .toast, :root.pixel .tutorial, :root.pixel #milestone {
+  border-radius: 0; box-shadow: 6px 6px 0 #000000c0; font-size: 12px;
+}
+:root.pixel #milestone { font-size: 36px; border-width: var(--px); text-shadow: 3px 3px 0 #5a3c00; }
+:root.pixel #tabs { border-top: var(--px) solid var(--line); }
+:root.pixel #tabs button { font-size: 12px; }
+:root.pixel #milestone { white-space: nowrap; }
+@media (max-width: 900px) { :root.pixel #milestone { font-size: 24px; } }

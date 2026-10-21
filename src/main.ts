@@ -1,9 +1,12 @@
 // Fonts ship with the page (OFL; see THIRD_PARTY.md): Exo 2 for Latin and
-// figures, Pretendard for Hangul, fetched in subsets as text needs them.
+// figures, Pretendard for Hangul, fetched in subsets as text needs them;
+// Galmuri for both in the pixel style.
 import '@fontsource/exo-2/latin-500.css';
 import '@fontsource/exo-2/latin-700.css';
 import '@fontsource/exo-2/latin-800.css';
 import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+import './fonts.css';
+import './pixel.css';
 import { World, type WorldEvent } from './sim/world';
 import type { LockResult } from './sim/game';
 import type { BotTech } from './sim/attack';
@@ -21,13 +24,14 @@ import { GARBAGE } from './data/garbage';
 import { SYNERGIES } from './data/synergies';
 import { tag } from './sim/tags';
 import { BoardRenderer, type BoardView } from './render/boardRenderer';
-import { WIDTH, occupiedCells } from './sim/board';
+import { TOP_VISIBLE_ROW, WIDTH, occupiedCells } from './sim/board';
 import { Fx } from './render/fx';
 import { hitStrength } from './render/hit';
 import { animatedPlacement, isLanded, type BotAnimation } from './render/botAnim';
 import { GOLD, PIECE_COLORS, WRATH_RIM, THEME, VIEW, setPalette, buildingColor, font, levelTheme } from './render/theme';
 import { BUFFS } from './data/golden';
 import { drawRoundHud, drawLifePanel } from './render/roundHud';
+import { Roller } from './render/roll';
 import { missionById } from './data/missions';
 import { drawEventHud, drawDuelGauge, eventName, EVENT_COLORS } from './render/eventHud';
 import { InputHandler, type Action } from './ui/input';
@@ -41,7 +45,7 @@ import { TutorialBubble, advance as tutorialAdvance, currentStep as tutorialStep
 import { installEngine, ccWasmBot, CC_DEFAULT } from './sim/bot/ccWasm';
 import { Game } from './sim/game';
 import { BotZoom } from './ui/botZoom';
-import { BOT_LINKS } from './data/botlinks';
+import { BOT_LINKS, linkBuffId } from './data/botlinks';
 import engineUrl from './engine/cold-clear.wasm?url';
 import { BotPrefetch } from './engine/botPrefetch';
 import { resolveLanguage, setLanguage, t } from './ui/i18n';
@@ -52,7 +56,7 @@ installEngine(await loadEngine());
 // Board text uses the page's fonts; wait for them (a moment at most) so the
 // first frames do not draw in a fallback.
 await Promise.race([
-  Promise.all([['800 16px "Exo 2"', 'A'], ['700 16px "Exo 2"', 'A'], ['700 16px "Pretendard Variable"', '금고레벨']]
+  Promise.all([['800 16px "Exo 2"', 'A'], ['700 16px "Exo 2"', 'A'], ['700 16px "Pretendard Variable"', '금고레벨'], ['700 12px Galmuri11', 'A금'], ['400 12px Galmuri11', 'A금']]
     .map(([f, text]) => document.fonts.load(f!, text).catch(() => []))),
   new Promise((r) => setTimeout(r, 1500)),
 ]);
@@ -85,10 +89,12 @@ function applyDisplay(): void {
   VIEW.backdrop = settings.backdrop / 100;
   VIEW.highContrast = settings.highContrast;
   VIEW.textScale = settings.uiScale / 100;
+  VIEW.pixel = settings.style === 'pixel';
   THEME.grid = settings.highContrast ? '#343b52' : '#161a25';
   const root = document.documentElement;
   root.classList.toggle('high-contrast', settings.highContrast);
   root.classList.toggle('reduce-motion', settings.reduceMotion);
+  root.classList.toggle('pixel', VIEW.pixel);
   root.style.setProperty('--ui-scale', String(settings.uiScale / 100));
 }
 const world = saved ? new World(saved.world.seed, saved.world) : new World((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
@@ -159,6 +165,10 @@ function ensureAutoViews(): void {
     autoRoot.replaceChildren();
     autoViews.length = 0;
   }
+  // One grid, every board the same size, rows filled left to right.
+  const pane = autoRoot.parentElement!;
+  const cols = Math.max(1, Math.min(world.autoBoards.length, Math.floor((pane.clientWidth - AUTO_GAP) / (AUTO_BOARD_COLS * cell + AUTO_GAP))));
+  autoRoot.style.gridTemplateColumns = `repeat(${cols}, max-content)`;
   while (autoViews.length < world.autoBoards.length) {
     const canvas = document.createElement('canvas');
     const index = autoViews.length;
@@ -264,6 +274,8 @@ const settingsPanel = new SettingsPanel(settingsOverlay, settings, () => {
   sound.set(settings.volume, settings.muted);
   applyDisplay();
   fitManual();
+  // The shop's icons are drawn once; a palette or style change redraws them.
+  shop?.refresh(true);
   saveNow();
   if (resolveLanguage(settings.language, navigator.languages ?? [navigator.language]) !== lang) location.reload();
 }, (open) => input.setActive(!open), {
@@ -319,6 +331,7 @@ function mergeSettings(s: Partial<HandlingSettings> | undefined): HandlingSettin
     // A save from before milestones starts at its balance's unit (set once the world loads), not at 1K again.
     milestone: s.milestone ?? -1,
     uiScale: s.uiScale ?? d.uiScale, highContrast: s.highContrast ?? d.highContrast, backdrop: s.backdrop ?? d.backdrop,
+    style: s.style ?? d.style,
   };
 }
 
@@ -555,6 +568,9 @@ function techLabel(r: LockResult, tech: BotTech): string | null {
     }
     case 'fourwide': return r.comboIndex > 0 ? `${r.comboIndex} COMBO` : null;
     case 'opener': return r.perfectClear ? 'PERFECT CLEAR' : r.piece === 'T' && r.spin === 'full' ? `T-SPIN ${names[r.lines]}` : null;
+    // The biggest thing it did.
+    case 'master': return r.perfectClear ? 'PERFECT CLEAR' : r.spin === 'full' ? `${r.piece}-SPIN ${names[r.lines]}`
+      : r.comboIndex > 1 ? `${r.comboIndex} COMBO` : r.lines === 4 ? (r.b2bExtended ? 'B2B TETRIS' : 'TETRIS') : null;
   }
 }
 
@@ -643,6 +659,7 @@ function checkMilestone(): void {
   saveNow();
 }
 
+const vaultRoll = new Roller();
 function render(): void {
   const g = world.manual;
   const view: BoardView = {
@@ -659,7 +676,8 @@ function render(): void {
   manual.wellBackground = theme.background;
   manual.wellGrid = settings.highContrast ? undefined : theme.grid;
   manual.render(view, manualFx, (ctx) => {
-    drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore, world.economy.boardGarbage * GARBAGE.penaltyPctPerRow, world.economy.stackBonus);
+    drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore, world.economy.boardGarbage * GARBAGE.penaltyPctPerRow, world.economy.stackBonus,
+      vaultRoll.value(Number(world.round.vault), performance.now()));
     drawEventHud(ctx, manual, world.lifeEvent, view.next.length);
     // Rows waiting for the board: the rival's and what purchases sent.
     drawDuelGauge(ctx, manual, (world.duel?.toMe ?? 0) + world.garbageQueue);
@@ -706,10 +724,9 @@ function boardLabel(id: string, name: string | undefined): string {
   // The rival names its fight: the streak while a life runs.
   const duel = id === 'rival' && world.duel ? ` · ${t('WIN {n}', { n: world.economy.meta.rivalStreak })}` : '';
   const tier = buildingTier(world.economy.owned(id));
-  const level = world.botLevel(id);
   const link = world.links.multiplier([tag.board('auto'), tag.building(id)], world.economy);
   const mul = buff * link;
-  return `${name ?? id}${tier > 0 ? ` ${'★'.repeat(tier)}` : ''}${level > 0 ? ` LV${level}` : ''}${syn}${duel}${mul > 1 ? ` ×${+mul.toFixed(2)}` : ''}`;
+  return `${name ?? id}${tier > 0 ? ` ${'★'.repeat(tier)}` : ''}${syn}${duel}${mul > 1 ? ` ×${+mul.toFixed(2)}` : ''}`;
 }
 
 // The board's name over the buffer rows, after a bar in the building's
@@ -739,6 +756,43 @@ function label(ctx: CanvasRenderingContext2D, r: BoardRenderer, text: string, id
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
   ctx.fillText(perSecond, r.cellX(0) - 4, r.height - 4);
+  // Its level and the way to the next, a bar over the per-second figure.
+  const level = world.botLevel(id);
+  const bx = 3;
+  const bw = colW - 3;
+  const bh = Math.max(4, Math.round(c * 0.35));
+  const by = r.height - 6 - small - bh - 2;
+  ctx.fillStyle = THEME.boxHead;
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.fillStyle = buildingColor(BUILDINGS.findIndex((b) => b.id === id));
+  ctx.fillRect(bx + 1, by + 1, Math.round((bw - 2) * world.botLevelProgress(id)), bh - 2);
+  ctx.fillStyle = THEME.text;
+  ctx.textAlign = 'left';
+  ctx.font = font(800, Math.max(8, small));
+  ctx.fillText(level >= world.botLevelCap() ? `LV${level} MAX` : `LV${level}`, bx, by - 2);
+  // A link running: the well's rim lights in the bot's colour and burns down.
+  const left = world.links.active.find((b) => b.id === linkBuffId(id))?.msLeft ?? 0;
+  if (left > 0) drawLinkRim(ctx, r, left / world.linkCapMs(id), buildingColor(BUILDINGS.findIndex((b) => b.id === id)));
+  ctx.restore();
+}
+
+// The rim around a bot's well, as much of it as `k` (0..1) of its link is
+// left, running clockwise from the top-left corner.
+function drawLinkRim(ctx: CanvasRenderingContext2D, r: BoardRenderer, k: number, color: string): void {
+  const c = r.layout.cell;
+  const x0 = r.cellX(0);
+  const y0 = r.cellY(TOP_VISIBLE_ROW);
+  const w = WIDTH * c;
+  const h = r.height - y0;
+  const t = 3;
+  let rest = Math.max(0, Math.min(1, k)) * 2 * (w + h);
+  ctx.save();
+  ctx.fillStyle = color;
+  const run = (len: number, draw: (n: number) => void): void => { const n = Math.min(len, rest); if (n > 0) draw(n); rest -= n; };
+  run(w, (n) => ctx.fillRect(x0, y0, n, t));
+  run(h, (n) => ctx.fillRect(x0 + w - t, y0, t, n));
+  run(w, (n) => ctx.fillRect(x0 + w - n, y0 + h - t, n, t));
+  run(h, (n) => ctx.fillRect(x0, y0 + h - n, t, n));
   ctx.restore();
 }
 

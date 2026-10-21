@@ -82,6 +82,8 @@ export interface CcMode {
   forbid?: CcKind[];
   // Let the engine see spins by pieces other than T (this game's rule).
   allSpins?: boolean;
+  // Search only what a piece can reach at 20G, sliding along the stack.
+  twentyG?: boolean;
 }
 
 export interface CcBotConfig extends CcMode {
@@ -103,7 +105,7 @@ export function stackHeight(grid: Grid): number {
 }
 
 // Buffer offsets, mirrored from engine/glue/src/lib.rs.
-const IN_HOLD = 40, IN_B2B = 41, IN_COMBO = 42, IN_QLEN = 43, IN_QUEUE = 44, IN_FORBID = 64, IN_ALLSPIN = 65, IN_WEIGHTS = 100;
+const IN_HOLD = 40, IN_B2B = 41, IN_COMBO = 42, IN_QLEN = 43, IN_QUEUE = 44, IN_FORBID = 64, IN_ALLSPIN = 65, IN_MOVEMENT = 66, IN_WEIGHTS = 100;
 const OUT_FOUND = 300, OUT_HOLD = 301, OUT_CELLS = 302, OUT_SPIN = 310, OUT_NODES = 400;
 const PREVIEW = 5;
 
@@ -146,6 +148,7 @@ export function engineSuggest(game: Game, mode: CcMode, nodes: number, preview =
   queue.forEach((p, i) => { io[IN_QUEUE + i] = PIECES.indexOf(p); });
   io[IN_FORBID] = (mode.forbid ?? []).reduce((m, k) => m | (1 << KINDS.indexOf(k)), 0);
   io[IN_ALLSPIN] = mode.allSpins ? 1 : 0;
+  io[IN_MOVEMENT] = mode.twentyG ? 1 : 0;
   flatten(mode.weights).forEach((v, i) => { io[IN_WEIGHTS + i] = v; });
   if (!engine.suggest(nodes, positionSeed(game.grid, queue, hold))) return null;
   // The buffer may have moved if the search grew memory.

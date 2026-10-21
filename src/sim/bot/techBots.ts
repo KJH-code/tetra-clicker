@@ -113,3 +113,18 @@ export const fourWideBot = (): BotPolicy => ccWasmBot({
   ...FOURWIDE, nodes: 6_000,
   mode: (game) => (wellHeight(game.grid) >= FOURWIDE_PANIC ? FOURWIDE_DIG : null),
 });
+
+// MASTER: every technique at once, paid for all of them. Spins by any piece
+// count, T-slots are worth building, and a combo or a chain is worth
+// keeping, each a little less than its own building's bot would weigh it.
+export const MASTER: CcMode = {
+  weights: w({
+    tslot: [8, 148, 400, 200], tspin1: 200, tspin2: 1200, tspin3: 1200,
+    allspin: [300, 700, 900, 1100], combo_garbage: 400, b2b_clear: 300, clear4: 600,
+  }),
+  allSpins: true,
+};
+export const masterBot = (): BotPolicy => ccWasmBot({ ...MASTER, nodes: 10_000 });
+
+// GRANDMASTER: stock Cold Clear, but only moves a piece can make at 20G.
+export const grandmasterBot = (): BotPolicy => ccWasmBot({ weights: CC_DEFAULT, twentyG: true, nodes: 6_000 });

@@ -170,8 +170,14 @@ export class Fx {
       const scale = f.pop ? 1 + 0.6 * Math.max(0, 1 - f.t / 120) ** 2 : 1;
       ctx.globalAlpha = f.pop ? (k < 0.7 ? 1 : 1 - ((k - 0.7) / 0.3) ** 2) : 1 - k * k;
       ctx.fillStyle = f.color;
-      ctx.shadowColor = f.color;
-      ctx.shadowBlur = f.pop ? 18 : 12;
+      // Pixel text gets a hard black drop instead of a glow, which would blur it.
+      if (VIEW.pixel) {
+        ctx.shadowColor = '#000000';
+        ctx.shadowOffsetX = ctx.shadowOffsetY = f.pop ? 3 : 2;
+      } else {
+        ctx.shadowColor = f.color;
+        ctx.shadowBlur = f.pop ? 18 : 12;
+      }
       let size = f.size;
       ctx.font = font(800, size);
       if (f.maxWidth) {

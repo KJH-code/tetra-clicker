@@ -91,7 +91,7 @@ html, body {
 #auto-pane { --zone: var(--faint); display: flex; align-items: center; justify-content: center; padding: 12px; overflow-y: auto; }
 #shop-pane { --zone: var(--shop); }
 
-#auto-boards { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-content: center; }
+#auto-boards { display: grid; gap: 12px; justify-content: center; align-content: center; }
 #auto-boards:empty::before {
   content: 'NO BOTS';
   color: var(--faint);
@@ -242,6 +242,7 @@ canvas { display: block; image-rendering: pixelated; }
 .chip.wrath { --k: var(--danger); }
 .chip.golden { --k: var(--gold); }
 .chip.synergy { --k: #6fe6ff; }
+.chip.link { --k: #a6ff4d; }
 .chip.cant { opacity: 0.35; cursor: default; filter: saturate(0.5); }
 .chip-tip {
   position: absolute; z-index: 5; pointer-events: none;
@@ -517,3 +518,13 @@ canvas { display: block; image-rendering: pixelated; }
 :root.reduce-motion .chip:hover, :root.reduce-motion .chip:active, :root.reduce-motion .pcard:hover { transform: none !important; }
 /* Hangul spaced like the English capitals reads as loose syllables. */
 :root:lang(ko) *, :root:lang(ko) *::placeholder { letter-spacing: 0 !important; }
+
+/* Building icons: what the bot does, as a little stack (src/render/icons.ts). */
+.building { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "icon name owned" "icon hint price"; }
+.building .icon { grid-area: icon; align-self: center; margin-right: 2px; image-rendering: pixelated; }
+.building.locked .icon { filter: grayscale(1) brightness(0.6); }
+/* One you can buy now pulses at its edge. */
+.building:not(:disabled):not(.locked) { animation: can-buy 1.6s ease-in-out infinite; }
+@keyframes can-buy { 50% { border-color: var(--shop); box-shadow: 0 0 0 1px #3fd17a66, 0 0 16px #3fd17a40, 0 4px 14px #00000040; } }
+:root.pixel .building:not(:disabled):not(.locked) { animation: can-buy-px 1s steps(2) infinite; }
+@keyframes can-buy-px { 50% { box-shadow: var(--bevel), inset 0 0 0 var(--px) var(--shop); } }

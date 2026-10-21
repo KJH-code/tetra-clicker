@@ -49,10 +49,31 @@ hardcore red. Buttons are filled in their area's colour; each building has
 a colour of its own (the piece colours down the ladder) on its shop card and
 over its bot board. The shop ends with a NEXT GOAL card: the next building
 on the ladder (or, once every kind is owned, the cheapest next copy) and how
-long PER SECOND takes to pay for it. Text is Exo 2 for Latin and Pretendard
-for Hangul, both bundled ([THIRD_PARTY.md](THIRD_PARTY.md)); the boards wait
-for them before the first frame. Hover and press effects are short and stop
-under LESS MOTION.
+long PER SECOND takes to pay for it. Hover and press effects are short and
+stop under LESS MOTION.
+
+STYLE (settings, under accessibility) picks the look; both are kept:
+
+- **PIXEL** (the default, `src/pixel.css`): arcade frames. Text is Galmuri,
+  a bitmap font with Hangul, set at 12 / 24 / 36 px so its pixels land on
+  screen pixels. Corners are notched, depth is a hard bevel (light top-left,
+  dark bottom-right), shadows are solid offsets and never blur, windows open
+  with a title bar in their area's colour, progress bars fill in blocks.
+  Blocks on every board are bevelled squares with a pixel of shine, the
+  ghost is a hollow square, and board text drops a hard black shadow
+  instead of a glow.
+- **CLASSIC**: the earlier smooth look, Exo 2 for Latin and Pretendard for
+  Hangul, glowing blocks.
+
+All three fonts are bundled ([THIRD_PARTY.md](THIRD_PARTY.md)); the boards
+wait for them before the first frame.
+
+Each shop card carries a 5×5 picture of what its bot does
+(`src/render/icons.ts`), and a card you can afford pulses at its edge. The
+manual board's readouts sit in two panels in the hold column (vault, level
+and bots above, the life's pace and missions below); the level bar fills a
+block per row cleared, and the vault and the shop's balance count up to a
+gain instead of jumping (`src/render/roll.ts`).
 
 Clears on the manual board hit as hard as the technique (`hitStrength` in
 `src/render/hit.ts`, 0–8: a single barely, a tetris 4, a T-spin double 3,
@@ -251,20 +272,20 @@ until NEW RUN. The shop is a tree (`src/ui/prestigeTree.ts`): a CROWN root in
 the middle and a ray per chain, each step on a line from the one before;
 bought steps glow in their chain's colour, the next buyable one is outlined,
 the rest are faint. Drag to move it, wheel or pinch to zoom; it opens on the
-first three steps of every chain. Six chains of five, 1 / 3 / 9 / 27 / 81
+first three steps of every chain. Seven chains of five, 1 / 3 / 9 / 27 / 81
 crowns, each step needing the one before:
 
-| production | survival | proportion | mission | event | wrath |
-|---|---|---|---|---|---|
-| all income ×2 | gravity ×0.8 | risk weight ×1.5 | mission pay ×1.5 | events 25% more often | wrath pieces appear |
-| start with 2K Lines | keep 25% of the vault on a top-out | tech cap +0.5 | four missions a life | good events twice as likely | ELDER FRENZY lasts 12 s |
-| manual ×3 | purchase garbage ×0.8 | risk weight ×2 | hard missions (TETRIS ×6, PERFECT CLEAR, 10 COMBO, 5 min each) | event rewards ×1.5 | RUIN takes 10% |
-| all income ×2 | keep 50% of the vault on a top-out | start level +2 | mission pay ×2 | boss HP ×0.75 | CLOT half as likely |
-| all income ×3 | keep 75% of the vault on a top-out | risk weight ×3 | each mission met: +10% income for the rest of the life | events 50% more often in all, rewards ×2 | no RUIN |
+| production | survival | proportion | mission | event | bots | wrath |
+|---|---|---|---|---|---|---|
+| all income ×2 | gravity ×0.8 | risk weight ×1.5 | mission pay ×1.5 | events 25% more often | bot level cap 30 | wrath pieces appear |
+| start with 2K Lines | keep 25% of the vault on a top-out | tech cap +0.5 | four missions a life | good events twice as likely | MASTER opens | ELDER FRENZY lasts 12 s |
+| manual ×3 | purchase garbage ×0.8 | risk weight ×2 | hard missions (TETRIS ×6, PERFECT CLEAR, 10 COMBO, 5 min each) | event rewards ×1.5 | bot level cap 40 | RUIN takes 10% |
+| all income ×2 | keep 50% of the vault on a top-out | start level +2 | mission pay ×2 | boss HP ×0.75 | GRANDMASTER opens | CLOT half as likely |
+| all income ×3 | keep 75% of the vault on a top-out | risk weight ×3 | each mission met: +10% income for the rest of the life | events 50% more often in all, rewards ×2 | bot level cap 50, bot XP ×2 | no RUIN |
 
 WRATH's ids are `elder_1..5`, clear of the run upgrades `wrath_1..3`.
 
-A fifth chain, SYNERGY, is research: 1, 2, 3 … 8 crowns up the ladder, each
+Another chain, SYNERGY, is research: 1, 2, 3 … 16 crowns up the ladder, each
 opening one synergy for every later run (below).
 
 Everything is data in `src/data/prestige.ts`.
@@ -316,6 +337,8 @@ research.
 | OPENER + HELPER | 460,000,000 | link | a perfect clear by hand doubles the HELPER bot for 30 s |
 | HELPER + INVADER | 1,600,000,000 | reward | the INVADER bot shares combo pay: ×1.25 |
 | INVADER + RIVAL | 3,900,000,000 | cross | each earns +1% per copy of the other |
+| RIVAL + MASTER | 10,000,000,000 | cross | each earns +1% per copy of the other |
+| MASTER + GRANDMASTER | 25,000,000,000 | cross | each earns +1% per copy of the other |
 
 Reward and play synergies are a fixed ×1.25 on that bot's income, in play
 and in the hidden-tab formula alike; the bot is still paid only for its own
@@ -379,14 +402,23 @@ The bots and the manual board pull on each other (`src/data/botlinks.ts`):
 - **Links**: a clear by hand doubles the bot built on it for 30 s, 30 s
   more for each repeat, 90 s at most: a single, double, triple or tetris its
   clear-size bot, a T-spin T-SPIN, any other spin ALL-SPIN, a combo COMBO, a
-  back-to-back B2B, a perfect clear PERFECT (only bots owned). Links stack
-  with golden and synergy buffs. The bot's label shows the multiplier.
+  back-to-back B2B, a perfect clear PERFECT, and any technique at all
+  (a tetris, a spin, a combo, a chain, a PC) MASTER (only bots owned).
+  Links stack with golden and synergy buffs. The bot's label shows the
+  multiplier, and while a link runs the rim of its well lights in the
+  building's colour and burns down with the time left.
+- **Link upgrades** (chips, group `link`): each building has two, LINK ×3
+  at 10 owned (its base price × 1,000) and LINK UP TO 180 S at 50 owned
+  (× 1,000,000), which doubles the cap. The simulator leaves links out, so
+  these never change the ladder.
 - **Low stack**: while a life runs, a manual stack of four rows or fewer
   speeds every bot 20%, falling to nothing at ten rows (BOTS +n% under the
   level bar). Garbage still slows them as before.
 - **Bot levels**: each building's bot levels up on its own technique (its
   clear size for the plain ones): level n at 50 × n(n+1)/2 of them, +5% to
-  that building a level, 20 at most. A run's levels go with an ascension.
+  that building a level, 20 at most until the BOTS prestige chain raises
+  the cap to 30, 40 and 50 (and doubles XP at its end). A run's levels go
+  with an ascension.
   The simulator counts them, taking a quarter of a bot's pieces as its
   technique (a guess).
 - **Abilities**: TETRIS cancels a queued garbage row on your board with
@@ -394,14 +426,17 @@ The bots and the manual board pull on each other (`src/data/botlinks.ts`):
   COMBO pays 10% more per combo step and B2B 2% more per chain step;
   DOWNSTACK lifts a garbage row off your board when it clears garbage (at
   most every 20 s); OPENER doubles the first 10 pieces of each life by hand;
-  ALL-SPIN takes 2 s off the hint cooldown with each spin.
+  ALL-SPIN takes 2 s off the hint cooldown with each spin; GRANDMASTER
+  cancels a queued garbage row with each tetris and, while owned, makes your
+  pieces fall 10% slower.
 - **HINT** (H, or the touch button): the bots' pick for the piece in play
   shows as a dashed ghost for 4 s ("HOLD FIRST" when it uses the hold).
   Cooldown 30 s ÷ (1 + bots owned / 50), 5 s at least; needs a bot and a
   live life. It is worked out on a copy of the board, so asking never
   changes the life.
-- **The bot pane**: each board's label carries its stars, level and
-  multiplier, its PER SECOND sits under the hold column, a technique bursts
+- **The bot pane**: boards sit in one even grid; each board's label
+  carries its stars and multiplier, the hold column ends with its level, an
+  XP bar to the next (MAX at the cap) and its PER SECOND, a technique bursts
   and stamps its name, and clicking a board opens it large with what it
   owns, earns, its level and XP bar, its link and its ability.
 
@@ -535,6 +570,8 @@ average level 4.
 | HELPER | 46,000,000 | the COMBO bot; lifts garbage off your board (below) | 3.05 | 1.18 | combo |
 | INVADER | 160,000,000 | the DOWNSTACK bot; adds to your purchase garbage (below) | 1.625 | 2.40 | table value + garbage rows |
 | RIVAL | 390,000,000 | Cold Clear's own weights, 6,000 nodes; fights your board (below) | 2.82 | 1.488 | B2B |
+| MASTER | 1,000,000,000 | every technique at once: spins by any piece, T-slots, combos and chains kept (per 100 pieces: 12.7 spins, 10.3 B2B, 4.3 combo, 2.8 tetrises) | 2.66 | 1.691 | everything |
+| GRANDMASTER | 2,500,000,000 | Cold Clear's own weights, searching only what a piece can reach at 20G (6.3 tetrises per 100 pieces) | 3.84 | 1.251 | table value |
 
 Each building unlocks after one copy of the previous tier. Its bot never
 tops out, and every clear that is not its own technique pays the plain table
@@ -545,7 +582,14 @@ The technique bots earn about the same per piece (a single is worth too
 little for a combo to beat a tetris), so a higher tier plays faster instead:
 PPS is set so PPS × Lines per piece climbs 1.6, 1.8, 2.0, 2.2 Lines a second,
 and PERFECT, which earns the most per piece, stays at 1 PPS; past it the
-step is 0.3: 2.7, 3.0, 3.3, 3.6, 3.9, 4.2.
+step is 0.3: 2.7, 3.0, 3.3, 3.6, 3.9, 4.2, and 4.5, 4.8 for MASTER and
+GRANDMASTER. Those two open only with the BOTS prestige chain (MASTER at its
+second step, GRANDMASTER at its fourth, each after one copy of the tier
+before), so they sit outside the simulator's single-run ladder
+(`PRESTIGE_LADDER` in `src/data/ladder.ts`) and are priced on RIVAL's ×2.5
+step. GRANDMASTER's 20G is the engine's own: `npm run build:engine` builds
+the glue with a movement flag (`engine/glue/src/lib.rs`, input slot 66) that
+switches Cold Clear to its TwentyG move generator.
 
 The last three reach into the manual board, from the moment one is bought
 (`src/data/buildings.ts`, `src/sim/world.ts`):
@@ -622,6 +666,7 @@ unlock. All of them are data in `src/data/upgrades.ts`.
 | GRACE | 5 combo 10 / 50 times | a combo survives 1, then 2, empty pieces |
 | SHIELD | 25 back-to-back clears | one ordinary clear per chain does not break B2B |
 | NEXT+1 | 500 manual pieces | six next pieces |
+| LINK ×3 / LINK 180 S (generated per building) | own 10 / 50 | that building's link ×3, then its cap 90 s → 180 s |
 
 Technique upgrades and buffs only matter on the manual board: bot income
 carries no technique tags, so the SPIN / B2B / PC / COMBO multipliers never

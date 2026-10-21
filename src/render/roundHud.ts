@@ -2,7 +2,7 @@ import type { Round } from '../sim/round';
 import type { BoardRenderer } from './boardRenderer';
 import { format } from '../sim/num';
 import { HEIGHT, TOP_VISIBLE_ROW, WIDTH } from '../sim/board';
-import { FONT, GOLD, THEME, VIEW, font as fontOf } from './theme';
+import { fontFamily, GOLD, THEME, VIEW, font as fontOf } from './theme';
 import { LEVELS, levelPay } from '../data/levels';
 import { t } from '../ui/i18n';
 
@@ -11,7 +11,8 @@ import { t } from '../ui/i18n';
 // checkpoint. A centred banner covers the states where the board is not
 // live (waiting, paused).
 export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, round: Round, wrath: number,
-  buffs: { label: string; msLeft: number }[] = [], nextStartLevel = 1, hardcore = false, botPenaltyPct = 0, stackBonusPct = 0): void {
+  buffs: { label: string; msLeft: number }[] = [], nextStartLevel = 1, hardcore = false, botPenaltyPct = 0, stackBonusPct = 0,
+  vaultShown = Number(round.vault)): void {
   const c = r.layout.cell;
   const colW = r.layout.leftCells * c;
   const x0 = 6;
@@ -20,14 +21,15 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
   const s = VIEW.textScale;
   const font = (px: number, text: string, weight = ''): void => {
     let size = Math.round(px * s);
-    ctx.font = `${weight} ${size}px ${FONT}`;
+    ctx.font = `${weight} ${size}px ${fontFamily()}`;
     const w = ctx.measureText(text).width;
     if (w > colW - x0 * 2) {
       size = Math.floor((size * (colW - x0 * 2)) / w);
-      ctx.font = `${weight} ${size}px ${FONT}`;
+      ctx.font = `${weight} ${size}px ${fontFamily()}`;
     }
   };
   let y = r.cellY(TOP_VISIBLE_ROW + 8);
+  const top = y - (hardcore ? c * 0.9 * s : 0);
   ctx.save();
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -44,8 +46,8 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
   }
   label(t('VAULT'));
   ctx.fillStyle = THEME.text;
-  font(c * 0.7, format(round.vault), '700');
-  ctx.fillText(format(round.vault), x0, y);
+  font(c * 0.7, format(vaultShown), '700');
+  ctx.fillText(format(vaultShown), x0, y);
   y += c * 1.0 * s;
   label(round.active ? t('CHECKPOINT IN {n}', { n: round.rowsToCheckpoint }) : t('CHECKPOINT EVERY {n}', { n: LEVELS.checkpointRows }));
   y += c * 0.15 * s;
@@ -54,20 +56,35 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
   const level = round.active ? round.level : nextStartLevel;
   const color = level < 5 ? '#00f0ff' : level < 10 ? '#ff2ed2' : '#ff3b3b';
   ctx.fillStyle = color;
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 10;
+  ctx.shadowColor = VIEW.pixel ? '#000000' : color;
+  if (VIEW.pixel) ctx.shadowOffsetX = ctx.shadowOffsetY = 2;
+  else ctx.shadowBlur = 10;
   const pay = `${level}  ×${+levelPay(level).toFixed(2)}`;
   font(c * 0.7, pay, '700');
   ctx.fillText(pay, x0, y);
   ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = ctx.shadowOffsetY = 0;
   y += c * 0.85 * s;
+  // The bar to the next level, big enough to read from the corner of an eye;
+  // in the pixel style it fills a block per row cleared.
   const w = colW - x0 * 2;
-  const h = c * 0.3;
+  const h = Math.round(c * 0.55);
   const k = round.active ? (round.rows % round.rowsPerLevel) / round.rowsPerLevel : 0;
   ctx.fillStyle = THEME.boxHead;
   ctx.fillRect(x0, y, w, h);
-  ctx.fillStyle = color;
-  ctx.fillRect(x0, y, w * k, h);
+  if (VIEW.pixel) {
+    const n = round.rowsPerLevel;
+    const gap = 2;
+    const bw = (w - 4 - gap * (n - 1)) / n;
+    const lit = round.active ? round.rows % n : 0;
+    for (let i = 0; i < lit; i++) {
+      ctx.fillStyle = color;
+      ctx.fillRect(Math.round(x0 + 2 + i * (bw + gap)), y + 2, Math.max(1, Math.round(bw)), h - 4);
+    }
+  } else {
+    ctx.fillStyle = color;
+    ctx.fillRect(x0, y, w * k, h);
+  }
   y += h + c * 0.4;
   // Garbage left on the board slows the bots.
   if (botPenaltyPct > 0) {
@@ -84,15 +101,19 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
     font(c * 0.42, text, '800');
     ctx.fillText(text, x0, y);
   }
+  y += c * 0.55 * s;
+  hudPanel(ctx, 2, top - 6, colW - 4, y - top + 6);
   // Running buffs, under the multiplier they stack with.
-  y += c * 1.0;
+  y += c * 0.45;
   for (const b of buffs) {
     ctx.fillStyle = GOLD;
-    ctx.shadowColor = GOLD;
-    ctx.shadowBlur = 8;
+    ctx.shadowColor = VIEW.pixel ? '#000000' : GOLD;
+    if (VIEW.pixel) ctx.shadowOffsetX = ctx.shadowOffsetY = 2;
+    else ctx.shadowBlur = 8;
     font(c * 0.36, t(b.label), '700');
     ctx.fillText(t(b.label), x0, y);
     ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = ctx.shadowOffsetY = 0;
     y += c * 0.5 * s;
     ctx.fillStyle = THEME.text;
     font(c * 0.36, `${Math.ceil(b.msLeft / 1000)}s`);
@@ -109,11 +130,13 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = banner.color;
-    ctx.shadowColor = banner.color;
-    ctx.shadowBlur = 14;
+    ctx.shadowColor = VIEW.pixel ? '#000000' : banner.color;
+    if (VIEW.pixel) ctx.shadowOffsetX = ctx.shadowOffsetY = 3;
+    else ctx.shadowBlur = 14;
     ctx.font = fontOf(800, c * 0.9 * VIEW.textScale);
     ctx.fillText(banner.big, cx, cy - c * 0.25);
     ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = ctx.shadowOffsetY = 0;
     if (banner.small) {
       ctx.fillStyle = THEME.dim;
       ctx.font = fontOf(700, c * 0.4 * VIEW.textScale);
@@ -190,6 +213,32 @@ export function drawLifePanel(ctx: CanvasRenderingContext2D, r: BoardRenderer, i
     ctx.fillStyle = i === 0 ? THEME.text : '#ffe600';
     fit(c * 0.36, lines[i]!, 700);
     ctx.fillText(lines[i]!, x0, y);
+  }
+  hudPanel(ctx, 2, y - 6, w + x0 * 2 - 4, r.cellY(HEIGHT) - y + 2);
+  ctx.restore();
+}
+
+// The box behind a block of HUD text, drawn after the text and slid under
+// it (destination-over), so it can fit whatever the text came to. Pixel
+// style: a bevelled slab; classic: a faint plate.
+function hudPanel(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-over';
+  x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
+  if (VIEW.pixel) {
+    ctx.fillStyle = THEME.box;
+    ctx.fillRect(x + 3, y + 3, w - 6, h - 6);
+    ctx.fillStyle = '#ffffff14';
+    ctx.fillRect(x, y, w - 3, 3);
+    ctx.fillRect(x, y, 3, h - 3);
+    ctx.fillStyle = '#00000080';
+    ctx.fillRect(x + 3, y + h - 3, w - 3, 3);
+    ctx.fillRect(x + w - 3, y + 3, 3, h - 3);
+    ctx.fillStyle = THEME.boxHead;
+    ctx.fillRect(x, y, w, h);
+  } else {
+    ctx.fillStyle = '#ffffff08';
+    ctx.fillRect(x, y, w, h);
   }
   ctx.restore();
 }

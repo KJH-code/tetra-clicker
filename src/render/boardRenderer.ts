@@ -2,6 +2,7 @@ import { WIDTH, HEIGHT, TOP_VISIBLE_ROW, occupiedCells, type Grid, type Placemen
 import { cellsOf, pieceFromId, type Piece } from '../sim/pieces';
 import { GOLD, PIECE_COLORS, THEME, VIEW, WRATH_FILL, WRATH_RIM, font } from './theme';
 import type { Fx } from './fx';
+import { paintBlock } from './icons';
 
 // Two buffer rows are drawn above the visible twenty, dimmed, so a piece
 // kicked above the ceiling is still seen rather than vanishing.
@@ -143,18 +144,13 @@ export class BoardRenderer {
   private paintCell(px: number, py: number, c: number, color: string, alpha: number, glow: boolean, piece: Piece | null): void {
     const { ctx } = this;
     ctx.save();
-    ctx.globalAlpha = alpha;
-    if (glow) {
+    // A pixel block is its own bevel and never glows: a blur would soften it.
+    if (glow && !VIEW.pixel) {
       ctx.shadowColor = color;
       ctx.shadowBlur = c * 0.6;
     }
-    ctx.fillStyle = color;
-    ctx.fillRect(px + 1, py + 1, c - 2, c - 2);
+    paintBlock(ctx, VIEW.pixel ? px : px + 1, VIEW.pixel ? py : py + 1, VIEW.pixel ? c : c - 2, color, alpha);
     ctx.shadowBlur = 0;
-    // Inner highlight gives the block a lit edge without a texture.
-    ctx.fillStyle = '#ffffff';
-    ctx.globalAlpha = alpha * 0.25;
-    ctx.fillRect(px + 1, py + 1, c - 2, Math.max(1, c * 0.18));
     if (piece && VIEW.patterns) drawPattern(ctx, piece, px + 1, py + 1, c - 2, alpha);
     if (VIEW.highContrast) {
       ctx.globalAlpha = alpha;
@@ -171,8 +167,20 @@ export class BoardRenderer {
     ctx.save();
     ctx.strokeStyle = color;
     ctx.globalAlpha = 0.5;
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(this.cellX(x) + 2.5, this.cellY(y) + 2.5, c - 5, c - 5);
+    if (VIEW.pixel) {
+      // Hollow, square, two pixels thick: a block's outline in its colour.
+      const px = Math.round(this.cellX(x));
+      const py = Math.round(this.cellY(y));
+      const s = Math.round(c);
+      ctx.fillStyle = color;
+      ctx.fillRect(px + 2, py + 2, s - 4, 2);
+      ctx.fillRect(px + 2, py + s - 4, s - 4, 2);
+      ctx.fillRect(px + 2, py + 4, 2, s - 8);
+      ctx.fillRect(px + s - 4, py + 4, 2, s - 8);
+    } else {
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(this.cellX(x) + 2.5, this.cellY(y) + 2.5, c - 5, c - 5);
+    }
     ctx.restore();
   }
 
@@ -230,10 +238,14 @@ export class BoardRenderer {
     ctx.save();
     ctx.globalAlpha = alpha;
     const color = gold ? (wrath ? WRATH_FILL : GOLD) : PIECE_COLORS[piece];
-    ctx.fillStyle = color;
-    ctx.shadowColor = gold && wrath ? WRATH_RIM : color;
-    ctx.shadowBlur = c * (gold ? 1.2 : 0.5);
-    for (const [x, y] of cells) ctx.fillRect(ox + (x - minX) * c + 1, oy + (y - minY) * c + 1, c - 2, c - 2);
+    if (VIEW.pixel) {
+      for (const [x, y] of cells) paintBlock(ctx, ox + (x - minX) * c, oy + (y - minY) * c, c, color);
+    } else {
+      ctx.fillStyle = color;
+      ctx.shadowColor = gold && wrath ? WRATH_RIM : color;
+      ctx.shadowBlur = c * (gold ? 1.2 : 0.5);
+      for (const [x, y] of cells) ctx.fillRect(ox + (x - minX) * c + 1, oy + (y - minY) * c + 1, c - 2, c - 2);
+    }
     ctx.restore();
     if (VIEW.patterns) for (const [x, y] of cells) drawPattern(ctx, piece, ox + (x - minX) * c + 1, oy + (y - minY) * c + 1, c - 2, alpha);
     if (gold) for (const [x, y] of cells) this.drawGoldEdge(ox + (x - minX) * c + 1, oy + (y - minY) * c + 1, c - 2, wrath);

@@ -62,6 +62,8 @@ const SPECS: Spec[] = [
     trigger: { on: 'pc', buff: 'syn_helper' } },
   { kind: 'reward', name: 'HELPER + INVADER: the INVADER bot shares combo pay (×1.25)', effects: [income('invader', FIXED_REWARD)] },
   { kind: 'cross', name: 'INVADER + RIVAL: +1% each per copy of the other', effects: cross('invader', 'rival') },
+  { kind: 'cross', name: 'RIVAL + MASTER: +1% each per copy of the other', effects: cross('rival', 'master') },
+  { kind: 'cross', name: 'MASTER + GRANDMASTER: +1% each per copy of the other', effects: cross('master', 'grandmaster') },
 ];
 
 export const SYNERGIES: SynergyDef[] = SPECS.map((s, i) => {
