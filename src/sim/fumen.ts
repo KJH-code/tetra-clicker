@@ -28,3 +28,21 @@ export function decodeBuild(fumen: string): BuildStage[] {
     return stage;
   });
 }
+
+// A build drawn as text pictures (src/data/openers.ts): rows top to bottom
+// joined by '/', the last row on the floor.
+export function pictureStages(pictures: readonly string[]): BuildStage[] {
+  return pictures.map((picture) => {
+    const rows = picture.split('/');
+    const stage: BuildStage = new Array<StageCell>(WIDTH * HEIGHT).fill(null);
+    rows.forEach((row, i) => {
+      const y = HEIGHT - rows.length + i;
+      for (let x = 0; x < WIDTH; x++) {
+        const ch = row[x];
+        if (!ch || ch === '_') continue;
+        stage[y * WIDTH + x] = (PIECES as readonly string[]).includes(ch) ? (ch as Piece) : 'X';
+      }
+    });
+    return stage;
+  });
+}

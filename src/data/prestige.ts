@@ -1,7 +1,7 @@
 import type { Condition, Effect } from '../sim/effects';
 import { SYNERGIES } from './synergies';
 import { buildingById } from './buildings';
-import { OPENERS } from './openers';
+import { OPENERS, OPENER_BUILD_BONUS_PCT } from './openers';
 
 // Prestige: CROWNs from risk-weighted Lines, spent between runs.
 //
@@ -131,7 +131,13 @@ export const PRESTIGE_UPGRADES: PrestigeDef[] = [
   })),
   // Named builds for the OPENER bot, one step each, two crowns dearer each
   // time (src/data/openers.ts; empty until their fumens are in).
-  ...OPENERS.map((o, i): PrestigeDef => ({ id: `opener_${i + 1}`, branch: 'opener', name: `OPENER BUILD: ${o.name}`, price: 2 * (i + 1), effects: [] })),
+  // Each also pays the OPENER bot 25% more: a build's spins and its one PC
+  // every few bags earn less a piece than the DPC loop it replaces, and
+  // the bonus keeps every step a gain (tests/slow/tech-openers.test.ts).
+  ...OPENERS.map((o, i): PrestigeDef => ({
+    id: `opener_${i + 1}`, branch: 'opener', name: `OPENER BUILD: ${o.name}`, price: 2 * (i + 1),
+    effects: [{ target: 'income', filter: ['building:opener'], op: 'add_pct', value: OPENER_BUILD_BONUS_PCT }],
+  })),
 ];
 
 export const prestigeById = (id: string): PrestigeDef | undefined => PRESTIGE_UPGRADES.find((u) => u.id === id);

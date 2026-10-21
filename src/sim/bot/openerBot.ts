@@ -2,9 +2,9 @@ import type { Game } from '../game';
 import type { BotChoice, BotPolicy } from './policy';
 import { solvePc, moveFor, type PcStep } from './cc/pcf';
 import { ccWasmBot, stackHeight } from './ccWasm';
-import { PC_RECOVER } from './pcBot';
+import { PC_RECOVER, PC_SETUP_STAGES } from './pcBot';
 import { TSPIN, COMBO_BUILD, COMBO_CUT } from './techBots';
-import { followBuild } from './buildFollower';
+import { planBuild } from './buildFollower';
 import type { BuildStage } from '../fumen';
 
 // OPENER: a DPC loop found by search rather than from a book. From an empty
@@ -27,6 +27,7 @@ const COMBO_BUILD_TO = 5;
 
 export function openerBot(builds: readonly BuildStage[][] = [], after: 'tsd' | 'combo' = 'tsd'): BotPolicy {
   const plans = new WeakMap<Game, PcStep[]>();
+  const stagePlans = new WeakMap<Game, BotChoice[]>();
   const state = new WeakMap<Game, { phase: Phase; filled: number; failed: string; cutting: boolean }>();
   const tsd = ccWasmBot({ ...TSPIN, forbid: [...(TSPIN.forbid ?? []), 'clear1', 'clear2', 'clear3', 'clear4', 'mini1', 'mini2'], nodes: 10_000 });
   const recover = ccWasmBot({ weights: PC_RECOVER, nodes: 3_000 });
@@ -57,7 +58,13 @@ export function openerBot(builds: readonly BuildStage[][] = [], after: 'tsd' | '
     const hold = game.hold;
     const seq = hold ? [hold, active.piece, ...game.preview(PC_PREVIEW - 2)] : [active.piece, ...game.preview(PC_PREVIEW - 1)];
     const found = solvePc(game.grid, seq, empty ? 4 : PC_FROM_RESIDUE, empty ? 400_000 : 80_000);
-    if (!found || found.length === 0) { st.failed = key; return null; }
+    if (!found || found.length === 0) {
+      st.failed = key;
+      // No PC in sight from empty: a known setup the queue can lay, if any.
+      const setup = empty ? planBuild(game, PC_SETUP_STAGES) : null;
+      if (setup) { stagePlans.set(game, setup); return stagePlans.get(game)!.shift()!; }
+      return null;
+    }
     plans.set(game, found);
     return follow(game, found);
   };
@@ -72,9 +79,23 @@ export function openerBot(builds: readonly BuildStage[][] = [], after: 'tsd' | '
       const cleared = filled < st.filled;
       st.filled = filled;
       // A researched build the queue fits comes first.
-      for (const b of builds) {
-        const c = followBuild(game, b);
-        if (c) { plans.set(game, []); return c; }
+      // A researched build comes first: a stage under way plays on, and a
+      // new one starts when the board is its leftovers and the queue can
+      // finish it. Whatever the last stage leaves is finished into a PC (or
+      // dug out) before the loop starts again.
+      let staged = stagePlans.get(game);
+      if (!staged || staged.length === 0) {
+        staged = undefined;
+        for (const b of builds) {
+          const p = planBuild(game, b);
+          if (p) { staged = p; stagePlans.set(game, p); break; }
+        }
+      }
+      if (staged && staged.length > 0) {
+        const step = staged.shift()!;
+        plans.set(game, []);
+        st.phase = 'finish';
+        return step;
       }
       const plan = plans.get(game);
       if (plan && plan.length > 0) {

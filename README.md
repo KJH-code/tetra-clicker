@@ -610,11 +610,48 @@ The last three reach into the manual board, from the moment one is bought
 
 DOWNSTACK and 4-WIDE play on boards with rules of their own (`BoardMode`
 in `src/sim/game.ts`: its own garbage, walls), kept in the board's snapshot
-so the worker's copy plays the same game. OPENER's named builds (TEAL,
-산악 2호, 신DT, Sarcell, SDPC, GA spin, Eternal Return …) are a prestige
-chain, one step a build, once their fumen diagrams are in
-(`src/data/openers.ts`, decoded with tetris-fumen); a researched build the
-queue fits is played ahead of the search.
+so the worker's copy plays the same game.
+
+OPENER's named builds are the OPENER prestige chain, one build a step, 2,
+4, 6 … 22 crowns (`src/data/openers.ts`). Eleven, from pensil.wiki: every
+board picture on each build's page, read by script, its bags and its PC
+solutions alike (a lowercase spin cell counts as that piece, X is the
+leftovers of the bags before). A stage starts only on a board that is
+exactly its leftovers, and only when the visible queue and the hold can lay
+all of it; the moves are worked out on a copy of the game, clears and all
+(`planBuild` in `src/sim/bot/buildFollower.ts`), so the bot never walks into
+a bag it cannot finish. When the build runs out its leftovers are solved
+into a PC and the DPC loop goes on.
+
+Measured alone (3 seeds × 600 pieces, the loop alone 2.016 Lines a piece),
+cheapest first:
+
+| step | build | Lines / piece |
+|---|---|---|
+| 1 | TEAL | 1.648 |
+| 2 | GUARDIAN ANGEL SPIN | 1.794 |
+| 3 | OMNISPIN | 1.863 |
+| 4 | SARCELLE | 1.878 |
+| 5 | WRENCH PC | 1.978 |
+| 6 | SDPC | 1.978 |
+| 7 | HUMMINGBIRD | 1.996 |
+| 8 | MOUNTAINOUS STACKING 2 | 2.016 |
+| 9 | LJ SWITCH | 2.02 |
+| 10 | TABLE FLIP V2 | 2.03 |
+| 11 | JIGSAW | 2.118 |
+
+A build's spins and its one PC every few bags earn less a piece than the
+loop's PC every ten pieces (a PC is 10 on the table), so each step also pays
+OPENER +25% (summed); `tests/slow/tech-openers.test.ts` holds every step to
+a gain over the one before.
+
+PERFECT and OPENER also know 79 first-PC setups from
+[PC INFO KOREA](https://sites.google.com/view/pcinfokorea/) (round 1:
+basic, intermediate, advanced and QB pages; `src/data/pcSetups.ts`), read
+from its images by their fumen colours. When the solver finds no PC from an
+empty board, a setup the queue can lay is laid and solved from there. Each
+was checked to finish into a PC; 45 of the pages' 191 images are hosted
+where they could not be fetched, so those setups are not in yet.
 
 T-SPIN, ALL-SPIN, COMBO and B2B are [Cold Clear](https://github.com/MinusKelvin/cold-clear)
 itself: the Rust engine in `engine/`, built to a 150 KB WebAssembly module,

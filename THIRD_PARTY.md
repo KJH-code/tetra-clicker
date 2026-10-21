@@ -60,6 +60,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Build and setup diagrams
+
+Board diagrams, transcribed into `src/data/openers.ts` and
+`src/data/pcSetups.ts` (shapes only; no text is reproduced):
+
+- **pensil.wiki** — https://pensil.wiki: the pages for TeaL, Guardian Angel
+  Spin, 허밍버드 (Hummingbird), Jigsaw, LJ Switch, Table Flip v2, 렌치PC (Wrench
+  PC), 옴니스핀 (Omnispin), 산악쌓기 2호, SDPC and Sarcelle. Each build
+  credits its own authors on its page (e.g. TeaL: COpener Gaming; Guardian
+  Angel Spin: ChairStair and ReallyNotSomeone; LJ Switch: Pulsar; Wrench PC:
+  Unongmilk; Omnispin: Auri and ReallyNotSomeone; Sarcelle: Fern).
+- **PC INFO KOREA** — https://sites.google.com/view/pcinfokorea/: the round-1
+  perfect-clear setups (basic, intermediate, advanced, QB).
+
 ## Fonts
 
 All three are bundled from npm and served with the page, under the SIL Open Font

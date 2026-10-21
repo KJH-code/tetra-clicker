@@ -6,7 +6,7 @@ import { pcBot } from './pcBot';
 import { ccWasmBot, CC_DEFAULT } from './ccWasm';
 import { openerBot } from './openerBot';
 import { OPENERS } from '../../data/openers';
-import { decodeBuild } from '../fumen';
+import { pictureStages } from '../fumen';
 import type { Game, LockResult } from '../game';
 import { cloneGrid, type Grid, type Placement } from '../board';
 import { replay } from './cc/movegen';
@@ -47,7 +47,7 @@ export function policyFor(skill: string): BotPolicy | undefined {
   if (base !== 'opener' || !list) return undefined;
   let p = variants.get(skill);
   if (!p) {
-    const builds = list.split(',').map((id) => OPENERS.find((o) => o.id === id)).filter((o) => o !== undefined).map((o) => decodeBuild(o.fumen));
+    const builds = list.split(',').map((id) => OPENERS.find((o) => o.id === id)).filter((o) => o !== undefined).map((o) => pictureStages(o.stages));
     p = openerBot(builds);
     variants.set(skill, p);
   }
