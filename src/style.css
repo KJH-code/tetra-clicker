@@ -298,6 +298,7 @@ canvas { display: block; image-rendering: pixelated; }
   color: var(--zone); border-bottom: 1px solid var(--line);
 }
 .settings > h2:first-child { margin-top: 0; font-size: 20px; letter-spacing: 0.1em; color: var(--text); border-bottom-color: var(--zone); }
+.settings .version { text-align: center; font-size: 11px; color: var(--faint); margin-top: 4px; }
 .settings .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; flex-wrap: wrap; }
 .settings:not(.ascend):not(.achievements) { max-height: 92vh; overflow-y: auto; }
 

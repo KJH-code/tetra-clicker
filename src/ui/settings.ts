@@ -99,7 +99,10 @@ export class SettingsPanel {
     const close = button(t('CLOSE'), () => this.close());
     close.classList.add('primary');
     actions.append(reset, close);
-    box.append(actions);
+    const version = document.createElement('div');
+    version.className = 'version';
+    version.textContent = `TETRA CLICKER v${__APP_VERSION__}`;
+    box.append(actions, version);
     // Keep the scroll position across re-renders (a toggle should not jump to the top).
     const scroll = (this.overlay.firstElementChild as HTMLElement | null)?.scrollTop ?? 0;
     this.overlay.replaceChildren(box);

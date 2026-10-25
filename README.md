@@ -2,10 +2,38 @@
 
 Tetris × idle clicker. Clear lines by hand to earn **Lines**, spend Lines on
 buildings, and each building is a bot that plays its own board and clears
-lines for you. Fifteen buildings, from a bot that only clears singles to a
-rival that trades garbage with your own board.
+lines for you. Seventeen buildings, from a bot that only clears singles to a
+grandmaster stacking at 20G.
 
-Play: https://kjh-code.github.io/tetra-clicker/
+Play: https://kjh-code.github.io/tetra-clicker/ · version 1.0.0 (shown at the
+foot of the settings window)
+
+## What v1 has
+
+- **Your board**: guideline Tetris (SRS, hold, 180°, all-spins, DAS/ARR/SDF
+  and keys of your own), lives with a vault banked at checkpoints, levels
+  that pay more and fall faster up to 20G, garbage from what you buy.
+- **17 buildings**, each a bot with its own board: plain clears, Cold Clear
+  tuned per technique (T-SPIN, ALL-SPIN, COMBO, B2B), a perfect-clear loop, a
+  DPC loop with named opener builds, boards with garbage or walls, three that
+  reach into yours (HELPER, INVADER, RIVAL), and MASTER and GRANDMASTER.
+- **Bots and the hand**: your techniques boost their bots (links), a low
+  stack speeds them, bots level up, some have abilities, H asks them for a
+  hint.
+- **Upgrades**: milestones, manual, technique, rule, golden and wrath
+  pieces, synergies between neighbouring buildings, links.
+- **Lives**: three missions a life, seven kinds of event (rival, invader,
+  helper, bonus round, boss, technique challenge, mystery).
+- **Prestige**: crowns from a run's risk-weighted Lines, a tree of nine
+  chains (production, survival, proportion, mission, event, bots, wrath,
+  opener builds, synergy research); hardcore and challenge runs.
+- **100 achievements**, a stats tab with your last 20 lives, save export
+  and import.
+- **Look**: arcade pixel style or the classic one, board hit effects, a
+  drifting backdrop; English and Korean; colour-blind palette, patterns,
+  less motion, high contrast, text size; touch controls on phones.
+- **Economy simulator** at `/sim.html`, which the building prices are fitted
+  with.
 
 ## Run
 
