@@ -176,7 +176,7 @@ export class SettingsPanel {
     }
     const switches = document.createElement('div');
     switches.className = 'switches';
-    const toggle = (label: string, key: 'patterns' | 'reduceMotion' | 'highContrast' | 'hitEffects'): HTMLElement => {
+    const toggle = (label: string, key: 'patterns' | 'reduceMotion' | 'highContrast' | 'hitEffects' | 'titleScreen'): HTMLElement => {
       const b = document.createElement('button');
       b.className = 'switch';
       b.setAttribute('aria-pressed', String(s[key]));
@@ -187,7 +187,7 @@ export class SettingsPanel {
       b.addEventListener('click', () => { s[key] = !s[key]; this.onChange(s); this.render(); });
       return b;
     };
-    switches.append(toggle(t('HIT EFFECTS'), 'hitEffects'), toggle(t('PATTERNS'), 'patterns'), toggle(t('LESS MOTION'), 'reduceMotion'), toggle(t('HIGH CONTRAST'), 'highContrast'));
+    switches.append(toggle(t('HIT EFFECTS'), 'hitEffects'), toggle(t('PATTERNS'), 'patterns'), toggle(t('LESS MOTION'), 'reduceMotion'), toggle(t('HIGH CONTRAST'), 'highContrast'), toggle(t('TITLE SCREEN'), 'titleScreen'));
     const style = document.createElement('div');
     style.className = 'seg';
     for (const [value, name] of [['pixel', t('PIXEL')], ['classic', t('CLASSIC')]] as const) {

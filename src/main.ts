@@ -49,10 +49,13 @@ import { BOT_LINKS, linkBuffId } from './data/botlinks';
 import engineUrl from './engine/cold-clear.wasm?url';
 import { BotPrefetch } from './engine/botPrefetch';
 import { resolveLanguage, setLanguage, t } from './ui/i18n';
+import { TitleScreen } from './ui/title';
 
+// The title screen covers the loading: it needs nothing the engine brings.
+const title = new TitleScreen(document.body);
 // The technique bots think with Cold Clear compiled to wasm. Browsers only
 // compile a module this size asynchronously, so it loads before anything plays.
-installEngine(await loadEngine());
+installEngine(await loadEngine((k) => title.progress(k * 0.9)));
 // Board text uses the page's fonts; wait for them (a moment at most) so the
 // first frames do not draw in a fallback.
 await Promise.race([
@@ -61,10 +64,28 @@ await Promise.race([
   new Promise((r) => setTimeout(r, 1500)),
 ]);
 
-async function loadEngine(): Promise<WebAssembly.Instance> {
+async function loadEngine(onProgress: (k: number) => void): Promise<WebAssembly.Instance> {
   const response = await fetch(engineUrl);
   // A host that serves .wasm with the wrong type breaks streaming; bytes always work.
-  const bytes = await response.arrayBuffer();
+  // Read in chunks so the title's loading bar follows the download.
+  const total = Number(response.headers.get('content-length')) || 0;
+  const reader = response.body?.getReader();
+  let bytes: ArrayBuffer;
+  if (reader && total > 0) {
+    const buf = new Uint8Array(total);
+    let got = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done || !value) break;
+      buf.set(value.subarray(0, Math.max(0, total - got)), got);
+      got += value.length;
+      onProgress(Math.min(1, got / total));
+    }
+    bytes = buf.buffer.slice(0, Math.min(got, total));
+  } else {
+    bytes = await response.arrayBuffer();
+  }
+  onProgress(1);
   return (await WebAssembly.instantiate(bytes, {})).instance;
 }
 
@@ -332,6 +353,7 @@ function mergeSettings(s: Partial<HandlingSettings> | undefined): HandlingSettin
     milestone: s.milestone ?? -1,
     uiScale: s.uiScale ?? d.uiScale, highContrast: s.highContrast ?? d.highContrast, backdrop: s.backdrop ?? d.backdrop,
     style: s.style ?? d.style,
+    titleScreen: s.titleScreen ?? d.titleScreen,
   };
 }
 
@@ -809,3 +831,11 @@ window.setInterval(() => { if (document.hidden) tick(); }, 1000);
 // Dev server only: lets a browser script stage a clear or a garbage rise
 // for screenshots without playing one out.
 if (import.meta.env.DEV) Object.assign(window, { tetra: { world, handleEvent } });
+
+// Everything is up: the title asks for a key (or steps aside at once when
+// turned off). Its key is the gesture that lets audio start.
+title.ready({ prompt: window.matchMedia('(pointer: coarse)').matches ? t('TAP TO START') : t('PRESS ANY KEY'), subtitle: t('TETRIS × IDLE CLICKER') }, {
+  auto: !settings.titleScreen,
+  reduceMotion: settings.reduceMotion,
+  onGo: () => { sound.unlock(); sound.play('start'); },
+});

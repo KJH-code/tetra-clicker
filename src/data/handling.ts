@@ -26,6 +26,8 @@ export interface HandlingSettings {
   highContrast: boolean;
   // PIXEL: blocky arcade frames, a bitmap font and bevelled blocks; CLASSIC: the earlier smooth look.
   style: 'pixel' | 'classic';
+  // The arcade title screen on each visit (off: it only shows while loading).
+  titleScreen: boolean;
 }
 
 export const TUTORIAL_OFF = -1;
@@ -87,6 +89,7 @@ export const DEFAULT_HANDLING: HandlingSettings = {
   uiScale: 100,
   highContrast: false,
   style: 'pixel',
+  titleScreen: true,
 };
 
 export const ACTION_LABELS: Record<keyof KeyBindings, string> = {

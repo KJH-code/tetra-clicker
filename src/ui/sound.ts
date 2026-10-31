@@ -3,7 +3,7 @@
 export type Cue =
   | 'lock' | 'clear1' | 'clear2' | 'clear3' | 'clear4' | 'tspin' | 'pc'
   | 'levelUp' | 'checkpoint' | 'topOut' | 'golden' | 'wrath' | 'achievement' | 'buy'
-  | 'cancel' | 'rise';
+  | 'cancel' | 'rise' | 'start';
 
 interface Note {
   freq: number;
@@ -39,6 +39,8 @@ const CUES: Record<Cue, Note[]> = {
   // Attack eating queued garbage: a bright crack. Garbage rising: a dull shove.
   cancel: [{ freq: 1400, to: 500, at: 0, dur: 0.09, type: 'square', gain: 0.3 }, { freq: 2100, to: 900, at: 0.03, dur: 0.08, type: 'triangle', gain: 0.25 }],
   rise: [{ freq: 90, to: 60, at: 0, dur: 0.18, type: 'sawtooth', gain: 0.45 }, { freq: 140, to: 80, at: 0, dur: 0.12, type: 'square', gain: 0.2 }],
+  // The title screen dismissed: a short square-wave fanfare, up and resolve.
+  start: [...arp([523.25, 659.25, 783.99, 1046.5], 0.07, 0.1, 'square', 0.45), { freq: 1567.98, at: 0.3, dur: 0.32, type: 'square', gain: 0.45 }, { freq: 783.99, at: 0.3, dur: 0.32, type: 'triangle', gain: 0.4 }],
   buy: [{ freq: 660, at: 0, dur: 0.06, type: 'square', gain: 0.3 }, { freq: 990, at: 0.05, dur: 0.08, type: 'square', gain: 0.3 }],
 };
 

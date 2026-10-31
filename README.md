@@ -80,6 +80,16 @@ on the ladder (or, once every kind is owned, the cheapest next copy) and how
 long PER SECOND takes to pay for it. Hover and press effects are short and
 stop under LESS MOTION.
 
+Each visit opens on an arcade title screen (`src/ui/title.ts`), always in
+the pixel style: the tube switches on from a bright line, TETRA CLICKER
+resolves out of coarse pixels into bevelled blocks, bot boards play behind
+it (the TypeScript bots, so it runs before the engine), NOW LOADING fills
+with the engine's download, then PRESS ANY KEY (TAP TO START on touch)
+blinks. The key or tap plays a short square-wave jingle, flashes, breaks
+the picture back into pixels and is never passed to the game. TITLE SCREEN
+in settings turns it off (it then only covers the loading); LESS MOTION
+skips its animation.
+
 STYLE (settings, under accessibility) picks the look; both are kept:
 
 - **PIXEL** (the default, `src/pixel.css`): arcade frames. Text is Galmuri,
