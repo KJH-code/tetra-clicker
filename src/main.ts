@@ -266,6 +266,8 @@ function showTab(tab: string): void {
   document.body.dataset['tab'] = tab;
   for (const b of document.querySelectorAll<HTMLButtonElement>('#tabs button')) b.classList.toggle('on', b.dataset['tab'] === tab);
   fitManual();
+  // A hidden shop had no width to fit its names to; now it has.
+  if (tab === 'shop') shop.refresh(true);
 }
 for (const b of document.querySelectorAll<HTMLButtonElement>('#tabs button')) b.addEventListener('click', () => showTab(b.dataset['tab']!));
 showTab('board');
@@ -682,7 +684,7 @@ function render(): void {
   manual.wellBackground = theme.background;
   manual.wellGrid = settings.highContrast ? undefined : theme.grid;
   manual.render(view, manualFx, (ctx) => {
-    drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore, world.economy.boardGarbage * GARBAGE.penaltyPctPerRow, world.economy.stackBonus,
+    const hudBottom = drawRoundHud(ctx, manual, world.round, world.wrath(), buffs, world.nextStartLevel(), world.economy.meta.hardcore, world.economy.boardGarbage * GARBAGE.penaltyPctPerRow, world.economy.stackBonus,
       vaultRoll.value(Number(world.round.vault), performance.now()));
     drawEventHud(ctx, manual, world.lifeEvent, view.next.length);
     // Rows waiting for the board: the rival's and what purchases sent.
@@ -699,7 +701,7 @@ function render(): void {
         }),
         pps: window > 0.5 ? recent / window : 0, seconds,
         combo: Math.max(0, g.combo), b2b: Math.max(0, g.b2b),
-      });
+      }, hudBottom);
     }
   });
   manualPane.classList.toggle('hardcore', world.economy.meta.hardcore);

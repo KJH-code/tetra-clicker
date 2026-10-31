@@ -3,6 +3,12 @@ import { format } from '../sim/num';
 import { UPGRADES, type UpgradeDef } from '../data/upgrades';
 import { t } from './i18n';
 
+// Cheapest first, so the next thing to buy sits at the start of the row;
+// equal prices keep the data's order.
+export function byPrice<T extends { id: string }>(upgrades: readonly T[], price: (id: string) => number): T[] {
+  return upgrades.map((u, i) => ({ u, i, p: price(u.id) })).sort((a, b) => a.p - b.p || a.i - b.i).map((x) => x.u);
+}
+
 // A row of small chips above the buildings: one per upgrade that is unlocked
 // and not yet bought. Text stays short on the chip; the tooltip carries the
 // name, the price and whether it changes the rules of Tetris.
@@ -23,7 +29,7 @@ export class UpgradeChips {
 
   refresh(): void {
     const eco = this.world.economy;
-    const open = UPGRADES.filter((u) => eco.isUpgradeUnlocked(u.id));
+    const open = byPrice(UPGRADES.filter((u) => eco.isUpgradeUnlocked(u.id)), (id) => Number(eco.upgradePrice(id)));
     const key = open.map((u) => u.id).join(',');
     if (key !== this.shownKey) {
       this.shownKey = key;
@@ -54,7 +60,11 @@ export class UpgradeChips {
     const parent = this.tip.offsetParent as HTMLElement | null;
     const a = anchor.getBoundingClientRect();
     const p = parent?.getBoundingClientRect() ?? { left: 0, top: 0 };
-    this.tip.style.left = `${Math.max(8, a.left - p.left - 40)}px`;
+    // Under the chip, kept inside the pane: a long name near its right
+    // edge is nudged left rather than cut off.
+    const room = parent?.clientWidth ?? window.innerWidth;
+    const left = Math.min(a.left - p.left - 40, room - this.tip.offsetWidth - 8);
+    this.tip.style.left = `${Math.max(8, left)}px`;
     this.tip.style.top = `${a.bottom - p.top + 6}px`;
   }
 }

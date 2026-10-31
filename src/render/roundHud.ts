@@ -12,7 +12,7 @@ import { t } from '../ui/i18n';
 // live (waiting, paused).
 export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, round: Round, wrath: number,
   buffs: { label: string; msLeft: number }[] = [], nextStartLevel = 1, hardcore = false, botPenaltyPct = 0, stackBonusPct = 0,
-  vaultShown = Number(round.vault)): void {
+  vaultShown = Number(round.vault)): number {
   const c = r.layout.cell;
   const colW = r.layout.leftCells * c;
   const x0 = 6;
@@ -120,6 +120,7 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
     ctx.fillText(`${Math.ceil(b.msLeft / 1000)}s`, x0, y);
     y += c * 0.65 * s;
   }
+  const bottom = y;
 
   const banner = bannerText(round);
   if (banner) {
@@ -144,6 +145,8 @@ export function drawRoundHud(ctx: CanvasRenderingContext2D, r: BoardRenderer, ro
     }
   }
   ctx.restore();
+  // Where its text ends, so the life panel below keeps clear of it.
+  return bottom;
 }
 
 function bannerText(round: Round): { big: string; small?: string; color: string } | null {
@@ -161,10 +164,15 @@ export interface LifeInfo {
 }
 
 // The bottom of the hold column while a life runs: pace and chains, then the
-// life's three missions with a bar each, a done one ticked green.
-export function drawLifePanel(ctx: CanvasRenderingContext2D, r: BoardRenderer, info: LifeInfo): void {
+// life's three missions with a bar each, a done one ticked green. It stays
+// below `minTop` (where the HUD above it ends), shrinking its text when
+// large text or a short board would have the two run into each other.
+export function drawLifePanel(ctx: CanvasRenderingContext2D, r: BoardRenderer, info: LifeInfo, minTop = 0): void {
   const c = r.layout.cell;
-  const s = VIEW.textScale;
+  const lines = 1 + (info.combo > 0 || info.b2b > 0 ? 1 : 0);
+  const height = (k: number): number => 8 + c * 1.05 * k * info.missions.length + c * 0.55 * k + c * 0.6 * k * lines + 8;
+  const room = r.cellY(HEIGHT) - minTop - 6;
+  const s = VIEW.textScale * Math.min(1, room / height(VIEW.textScale));
   const x0 = 6;
   const w = r.layout.leftCells * c - x0 * 2;
   const fit = (px: number, text: string, weight: number): void => {
@@ -182,7 +190,15 @@ export function drawLifePanel(ctx: CanvasRenderingContext2D, r: BoardRenderer, i
   for (const m of info.missions) {
     const text = m.done ? `✓ ${t(m.label)}` : t(m.label);
     ctx.fillStyle = m.done ? '#39ff14' : THEME.text;
-    fit(c * 0.36, text, 700);
+    // The label stops short of its count on the right.
+    const count = `${m.progress}/${m.goal}`;
+    ctx.font = fontOf(700, c * 0.3 * s);
+    const room = m.done ? w : w - ctx.measureText(count).width - 6;
+    let size = c * 0.36 * s;
+    ctx.font = fontOf(700, size);
+    const tw = ctx.measureText(text).width;
+    if (tw > room) size = Math.max(6, (size * room) / tw);
+    ctx.font = fontOf(700, size);
     ctx.fillText(text, x0, y);
     const by = y + c * 0.5 * s;
     const bh = c * 0.18;
@@ -194,7 +210,7 @@ export function drawLifePanel(ctx: CanvasRenderingContext2D, r: BoardRenderer, i
       ctx.fillStyle = THEME.dim;
       ctx.textAlign = 'right';
       ctx.font = fontOf(700, c * 0.3 * s);
-      ctx.fillText(`${m.progress}/${m.goal}`, x0 + w, y + c * 0.05);
+      ctx.fillText(count, x0 + w, y + c * 0.05);
       ctx.textAlign = 'left';
     }
     y += rowH;
@@ -206,13 +222,13 @@ export function drawLifePanel(ctx: CanvasRenderingContext2D, r: BoardRenderer, i
   ctx.fillText(t('MISSIONS'), x0, y);
   const mm = Math.floor(info.seconds / 60);
   const ss = String(Math.floor(info.seconds % 60)).padStart(2, '0');
-  const lines = [`${info.pps.toFixed(2)} PPS · ${mm}:${ss}`];
-  if (info.combo > 0 || info.b2b > 0) lines.push([info.combo > 0 ? `${info.combo} COMBO` : '', info.b2b > 0 ? `B2B ×${info.b2b}` : ''].filter(Boolean).join(' · '));
-  for (let i = lines.length - 1; i >= 0; i--) {
+  const pace = [`${info.pps.toFixed(2)} PPS · ${mm}:${ss}`];
+  if (lines > 1) pace.push([info.combo > 0 ? `${info.combo} COMBO` : '', info.b2b > 0 ? `B2B ×${info.b2b}` : ''].filter(Boolean).join(' · '));
+  for (let i = pace.length - 1; i >= 0; i--) {
     y -= c * 0.6 * s;
     ctx.fillStyle = i === 0 ? THEME.text : '#ffe600';
-    fit(c * 0.36, lines[i]!, 700);
-    ctx.fillText(lines[i]!, x0, y);
+    fit(c * 0.36, pace[i]!, 700);
+    ctx.fillText(pace[i]!, x0, y);
   }
   hudPanel(ctx, 2, y - 6, w + x0 * 2 - 4, r.cellY(HEIGHT) - y + 2);
   ctx.restore();

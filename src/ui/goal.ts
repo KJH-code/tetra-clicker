@@ -1,5 +1,5 @@
 import type { AchievementDef } from '../data/achievements';
-import type { EffectContext } from '../sim/effects';
+import type { Condition, EffectContext } from '../sim/effects';
 // The shop's NEXT GOAL card: the next building on the ladder (the first one
 // not yet owned), or once every kind is owned the cheapest next copy, and
 // how long PER SECOND takes to pay for it. Plain data in, plain data out.
@@ -19,6 +19,13 @@ export interface Goal {
   progress: number;
   // Seconds until affordable; 0 when it already is, null with no income.
   seconds: number | null;
+}
+
+// Whether a building can be a goal in this run: one a prestige step opens
+// (MASTER, GRANDMASTER) is no goal until that step is bought, however many
+// of the tier below are owned.
+export function inThisRun(unlock: readonly Condition[] | undefined, hasPrestige: (id: string) => boolean): boolean {
+  return (unlock ?? []).every((c) => c.type !== 'prestige' || hasPrestige(c.id));
 }
 
 export function nextGoal(buildings: readonly GoalBuilding[], balance: number, perSecond: number): Goal | null {

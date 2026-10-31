@@ -7,7 +7,8 @@
 // the steps as buttons, inside a "world" layer the player drags and zooms.
 
 export const CARD_W = 150;
-export const CARD_H = 54;
+// Room for a name of three short lines over its price.
+export const CARD_H = 76;
 const FIRST_RADIUS = 210;
 const STEP = 112;
 

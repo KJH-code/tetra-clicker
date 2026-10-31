@@ -3,6 +3,7 @@ import { PRESTIGE_UPGRADES, prestigeRequires, type Branch } from '../data/presti
 import { CHALLENGE, CHALLENGE_RULES, challengePoints } from '../data/challenges';
 import { buildTree, type TreeView } from './prestigeTree';
 import { t } from './i18n';
+import { fitText } from './fit';
 
 // In order round the tree from the long synergy ray at the bottom.
 export const BRANCHES: { id: Branch; title: string; color: string }[] = [
@@ -71,6 +72,8 @@ export class AscendPanel {
     );
     box.append(row);
     this.show(box);
+    // In the page now: names too long for their card (Korean ones mostly) shrink to fit.
+    for (const n of box.querySelectorAll<HTMLElement>('.ptree .pcard .name')) fitText(n, 8, true);
   }
 
   // A hardcore top-out lands the player straight on the prestige shop.

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { durationParts, nextGoal, type GoalBuilding } from '../src/ui/goal';
+import { durationParts, inThisRun, nextGoal, type GoalBuilding } from '../src/ui/goal';
+import { BUILDINGS } from '../src/data/buildings';
 
 const b = (id: string, price: number, owned: number, unlocked = true): GoalBuilding => ({ id, name: id.toUpperCase(), price, owned, unlocked });
 
@@ -49,5 +50,14 @@ describe('achievements near done', () => {
     const near = nearAchievements(defs, new Set(['e']), ctx, 2);
     expect(near.map((a) => a.id)).toEqual(['b', 'a']);
     expect(near[0]).toMatchObject({ value: 7, goal: 10 });
+  });
+});
+
+describe('goals within the run', () => {
+  test('a building a prestige step opens is no goal until that step is bought', () => {
+    const master = BUILDINGS.find((b) => b.id === 'master')!;
+    expect(inThisRun(master.unlock, () => false)).toBe(false);
+    expect(inThisRun(master.unlock, (id) => id === 'bots_2')).toBe(true);
+    expect(inThisRun(BUILDINGS.find((b) => b.id === 'rival')!.unlock, () => false)).toBe(true);
   });
 });

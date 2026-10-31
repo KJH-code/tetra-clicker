@@ -7,7 +7,8 @@ import { t } from './i18n';
 import { buildingColor } from '../render/theme';
 import { drawBuildingIcon } from '../render/icons';
 import { Roller } from '../render/roll';
-import { durationParts, nextGoal, nearAchievements } from './goal';
+import { fitText } from './fit';
+import { durationParts, inThisRun, nextGoal, nearAchievements } from './goal';
 import { buildingTier, TIER_STEPS } from '../data/tiers';
 import { GARBAGE } from '../data/garbage';
 
@@ -114,13 +115,19 @@ export class Shop {
   }
 
   refresh(force = false): void {
-    // Icons follow the palette and the style, which only change on a forced refresh.
-    if (force) for (const [id, ui] of this.buttons) drawBuildingIcon(ui.icon, id);
+    // Icons follow the palette and the style, which only change on a forced refresh;
+    // so does the room a name has, so names are fitted then too.
+    if (force) fitText(this.balanceEl, 18);
+    if (force) for (const [id, ui] of this.buttons) {
+      drawBuildingIcon(ui.icon, id);
+      fitText(ui.stars.parentElement!, 9);
+    }
     const balance = Number(this.world.economy.balance);
     // The figure rolls up to a gain rather than jumping.
     const shown = this.roll.value(balance, performance.now());
     if (force || balance !== this.lastBalance || shown !== balance) {
       this.balanceEl.textContent = format(shown);
+      fitText(this.balanceEl, 18);
       if (balance > this.lastBalance) {
         this.balanceEl.classList.remove('bump');
         void this.balanceEl.offsetWidth; // restart the animation
@@ -128,7 +135,11 @@ export class Shop {
       }
       this.lastBalance = balance;
     }
-    this.incomeEl.textContent = `${format(this.world.incomePerSecond(true))}/s`;
+    const income = `${format(this.world.incomePerSecond(true))}/s`;
+    if (this.incomeEl.textContent !== income) {
+      this.incomeEl.textContent = income;
+      fitText(this.incomeEl, 12);
+    }
     const live = this.world.economy.lifeLive > 0;
     this.band.classList.toggle('idle', !live);
     this.band.textContent = live ? t('LIVE · prices −{n}%', { n: GARBAGE.liveDiscountPct }) : t('READY · purchase garbage ×{n}', { n: GARBAGE.idleGarbageMul });
@@ -216,7 +227,7 @@ export class Shop {
 
   private refreshGoal(balance: number): void {
     const eco = this.world.economy;
-    const goal = nextGoal(BUILDINGS.map((b) => ({
+    const goal = nextGoal(BUILDINGS.filter((b) => inThisRun(b.unlock, (id) => eco.hasPrestige(id))).map((b) => ({
       id: b.id, name: b.name, price: Number(eco.price(b.id)), owned: eco.owned(b.id), unlocked: this.world.isUnlocked(b.id),
     })), balance, toNumber(this.world.incomePerSecond()));
     const card = this.goal.name.parentElement!;
