@@ -50,6 +50,7 @@ import engineUrl from './engine/cold-clear.wasm?url';
 import { BotPrefetch } from './engine/botPrefetch';
 import { resolveLanguage, setLanguage, t } from './ui/i18n';
 import { TitleScreen } from './ui/title';
+import { readBody } from './engine/readBody';
 
 // The title screen covers the loading: it needs nothing the engine brings.
 const title = new TitleScreen(document.body);
@@ -66,26 +67,9 @@ await Promise.race([
 
 async function loadEngine(onProgress: (k: number) => void): Promise<WebAssembly.Instance> {
   const response = await fetch(engineUrl);
-  // A host that serves .wasm with the wrong type breaks streaming; bytes always work.
-  // Read in chunks so the title's loading bar follows the download.
-  const total = Number(response.headers.get('content-length')) || 0;
-  const reader = response.body?.getReader();
-  let bytes: ArrayBuffer;
-  if (reader && total > 0) {
-    const buf = new Uint8Array(total);
-    let got = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done || !value) break;
-      buf.set(value.subarray(0, Math.max(0, total - got)), got);
-      got += value.length;
-      onProgress(Math.min(1, got / total));
-    }
-    bytes = buf.buffer.slice(0, Math.min(got, total));
-  } else {
-    bytes = await response.arrayBuffer();
-  }
-  onProgress(1);
+  // A host that serves .wasm with the wrong type breaks streaming; bytes always
+  // work, read in chunks so the title's loading bar follows the download.
+  const bytes = await readBody(response, onProgress);
   return (await WebAssembly.instantiate(bytes, {})).instance;
 }
 
