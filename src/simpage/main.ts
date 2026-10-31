@@ -1,5 +1,6 @@
 import { simulate, DEFAULT_PLAYER, DEFAULT_TARGET, DEFAULT_HORIZON_SECONDS, type SimParams, type PlayerParams, type TargetParams } from '../sim/simulate';
 import { LADDER, type LadderEntry } from '../data/ladder';
+import { simulateRuns } from '../sim/runs';
 import { IncomeChart } from './chart';
 import { formatDuration, formatLines } from './format';
 import { resolveLanguage, setLanguage, t } from '../ui/i18n';
@@ -27,11 +28,15 @@ interface PageState {
   hardcore: boolean;
   // -1 = luck not modelled; 0..3 = golden pieces at that WRATH stage.
   wrath: number;
+  links: boolean;
+  // Ascensions: how many runs, each at most this many days.
+  runs: number;
+  maxRunDays: number;
 }
 
 function defaults(): PageState {
   return { ladder: structuredClone(LADDER), player: { ...DEFAULT_PLAYER }, target: { ...DEFAULT_TARGET }, horizonDays: DEFAULT_HORIZON_SECONDS / 86_400, upgrades: true,
-    synergies: false, hardcore: false, wrath: -1 };
+    synergies: false, hardcore: false, wrath: -1, links: true, runs: 5, maxRunDays: 400 };
 }
 
 function load(): PageState {
@@ -43,7 +48,8 @@ function load(): PageState {
     // Rows are matched by id so a ladder change in code survives an old save.
     const ladder = d.ladder.map((b) => ({ ...b, ...(s.ladder?.find((x) => x.id === b.id) ?? {}) }));
     return { ladder, player: { ...d.player, ...s.player }, target: { ...d.target, ...s.target }, horizonDays: s.horizonDays ?? d.horizonDays, upgrades: s.upgrades ?? true,
-      synergies: s.synergies ?? false, hardcore: s.hardcore ?? false, wrath: s.wrath ?? -1 };
+      synergies: s.synergies ?? false, hardcore: s.hardcore ?? false, wrath: s.wrath ?? -1,
+      links: s.links ?? true, runs: s.runs ?? 5, maxRunDays: s.maxRunDays ?? 400 };
   } catch {
     return defaults();
   }
@@ -56,6 +62,23 @@ const unlocks = document.getElementById('unlocks') as HTMLTableElement;
 const summary = document.createElement('div');
 summary.className = 'summary';
 unlocks.before(summary);
+// Ascensions, worked out on demand: a few seconds of simulation per run.
+const runsBox = document.createElement('section');
+runsBox.className = 'runs';
+unlocks.after(runsBox);
+
+function runAscensions(): void {
+  runsBox.innerHTML = `<p>${t('Working…')}</p>`;
+  // Let the page paint the note before the long calculation.
+  setTimeout(() => {
+    const reports = simulateRuns({ player: state.player, target: state.target, upgrades: state.upgrades, synergies: state.synergies, hardcore: state.hardcore,
+      links: state.links, ...(state.wrath >= 0 ? { wrath: state.wrath } : {}) }, { runs: state.runs, maxRunSeconds: state.maxRunDays * 86_400 });
+    const at = (s?: number): string => (s === undefined ? '—' : formatDuration(s));
+    const rows = reports.map((r) => `<tr><td>${r.run}</td><td>${formatDuration(r.seconds)}</td><td>+${r.crownsGained} (${r.crownsEarned})</td>` +
+      `<td>${at(r.firstUnlock['rival'])}</td><td>${at(r.firstUnlock['master'])}</td><td>${at(r.firstUnlock['grandmaster'])}</td><td class="bought">${r.bought.length}</td></tr>`);
+    runsBox.innerHTML = `<h2>${t('ASCENSIONS')}</h2><table><tr><th>${t('RUN')}</th><th>${t('LENGTH')}</th><th>CROWN</th><th>RIVAL</th><th>MASTER</th><th>GRANDMASTER</th><th>${t('STEPS BOUGHT')}</th></tr>${rows.join('')}</table>`;
+  }, 30);
+}
 
 function save(): void {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { /* storage may be blocked */ }
@@ -63,7 +86,7 @@ function save(): void {
 
 function run(): void {
   const params: SimParams = { buildings: state.ladder, player: state.player, target: state.target, horizonSeconds: state.horizonDays * 86_400, upgrades: state.upgrades,
-    synergies: state.synergies, hardcore: state.hardcore, ...(state.wrath >= 0 ? { wrath: state.wrath } : {}) };
+    synergies: state.synergies, hardcore: state.hardcore, links: state.links, ...(state.wrath >= 0 ? { wrath: state.wrath } : {}) };
   const result = simulate(params);
   chart.setState({ result, ladder: state.ladder, horizonSeconds: params.horizonSeconds });
   renderUnlocks(result.firstUnlock, result.target);
@@ -175,8 +198,18 @@ function buildControls(): void {
   controls.append(toggle(t('UPGRADES'), () => state.upgrades, (v) => { state.upgrades = v; }));
   controls.append(toggle(t('SYNERGIES'), () => state.synergies, (v) => { state.synergies = v; }));
   controls.append(toggle('HARDCORE', () => state.hardcore, (v) => { state.hardcore = v; }));
+  // The model player clears singles: the SINGLE bot's link is up while they play.
+  controls.append(toggle(t('LINKS'), () => state.links, (v) => { state.links = v; }));
   controls.append(toggle(t('LUCK (GOLDEN PIECES, EVENTS, MISSIONS)'), () => state.wrath >= 0, (v) => { state.wrath = v ? Math.max(0, state.wrath) : -1; buildControls(); }));
   if (state.wrath >= 0) controls.append(slider('WRATH', () => state.wrath, (v) => { state.wrath = v; }, 0, 3, 1));
+  controls.append(h2(t('ASCENSIONS')));
+  controls.append(slider(t('RUNS'), () => state.runs, (v) => { state.runs = v; }, 1, 12, 1));
+  controls.append(slider(t('MAX RUN (D)'), () => state.maxRunDays, (v) => { state.maxRunDays = v; }, 30, 800, 10));
+  const go = document.createElement('button');
+  go.className = 'btn';
+  go.textContent = t('RUN ASCENSIONS');
+  go.addEventListener('click', runAscensions);
+  controls.append(go);
   controls.append(h2(t('LADDER')));
   controls.append(ladderTable());
   const row = document.createElement('div');
@@ -208,7 +241,7 @@ function buildControls(): void {
 // the chosen numbers can be pasted back without translation.
 function exportJson(): string {
   return JSON.stringify({ ladder: state.ladder, player: state.player, target: state.target, upgrades: state.upgrades,
-    synergies: state.synergies, hardcore: state.hardcore, wrath: state.wrath }, null, 2);
+    synergies: state.synergies, hardcore: state.hardcore, wrath: state.wrath, links: state.links }, null, 2);
 }
 
 buildControls();

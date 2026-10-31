@@ -4,7 +4,9 @@ import { tag } from './tags';
 import { ATTACK } from '../data/attackTable';
 import type { LadderEntry } from '../data/ladder';
 import { milestonesFor, MANUAL_UPGRADES, MANUAL_SHARE_UPGRADES, type UpgradeDef } from '../data/upgrades';
-import { upgradeEffects } from '../data/index';
+import { prestigeEffects, upgradeEffects } from '../data/index';
+import { CROWN_EFFECT } from '../data/prestige';
+import { linkUpgradesFor } from '../data/upgrades';
 import { UPGRADES } from '../data/upgrades';
 import { SYNERGIES } from '../data/synergies';
 import { HARDCORE_EFFECTS } from '../data/hardcore';
@@ -12,7 +14,7 @@ import { GARBAGE } from '../data/garbage';
 import { WRATH } from '../data/golden';
 import { averageVault, goldenMeanSeconds, goldenValue, wrathValue, eventValue, eventMeanSeconds, missionMinutesPerLife } from './luck';
 import { levelPay } from '../data/levels';
-import { BOT_LINKS, botLevelFor } from '../data/botlinks';
+import { BOT_LINKS, botLevelFor, linkUpgradeId } from '../data/botlinks';
 
 // Economy simulator: how fast a player climbs the building ladder under a
 // given set of numbers. Bots are not run; each board earns at the same rate
@@ -58,6 +60,15 @@ export interface SimParams {
   wrath?: number;
   // Chance of beating a rival or outlasting an invader (default one in two).
   eventWin?: number;
+  // A later run: the prestige steps bought and the crowns earned so far
+  // (each +1% income), as runs.ts carries them from one ascension to the next.
+  prestige?: readonly string[];
+  crownsEarned?: number;
+  // End the run once this building is first bought (its ascension).
+  stopAfter?: string;
+  // Links: the model player clears singles, so while playing the SINGLE
+  // bot runs at its link multiplier (×2, ×3 with its link upgrade).
+  links?: boolean;
 }
 
 export interface Purchase {
@@ -91,6 +102,8 @@ export interface SimResult {
   manualLines: number;
   // Risk weight multiplier the run's effects give (×3 hardcore).
   riskWeight: number;
+  // When the run ended: its horizon, or the purchase it stops after.
+  seconds: number;
 }
 
 // The ladder prices were fitted to this player, at an average life level of 4.
@@ -147,9 +160,17 @@ export let lastIterations = 0;
 export function simulate(params: SimParams): SimResult {
   const { buildings, player, horizonSeconds, target } = params;
   const synergies = params.synergies ? UPGRADES.filter((u) => u.group === 'synergy' && u.unlock.every((c) => c.type !== 'owned' || buildings.some((b) => b.id === c.id))) : [];
-  const upgrades = [...(params.upgrades === false ? [] : ladderUpgrades(buildings)), ...synergies];
-  const eco = new LadderEconomy(buildings, upgrades, params.hardcore ? HARDCORE_EFFECTS : []);
+  const linkUps = params.links && buildings.some((b) => b.id === 'single') ? linkUpgradesFor(buildings.find((b) => b.id === 'single')!) : [];
+  const upgrades = [...(params.upgrades === false ? [] : ladderUpgrades(buildings)), ...synergies, ...linkUps];
+  // Prestige effects only when a run carries prestige: they cost the plain
+  // ladder's runs time for nothing.
+  const prestigeFx = params.prestige ? [...prestigeEffects(), CROWN_EFFECT] : [];
+  const eco = new LadderEconomy(buildings, upgrades, [...(params.hardcore ? HARDCORE_EFFECTS : []), ...prestigeFx]);
   for (const s of SYNERGIES) eco.meta.prestige.add(s.research);
+  for (const id of params.prestige ?? []) eco.meta.prestige.add(id);
+  eco.meta.crownsEarned = params.crownsEarned ?? 0;
+  const levelCap = Math.round(evaluate(eco.effects, 'bot_level_cap', [], eco, BOT_LINKS.maxLevel));
+  const xpMul = evaluate(eco.effects, 'bot_xp', [], eco, 1);
   eco.meta.hardcore = !!params.hardcore;
   // Hardcore lives start three levels up; the model's average moves with them.
   const levelBonus = params.hardcore ? 3 : 0;
@@ -161,10 +182,16 @@ export function simulate(params: SimParams): SimResult {
   const levelMul = (b: BuildingParams): number => {
     const since = firstUnlock[b.id];
     if (since === undefined) return 1;
-    return 1 + (BOT_LINKS.levelPct / 100) * botLevelFor(Math.max(0, t - since) * b.pps * BOT_TECH_SHARE);
+    return 1 + (BOT_LINKS.levelPct / 100) * botLevelFor(Math.max(0, t - since) * b.pps * BOT_TECH_SHARE * xpMul, levelCap);
+  };
+  // The SINGLE bot's link, up for the share of the day the player plays.
+  const linkMul = (b: BuildingParams): number => {
+    if (!params.links || b.id !== 'single') return 1;
+    const mul = eco.hasUpgrade(linkUpgradeId('single', 1)) ? 3 : 2;
+    return 1 + (mul - 1) * playShare(player, t);
   };
   const botIncome = (): number =>
-    buildings.reduce((sum, b) => sum + (eco.owned(b.id) > 0 ? b.pps * b.linesPerPiece * eco.incomeMultiplier(botTags(b.id)) * levelMul(b) : 0), 0);
+    buildings.reduce((sum, b) => sum + (eco.owned(b.id) > 0 ? b.pps * b.linesPerPiece * eco.incomeMultiplier(botTags(b.id)) * levelMul(b) * linkMul(b) : 0), 0);
   // The model player clears singles, worth two Lines a row; each row also
   // pays the share of bot income, and the level multiplies both.
   const manualIncome = (at: number, bots = botIncome()): number => {
@@ -303,6 +330,7 @@ export function simulate(params: SimParams): SimResult {
         const n = eco.owned(best.id);
         if (n === 1) firstUnlock[best.id] = t;
         purchases.push({ t, id: best.id, kind: 'building', n, price, incomeAfter: botIncome() });
+        if (n === 1 && best.id === params.stopAfter) break;
       } else {
         eco.upgrades.add(best.id);
         purchases.push({ t, id: best.id, kind: 'upgrade', n: 1, price, incomeAfter: botIncome() });
@@ -324,6 +352,7 @@ export function simulate(params: SimParams): SimResult {
     finalBalance: balance,
     finalIncome: income(t),
     manualLines: eco.stats.manualLines,
+    seconds: t,
     riskWeight: multiplierOf(eco, 'risk_weight'),
   };
 }

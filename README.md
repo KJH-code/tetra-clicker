@@ -5,8 +5,9 @@ buildings, and each building is a bot that plays its own board and clears
 lines for you. Seventeen buildings, from a bot that only clears singles to a
 grandmaster stacking at 20G.
 
-Play: https://kjh-code.github.io/tetra-clicker/ · version 1.0.0 (shown at the
-foot of the settings window)
+Play: https://kjh-code.github.io/tetra-clicker/ · version 1.1.0 (shown at the
+foot of the settings window). **Finished**: v1.1.0 is the final release;
+the game is frozen and only bug fixes go in.
 
 ## What v1 has
 
@@ -477,11 +478,16 @@ The bots and the manual board pull on each other (`src/data/botlinks.ts`):
   Cooldown 30 s ÷ (1 + bots owned / 50), 5 s at least; needs a bot and a
   live life. It is worked out on a copy of the board, so asking never
   changes the life.
-- **The bot pane**: boards sit in one even grid; each board's label
-  carries its stars and multiplier, the hold column ends with its level, an
-  XP bar to the next (MAX at the cap) and its PER SECOND, a technique bursts
-  and stamps its name, and clicking a board opens it large with what it
-  owns, earns, its level and XP bar, its link and its ability.
+- **The bot pane**: the eight boards earning the most per second play at
+  full size in one even grid (`src/ui/botPanel.ts`; the pick is checked
+  once a second and an outsider must out-earn the weakest shown board by
+  25% to take its place, so boards don't flicker in and out). Under each
+  board an HTML strip carries its name, level, XP bar to the next (MAX at
+  the cap) and PER SECOND; a link glows as a rim round the board. The rest
+  are small chips below (icon, name, level, PER SECOND) that open the board
+  large on a click, as clicking a shown board does: what it owns, earns,
+  its level and XP bar, its link and its ability. A technique still bursts
+  and stamps its name on the board.
 
 ### Life events
 
@@ -786,6 +792,18 @@ target of `first × ratio^k`, and exports the numbers as JSON in the shape of
 `src/data/ladder.ts`. The ladder file mirrors the fifteen shop buildings for
 tuning; its default player averages level 4, the level the prices were
 fitted to.
+
+LINKS (on by default) counts the model player's link: it clears singles,
+so the SINGLE bot runs ×2 while the player plays (×3 once its LINK ×3
+upgrade is bought, which the buyer may then buy). ASCENSIONS chains
+prestige runs (`src/sim/runs.ts`): each run plays the ladder until the last
+building it can buy is bought (or MAX RUN days pass), ascends with the real
+CROWN formula on a modelled risk (hand Lines × average level × 70% banked ×
+risk weight, the technique score taken as 0.45), then spends its crowns on
+the cheapest prestige step it can, whatever the branch; the BOTS steps
+add MASTER and GRANDMASTER to the ladder. The table lists each run's
+length, crowns gained (and earned in all), when RIVAL, MASTER and
+GRANDMASTER came, and the steps bought.
 
 ## Save
 

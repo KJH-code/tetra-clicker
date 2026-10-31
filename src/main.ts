@@ -50,6 +50,9 @@ import engineUrl from './engine/cold-clear.wasm?url';
 import { BotPrefetch } from './engine/botPrefetch';
 import { resolveLanguage, setLanguage, t } from './ui/i18n';
 import { TitleScreen } from './ui/title';
+import { SHOWN_BOARDS, chooseShown } from './ui/botPanel';
+import { drawBuildingIcon } from './render/icons';
+import { fitText } from './ui/fit';
 import { readBody } from './engine/readBody';
 
 // The title screen covers the loading: it needs nothing the engine brings.
@@ -140,9 +143,22 @@ const coins = new Coins(document.getElementById('coins') as HTMLCanvasElement, (
 const milestoneEl = document.getElementById('milestone')!;
 
 // --- auto boards ----------------------------------------------------------
-interface AutoView { renderer: BoardRenderer; fx: Fx; anim: BotAnimation | null; lastEarned: number }
+// Each board is a card: the canvas, and under it a strip with its name,
+// level and earnings in page text (it stays readable however small the
+// board is drawn). Past eight boards only the top earners are shown full
+// size; the rest wait as chips below.
+interface AutoView {
+  renderer: BoardRenderer; fx: Fx; anim: BotAnimation | null; lastEarned: number;
+  card: HTMLElement; name: HTMLElement; level: HTMLElement; xp: HTMLElement; perSecond: HTMLElement; chip: HTMLElement;
+}
 const autoViews: AutoView[] = [];
 const autoRoot = document.getElementById('auto-boards')!;
+const autoMore = document.createElement('div');
+autoMore.id = 'auto-more';
+autoRoot.after(autoMore);
+let shownBoards: number[] = [];
+let shownAt = -Infinity;
+let stripsAt = -Infinity;
 // A bot board clicked opens large, with its numbers.
 const botZoom = new BotZoom(document.getElementById('bot-overlay')!, world, (open) => input.setActive(!open));
 
@@ -152,14 +168,18 @@ const botZoom = new BotZoom(document.getElementById('bot-overlay')!, world, (ope
 const AUTO_BOARD_COLS = 14; // hold column + the 10-wide well
 const AUTO_BOARD_ROWS = 22; // 20 visible + 2 buffer rows
 const AUTO_GAP = 12;
+const STRIP_H = 40; // the name and level strip under each board
+const MORE_H = 76; // room kept for the chips of boards not shown, until they are measured
 function autoCellSize(): number {
-  const n = world.autoBoards.length;
+  const all = world.autoBoards.length;
+  const n = Math.min(all, SHOWN_BOARDS);
   const pane = autoRoot.parentElement!;
   const w = pane.clientWidth - 2 * AUTO_GAP;
-  const h = pane.clientHeight - 2 * AUTO_GAP;
-  for (let cell = n <= 1 ? 20 : 14; cell > 6; cell--) {
+  const more = all > SHOWN_BOARDS ? Math.max(MORE_H, autoMore.offsetHeight + 10) : 0;
+  const h = pane.clientHeight - 2 * AUTO_GAP - more;
+  for (let cell = n <= 1 ? 20 : 16; cell > 6; cell--) {
     const cols = Math.max(1, Math.floor((w + AUTO_GAP) / (AUTO_BOARD_COLS * cell + AUTO_GAP)));
-    if (Math.ceil(n / cols) * (AUTO_BOARD_ROWS * cell + AUTO_GAP) - AUTO_GAP <= h) return cell;
+    if (Math.ceil(n / cols) * (AUTO_BOARD_ROWS * cell + STRIP_H + AUTO_GAP) - AUTO_GAP <= h) return cell;
   }
   return 6;
 }
@@ -168,20 +188,94 @@ function ensureAutoViews(): void {
   const cell = autoCellSize();
   if (autoViews.length > 0 && autoViews[0]!.renderer.layout.cell !== cell) {
     autoRoot.replaceChildren();
+    autoMore.replaceChildren();
     autoViews.length = 0;
+    shownAt = -Infinity;
   }
-  // One grid, every board the same size, rows filled left to right.
-  const pane = autoRoot.parentElement!;
-  const cols = Math.max(1, Math.min(world.autoBoards.length, Math.floor((pane.clientWidth - AUTO_GAP) / (AUTO_BOARD_COLS * cell + AUTO_GAP))));
-  autoRoot.style.gridTemplateColumns = `repeat(${cols}, max-content)`;
+  let added = false;
   while (autoViews.length < world.autoBoards.length) {
-    const canvas = document.createElement('canvas');
     const index = autoViews.length;
+    const id = world.autoBoards[index]!.buildingId;
+    const color = buildingColor(BUILDINGS.findIndex((b) => b.id === id));
+    const canvas = document.createElement('canvas');
     canvas.title = t('Click to look closer');
     canvas.addEventListener('click', () => botZoom.show(index));
-    autoRoot.append(canvas);
-    autoViews.push({ renderer: new BoardRenderer(canvas, { cell, leftCells: 4, rightCells: 0 }), fx: new Fx(), anim: null, lastEarned: 0 });
+    const card = el('div', 'botcard');
+    card.style.setProperty('--b', color);
+    const name = el('div', 'bot-name');
+    const level = el('span', 'bot-lv');
+    const xp = el('i', '');
+    const bar = el('span', 'bot-xp');
+    bar.append(xp);
+    const perSecond = el('span', 'bot-ps');
+    const meta = el('div', 'bot-meta');
+    meta.append(level, bar, perSecond);
+    const strip = el('div', 'botstrip');
+    strip.append(name, meta);
+    card.append(canvas, strip);
+    const chip = el('button', 'botchip');
+    chip.style.setProperty('--b', color);
+    const icon = document.createElement('canvas');
+    drawBuildingIcon(icon, id);
+    chip.append(icon, el('span', 'chip-text'));
+    chip.addEventListener('click', () => botZoom.show(index));
+    autoViews.push({ renderer: new BoardRenderer(canvas, { cell, leftCells: 4, rightCells: 0 }), fx: new Fx(), anim: null, lastEarned: 0, card, name, level, xp, perSecond, chip });
+    added = true;
   }
+  // Which boards are shown, at most once a second: a pick that held still.
+  const now = performance.now();
+  if (!added && now - shownAt < 1000) return;
+  shownAt = now;
+  const pick = chooseShown(shownBoards, world.autoBoards.map((b) => world.boardIncome(b.buildingId)));
+  const pane = autoRoot.parentElement!;
+  const cols = Math.max(1, Math.min(pick.length, Math.floor((pane.clientWidth - AUTO_GAP) / (AUTO_BOARD_COLS * cell + AUTO_GAP))));
+  autoRoot.style.gridTemplateColumns = `repeat(${cols}, max-content)`;
+  if (pick.join() !== shownBoards.join() || autoRoot.childElementCount !== pick.length) {
+    shownBoards = pick;
+    autoRoot.replaceChildren(...pick.map((i) => autoViews[i]!.card));
+    autoMore.replaceChildren(...autoViews.map((v, i) => (pick.includes(i) ? null : v.chip)).filter((c): c is HTMLElement => c !== null));
+    stripsAt = -Infinity;
+  }
+  autoMore.hidden = autoMore.childElementCount === 0;
+}
+
+// A new run (or an ascension): every card and chip rebuilt from the boards there are.
+function resetAutoViews(): void {
+  autoRoot.replaceChildren();
+  autoMore.replaceChildren();
+  autoViews.length = 0;
+  shownBoards = [];
+  shownAt = -Infinity;
+}
+
+function el(tag: string, className: string): HTMLElement {
+  const e = document.createElement(tag);
+  if (className) e.className = className;
+  return e;
+}
+
+// The strips and chips, a few times a second rather than every frame.
+function refreshStrips(): void {
+  const now = performance.now();
+  if (now - stripsAt < 250) return;
+  stripsAt = now;
+  world.autoBoards.forEach((board, i) => {
+    const v = autoViews[i];
+    if (!v) return;
+    const id = board.buildingId;
+    const lv = world.botLevel(id);
+    const lvText = lv >= world.botLevelCap() ? `LV${lv} MAX` : `LV${lv}`;
+    const ps = `${format(world.boardIncome(id))}/s`;
+    if (shownBoards.includes(i)) {
+      const name = boardLabel(id, buildingById(id)?.name);
+      if (v.name.textContent !== name) { v.name.textContent = name; fitText(v.name, 8); }
+      v.level.textContent = lvText;
+      v.xp.style.width = `${Math.round(world.botLevelProgress(id) * 100)}%`;
+      v.perSecond.textContent = ps;
+    } else {
+      v.chip.lastElementChild!.textContent = `${buildingById(id)?.name ?? id} · ${lvText} · ${ps}`;
+    }
+  });
 }
 
 // --- hint -------------------------------------------------------------------
@@ -300,8 +394,7 @@ const ascendOverlay = document.getElementById('ascend-overlay')!;
 // Built before the shop so a save made on the prestige shop reopens it.
 let shop: Shop;
 const ascendPanel = new AscendPanel(ascendOverlay, world, (open) => input.setActive(!open), () => {
-  autoRoot.replaceChildren();
-  autoViews.length = 0;
+  resetAutoViews();
   shop.refresh(true);
   saveNow();
 });
@@ -481,8 +574,7 @@ function handleEvent(e: WorldEvent): void {
       break;
     case 'hardcoreOver':
       ascendPanel.hardcoreOver(e.crowns);
-      autoRoot.replaceChildren();
-      autoViews.length = 0;
+      resetAutoViews();
       shop.refresh(true);
       break;
     case 'roundEnd': {
@@ -706,8 +798,10 @@ function render(): void {
   });
   manualPane.classList.toggle('hardcore', world.economy.meta.hardcore);
   ensureAutoViews();
+  refreshStrips();
   world.autoBoards.forEach((board, i) => {
     const v = autoViews[i]!;
+    if (!shownBoards.includes(i)) return;
     const def = buildingById(board.buildingId);
     // Starred buildings frame their boards in their own colour.
     const tier = buildingTier(world.economy.owned(board.buildingId));
@@ -715,9 +809,9 @@ function render(): void {
     const hold = { holds: board.game.holds, holdUsed: false, next: [] as never[] };
     if (v.anim) {
       const p = animatedPlacement(v.anim);
-      v.renderer.render({ grid: v.anim.before, active: p, ghostY: null, ...hold }, v.fx, (ctx) => label(ctx, v.renderer, boardLabel(board.buildingId, def?.name), board.buildingId));
+      v.renderer.render({ grid: v.anim.before, active: p, ghostY: null, ...hold }, v.fx, (ctx) => linkRim(ctx, v.renderer, board.buildingId));
     } else {
-      v.renderer.render({ grid: board.game.grid, active: null, ghostY: null, ...hold }, v.fx, (ctx) => label(ctx, v.renderer, boardLabel(board.buildingId, def?.name), board.buildingId));
+      v.renderer.render({ grid: board.game.grid, active: null, ghostY: null, ...hold }, v.fx, (ctx) => linkRim(ctx, v.renderer, board.buildingId));
     }
   });
 }
@@ -737,51 +831,10 @@ function boardLabel(id: string, name: string | undefined): string {
   return `${name ?? id}${tier > 0 ? ` ${'★'.repeat(tier)}` : ''}${syn}${duel}${mul > 1 ? ` ×${+mul.toFixed(2)}` : ''}`;
 }
 
-// The board's name over the buffer rows, after a bar in the building's
-// colour (the same as its shop card).
-function label(ctx: CanvasRenderingContext2D, r: BoardRenderer, text: string, id: string): void {
-  const c = r.layout.cell;
-  const h = Math.max(12, Math.round(c * 1.3));
-  ctx.save();
-  ctx.fillStyle = buildingColor(BUILDINGS.findIndex((b) => b.id === id));
-  ctx.fillRect(r.cellX(0) + 3, 4, 4, h - 4);
-  ctx.fillStyle = THEME.text;
-  // As large as fits across the well, 9-13 px.
-  const room = WIDTH * c - 12;
-  let size = 13;
-  ctx.font = font(800, size);
-  while (size > 9 && ctx.measureText(text).width > room) ctx.font = font(800, --size);
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, r.cellX(0) + 12, 2 + h / 2);
-  // What this building earns now, at the foot of the hold column.
-  const perSecond = `${format(world.boardIncome(id))}/s`;
-  ctx.fillStyle = THEME.dim;
-  let small = Math.max(8, Math.round(c * 0.55));
-  ctx.font = font(700, small);
-  const colW = r.layout.leftCells * c - 6;
-  while (small > 7 && ctx.measureText(perSecond).width > colW) ctx.font = font(700, --small);
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(perSecond, r.cellX(0) - 4, r.height - 4);
-  // Its level and the way to the next, a bar over the per-second figure.
-  const level = world.botLevel(id);
-  const bx = 3;
-  const bw = colW - 3;
-  const bh = Math.max(4, Math.round(c * 0.35));
-  const by = r.height - 6 - small - bh - 2;
-  ctx.fillStyle = THEME.boxHead;
-  ctx.fillRect(bx, by, bw, bh);
-  ctx.fillStyle = buildingColor(BUILDINGS.findIndex((b) => b.id === id));
-  ctx.fillRect(bx + 1, by + 1, Math.round((bw - 2) * world.botLevelProgress(id)), bh - 2);
-  ctx.fillStyle = THEME.text;
-  ctx.textAlign = 'left';
-  ctx.font = font(800, Math.max(8, small));
-  ctx.fillText(level >= world.botLevelCap() ? `LV${level} MAX` : `LV${level}`, bx, by - 2);
-  // A link running: the well's rim lights in the bot's colour and burns down.
+// A link running: the well's rim lights in the bot's colour and burns down.
+function linkRim(ctx: CanvasRenderingContext2D, r: BoardRenderer, id: string): void {
   const left = world.links.active.find((b) => b.id === linkBuffId(id))?.msLeft ?? 0;
   if (left > 0) drawLinkRim(ctx, r, left / world.linkCapMs(id), buildingColor(BUILDINGS.findIndex((b) => b.id === id)));
-  ctx.restore();
 }
 
 // The rim around a bot's well, as much of it as `k` (0..1) of its link is
