@@ -82,13 +82,18 @@ stop under LESS MOTION.
 
 Each visit opens on an arcade title screen (`src/ui/title.ts`), always in
 the pixel style: the tube switches on from a bright line, TETRA CLICKER
-resolves out of coarse pixels into bevelled blocks, bot boards play behind
-it (the TypeScript bots, so it runs before the engine), NOW LOADING fills
-with the engine's download, then PRESS ANY KEY (TAP TO START on touch)
-blinks. The key or tap plays a short square-wave jingle, flashes, breaks
-the picture back into pixels and is never passed to the game. TITLE SCREEN
-in settings turns it off (it then only covers the loading); LESS MOTION
-skips its animation.
+resolves out of coarse pixels into bevelled blocks and lands with a flash, a
+shake and a burst of its blocks, then floats; every five to eight seconds
+the tube glitches (red and blue fringes, the whole picture torn in bands,
+blocks of neon noise, a frame of inverted colour). It is arcade meets cyber:
+a synthwave floor of cyan and magenta lines runs to a glowing horizon, the
+text and board frames are neon, and bot boards play on the floor, their
+clears flashing (the TypeScript bots, so it runs before the engine), NOW
+LOADING fills with the engine's download, then PRESS ANY KEY (TAP TO START
+on touch) blinks. The key or tap plays a short square- wave jingle, flashes,
+breaks the picture back into pixels and is never passed to the game. TITLE
+SCREEN in settings turns it off (it then only covers the loading); LESS
+MOTION skips its animation.
 
 STYLE (settings, under accessibility) picks the look; both are kept:
 

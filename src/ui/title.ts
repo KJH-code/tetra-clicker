@@ -37,7 +37,16 @@ const BLOCKS = [64, 48, 32, 24, 16, 12, 8, 6, 4, 3, 2, 1];
 const BOARD_CELL = 9;
 const BOARD_STEP_MS = 140;
 
-interface BackBoard { game: Game; bot: BotPolicy; x: number; y: number; timer: number }
+interface BackBoard { game: Game; bot: BotPolicy; x: number; y: number; timer: number; flash: { rows: number[]; t: number } | null }
+interface Shard { x: number; y: number; vx: number; vy: number; size: number; color: string; t: number; life: number }
+
+const IMPACT_MS = 380; // the logo landing sharp: flash and shake
+const SHARD_GRAVITY = 1600; // px/s²
+const GLITCH_MS = 170;
+const ROW_FLASH_MS = 220;
+// Cyber neon: cyan and magenta for everything but the logo's piece colours.
+const CYAN = '#00f0ff';
+const MAGENTA = '#ff2ed2';
 
 export interface TitleText { prompt: string; subtitle: string }
 
@@ -58,6 +67,14 @@ export class TitleScreen {
   private resolveDone: (() => void) | null = null;
   readonly done: Promise<void>;
   private raf = 0;
+  private impactAt = -1;
+  private shards: Shard[] = [];
+  // The first glitch just after the logo lands, then every five to eight seconds.
+  private nextGlitch = BOOT_MS * 0.6 + RESOLVE_MS + 450;
+  private glitchAt = -1;
+  // The logo tinted red and blue, for the tube's colour fringes in a glitch.
+  private tintRed = document.createElement('canvas');
+  private tintBlue = document.createElement('canvas');
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement('div');
@@ -76,6 +93,8 @@ export class TitleScreen {
     window.addEventListener('keyup', this.swallow, true);
     this.root.addEventListener('pointerdown', this.onPointer);
     this.raf = requestAnimationFrame(this.frame);
+    // Dev server only: lets a browser script set off a glitch for screenshots.
+    if (import.meta.env.DEV) Object.assign(window, { titleGlitch: () => { this.glitchAt = performance.now(); } });
   }
 
   // 0..1 of the loading done.
@@ -131,6 +150,8 @@ export class TitleScreen {
     this.canvas.style.height = `${h}px`;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.drawLogo(w);
+    this.tint(this.tintRed, '#ff2050');
+    this.tint(this.tintBlue, '#20c0ff');
     this.placeBoards(w, h);
   };
 
@@ -155,6 +176,39 @@ export class TitleScreen {
     });
   }
 
+  private tint(into: HTMLCanvasElement, color: string): void {
+    into.width = this.logo.width;
+    into.height = this.logo.height;
+    const g = into.getContext('2d')!;
+    g.clearRect(0, 0, into.width, into.height);
+    g.drawImage(this.logo, 0, 0);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = color;
+    g.fillRect(0, 0, into.width, into.height);
+  }
+
+  // The logo lands: shards of its blocks burst out from where they sit.
+  private burst(lx: number, ly: number): void {
+    const g = this.logo.getContext('2d')!;
+    const { width, height } = this.logo;
+    const data = g.getImageData(0, 0, width, height).data;
+    for (let i = 0; i < 320; i++) {
+      const x = Math.floor(Math.random() * width);
+      const y = Math.floor(Math.random() * height);
+      const k = (y * width + x) * 4;
+      if (data[k + 3]! < 200) continue;
+      const fromCentre = (x - width / 2) / (width / 2);
+      this.shards.push({
+        x: lx + x, y: ly + y,
+        vx: fromCentre * 260 + (Math.random() * 2 - 1) * 160,
+        vy: -(140 + Math.random() * 380),
+        size: 6 + Math.random() * 9,
+        color: `rgb(${data[k]},${data[k + 1]},${data[k + 2]})`,
+        t: 0, life: 900 + Math.random() * 700,
+      });
+    }
+  }
+
   private placeBoards(w: number, h: number): void {
     const bw = WIDTH * BOARD_CELL;
     const count = Math.max(3, Math.min(7, Math.floor(w / (bw + 40))));
@@ -162,7 +216,7 @@ export class TitleScreen {
     const bots = [singleBot, sizeBot(2), sizeBot(3), sizeBot(4)];
     const kept = this.boards;
     this.boards = Array.from({ length: count }, (_, i) => kept[i] ?? {
-      game: new Game(1000 + i * 77), bot: bots[i % bots.length]!, x: 0, y: 0, timer: (i * BOARD_STEP_MS) / count,
+      game: new Game(1000 + i * 77), bot: bots[i % bots.length]!, x: 0, y: 0, timer: (i * BOARD_STEP_MS) / count, flash: null,
     });
     this.boards.forEach((b, i) => {
       b.x = Math.round(gap + i * (bw + gap));
@@ -180,6 +234,7 @@ export class TitleScreen {
     const ctx = this.ctx;
     ctx.fillStyle = '#050608';
     ctx.fillRect(0, 0, w, h);
+    this.drawGrid(w, h, t);
 
     // The bots play on, a step every so often; a board that tops out starts over.
     for (const b of this.boards) {
@@ -188,9 +243,11 @@ export class TitleScreen {
       b.timer += BOARD_STEP_MS;
       const m = playOne(b.game, b.bot);
       if (!m || m.result.topped) b.game = new Game((b.game.grid.length + now) | 0);
+      else if (m.result.lines > 0 && !this.still) b.flash = { rows: m.result.clearedRows, t: 0 };
     }
+    for (const b of this.boards) if (b.flash && (b.flash.t += dt) > ROW_FLASH_MS) b.flash = null;
     ctx.save();
-    ctx.globalAlpha = 0.28;
+    ctx.globalAlpha = 0.45;
     for (const b of this.boards) this.drawBoard(b);
     ctx.restore();
 
@@ -202,14 +259,35 @@ export class TitleScreen {
     // BLOCKS runs coarse to sharp: in, the index climbs with `resolve`; out, it falls back.
     const sharp = out > 0 ? 1 - out : resolve;
     const level = Math.round(sharp * (BLOCKS.length - 1));
-    const lx = Math.round((w - this.logo.width) / 2);
-    const ly = Math.round(h * 0.26 - this.logo.height / 2 + 40);
+    const baseX = Math.round((w - this.logo.width) / 2);
+    const baseY = Math.round(h * 0.26 - this.logo.height / 2 + 40);
+    // The moment it lands sharp: a flash, a shake and a burst of its blocks.
+    if (resolve >= 1 && this.impactAt < 0 && !this.still) {
+      this.impactAt = now;
+      this.burst(baseX, baseY);
+    }
+    const sinceImpact = this.impactAt < 0 ? Infinity : now - this.impactAt;
+    const shake = sinceImpact < IMPACT_MS ? 10 * (1 - sinceImpact / IMPACT_MS) ** 2 : 0;
+    const sx = shake ? Math.round((Math.random() * 2 - 1) * shake) : 0;
+    const sy = shake ? Math.round((Math.random() * 2 - 1) * shake) : 0;
+    // Settled, it floats a little.
+    const bob = this.still || this.impactAt < 0 ? 0 : Math.round(Math.sin(sinceImpact / 700) * 4);
+    const lx = baseX + sx;
+    const ly = baseY + sy + bob;
+    // Now and then the tube glitches: colour fringes and torn rows.
+    if (!this.still && resolve >= 1 && out === 0 && now >= this.nextGlitch + this.start) {
+      this.glitchAt = now;
+      this.nextGlitch = t + 5000 + Math.random() * 3000;
+    }
+    const glitching = this.glitchAt >= 0 && now - this.glitchAt < GLITCH_MS;
     if (resolve > 0) {
       ctx.save();
       ctx.globalAlpha = Math.min(1, resolve * 3) * (1 - out);
-      this.drawPixelated(lx, ly, BLOCKS[level]!);
+      if (glitching) this.drawGlitch(lx, ly);
+      else this.drawPixelated(lx, ly, BLOCKS[level]!);
       ctx.restore();
     }
+    this.drawShards(dt);
 
     ctx.save();
     ctx.textAlign = 'center';
@@ -217,14 +295,17 @@ export class TitleScreen {
     ctx.font = "700 24px Galmuri11, monospace";
     if (resolve >= 1 && out === 0) {
       if (this.text) {
-        ctx.fillStyle = '#8d93ab';
+        ctx.fillStyle = CYAN;
         ctx.fillText(this.text.subtitle, w / 2, ly + this.logo.height + 44);
         // PRESS ANY KEY, blinking on a half-second beat.
         if (this.still || Math.floor(t / 500) % 2 === 0) {
-          ctx.fillStyle = '#ffe600';
-          ctx.shadowColor = '#000';
-          ctx.shadowOffsetX = ctx.shadowOffsetY = 3;
+          // Split into magenta and cyan behind the yellow, like a misaligned tube.
           ctx.font = "700 36px Galmuri11, monospace";
+          ctx.fillStyle = MAGENTA;
+          ctx.fillText(this.text.prompt, w / 2 - 3, h * 0.62);
+          ctx.fillStyle = CYAN;
+          ctx.fillText(this.text.prompt, w / 2 + 3, h * 0.62);
+          ctx.fillStyle = '#ffe600';
           ctx.fillText(this.text.prompt, w / 2, h * 0.62);
         }
       } else {
@@ -233,14 +314,19 @@ export class TitleScreen {
     }
     // Arcade furniture: credits and the year.
     ctx.font = "400 12px Galmuri11, monospace";
-    ctx.fillStyle = '#5c627a';
+    ctx.fillStyle = '#00f0ff80';
     ctx.textAlign = 'left';
     ctx.fillText('CREDIT 00', 20, 24);
     ctx.textAlign = 'right';
     ctx.fillText(`© 2026 KJH · v${__APP_VERSION__}`, w - 20, 24);
     ctx.restore();
 
+    if (glitching) this.glitchScreen(w, h, now - this.glitchAt === 0 || now - this.glitchAt < 34);
     if (boot < 1) this.drawBoot(w, h, boot);
+    if (sinceImpact < IMPACT_MS * 0.6) {
+      ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - sinceImpact / (IMPACT_MS * 0.6))})`;
+      ctx.fillRect(0, 0, w, h);
+    }
     // Dismissed: a white flash at the start of the way out.
     if (out > 0 && out < 0.25) {
       ctx.fillStyle = `rgba(255,255,255,${0.6 * (1 - out / 0.25)})`;
@@ -273,12 +359,113 @@ export class TitleScreen {
     ctx.imageSmoothingEnabled = true;
   }
 
+  // Red and blue copies pulled apart, and a few rows of the logo torn sideways.
+  private drawGlitch(x: number, y: number): void {
+    const ctx = this.ctx;
+    const d = 10 + Math.round(Math.random() * 12);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha *= 0.7;
+    ctx.drawImage(this.tintRed, x - d, y);
+    ctx.drawImage(this.tintBlue, x + d, y);
+    ctx.restore();
+    const { width, height } = this.logo;
+    let row = 0;
+    while (row < height) {
+      const band = Math.min(height - row, 4 + Math.floor(Math.random() * 18));
+      const shift = Math.random() < 0.35 ? Math.round((Math.random() * 2 - 1) * 24) : 0;
+      ctx.drawImage(this.logo, 0, row, width, band, x + shift, y + row, width, band);
+      row += band;
+    }
+  }
+
+  // The whole picture in a glitch: bands of it torn sideways, blocks of
+  // digital noise, and on its first frame the colours inverted.
+  private glitchScreen(w: number, h: number, first: boolean): void {
+    const ctx = this.ctx;
+    const dpr = window.devicePixelRatio || 1;
+    for (let i = 0; i < 6; i++) {
+      const y = Math.floor(Math.random() * h);
+      const band = 4 + Math.floor(Math.random() * 28);
+      const shift = Math.round((Math.random() * 2 - 1) * 60);
+      ctx.drawImage(this.canvas, 0, y * dpr, w * dpr, band * dpr, shift, y, w, band);
+    }
+    const colors = [CYAN, MAGENTA, '#ffffff', '#ffe600'];
+    for (let i = 0; i < 14; i++) {
+      ctx.fillStyle = colors[i % colors.length]!;
+      ctx.globalAlpha = 0.35 + Math.random() * 0.5;
+      ctx.fillRect(Math.random() * w, Math.random() * h, 8 + Math.random() * 90, 2 + Math.random() * 10);
+    }
+    ctx.globalAlpha = 1;
+    if (first) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'difference';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+    }
+  }
+
+  // A synthwave floor: neon lines running to a vanishing point and rows
+  // sliding toward the viewer, a glowing horizon above the bot boards.
+  private drawGrid(w: number, h: number, t: number): void {
+    const ctx = this.ctx;
+    const horizon = Math.round(h * 0.68);
+    const vx = w / 2;
+    ctx.save();
+    const sky = ctx.createLinearGradient(0, horizon - 120, 0, horizon);
+    sky.addColorStop(0, 'rgba(255,46,210,0)');
+    sky.addColorStop(1, 'rgba(255,46,210,0.22)');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, horizon - 120, w, 120);
+    ctx.lineWidth = 2;
+    // Rows: evenly spaced in depth, so they bunch toward the horizon.
+    const speed = this.still ? 0 : (t / 1400) % 1;
+    for (let i = 0; i < 14; i++) {
+      const z = (i + 1 - speed) / 14;
+      const y = horizon + (h - horizon) * z * z;
+      ctx.strokeStyle = `rgba(0,240,255,${0.12 + 0.5 * z})`;
+      ctx.beginPath();
+      ctx.moveTo(0, Math.round(y) + 0.5);
+      ctx.lineTo(w, Math.round(y) + 0.5);
+      ctx.stroke();
+    }
+    // Columns from the vanishing point out past the screen's edges.
+    for (let i = -12; i <= 12; i++) {
+      ctx.strokeStyle = `rgba(255,46,210,${0.35 - Math.abs(i) * 0.015})`;
+      ctx.beginPath();
+      ctx.moveTo(vx + i * 14, horizon);
+      ctx.lineTo(vx + i * (w / 7), h);
+      ctx.stroke();
+    }
+    ctx.fillStyle = MAGENTA;
+    ctx.fillRect(0, horizon - 1, w, 2);
+    ctx.restore();
+  }
+
+  private drawShards(dt: number): void {
+    if (this.shards.length === 0) return;
+    const ctx = this.ctx;
+    const s = dt / 1000;
+    ctx.save();
+    for (const p of this.shards) {
+      p.t += dt;
+      p.vy += SHARD_GRAVITY * s;
+      p.x += p.vx * s;
+      p.y += p.vy * s;
+      ctx.globalAlpha = Math.max(0, 1 - p.t / p.life);
+      paintBlock(ctx, p.x, p.y, p.size, p.color);
+    }
+    ctx.restore();
+    this.shards = this.shards.filter((p) => p.t < p.life);
+  }
+
   private drawBoard(b: BackBoard): void {
     const ctx = this.ctx;
     const top = HEIGHT - 20;
     ctx.fillStyle = '#0d1018';
     ctx.fillRect(b.x, b.y, WIDTH * BOARD_CELL, 20 * BOARD_CELL);
-    ctx.strokeStyle = '#3a4157';
+    ctx.strokeStyle = this.boards.indexOf(b) % 2 ? CYAN : MAGENTA;
     ctx.lineWidth = 2;
     ctx.strokeRect(b.x - 1, b.y - 1, WIDTH * BOARD_CELL + 2, 20 * BOARD_CELL + 2);
     const g = b.game.grid;
@@ -289,6 +476,14 @@ export class TitleScreen {
         const p = pieceFromId(id);
         paintBlock(ctx, b.x + x * BOARD_CELL, b.y + (y - top) * BOARD_CELL, BOARD_CELL, p ? PIECE_COLORS[p] : '#8d93ab');
       }
+    }
+    // A clear flashes its rows white, as on the real boards.
+    if (b.flash) {
+      ctx.save();
+      ctx.globalAlpha *= 2.5 * (1 - b.flash.t / ROW_FLASH_MS);
+      ctx.fillStyle = '#ffffff';
+      for (const row of b.flash.rows) if (row >= top) ctx.fillRect(b.x, b.y + (row - top) * BOARD_CELL, WIDTH * BOARD_CELL, BOARD_CELL);
+      ctx.restore();
     }
   }
 
@@ -303,7 +498,7 @@ export class TitleScreen {
     const gap = 4;
     const x0 = Math.round(cx - (n * (bw + gap) - gap) / 2);
     for (let i = 0; i < n; i++) {
-      ctx.fillStyle = i < Math.floor(this.loaded * n) ? '#36d6e7' : '#1a1e2a';
+      ctx.fillStyle = i < Math.floor(this.loaded * n) ? (i % 2 ? MAGENTA : CYAN) : '#1a1e2a';
       ctx.fillRect(x0 + i * (bw + gap), Math.round(cy), bw, 14);
     }
   }
